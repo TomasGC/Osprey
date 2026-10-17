@@ -1,0 +1,18 @@
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+    # Composable functions use PascalCase per Compose convention.
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  LongParameterList:
+    active: true
+    # Composable functions legitimately take one parameter per callback/state slot --
+    # that's the standard Compose shape, not a code smell to refactor away.
+    ignoreAnnotated: ['Composable']
+
+style:
+  ReturnCount:
+    active: true
+    max: 4

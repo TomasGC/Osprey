@@ -1,0 +1,13 @@
+name: CD - Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    uses: TomasGC/condor/.github/workflows/kotlin-cd.yml@main
+    secrets: inherit
+    with:
+      app-name: osprey

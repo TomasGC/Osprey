@@ -1,0 +1,24 @@
+name: Push-CI
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'bugfix/**'
+
+concurrency:
+  group: push-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kotlin-pipeline:
+    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@main
+    secrets: inherit
+    with:
+      app-name: osprey
+      unit-tasks: '[":core:test", ":app:testDebugUnitTest"]'
+      integration-mock-tasks: '[":core:integrationMock"]'
+      integration-real-tasks: '[":core:integrationReal"]'
+      # #1 is scaffolding only, no application logic yet -- raise once :core ports real
+      # behavior (#3+).
+      coverage-threshold: 0
