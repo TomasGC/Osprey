@@ -68,6 +68,13 @@ class FakeFileSystemRepository : FileSystemRepository {
         return newNode(parent, name, isDirectory = true)
     }
 
+    override fun deleteEmptyFolder(folder: FileHandle) {
+        val id = folder.id()
+        val hasChildren = nodes.values.any { it.parentId == id }
+        if (hasChildren) throw DirectoryNotEmptyException("folder is not empty")
+        nodes.remove(id)
+    }
+
     override fun readBytes(entry: FileHandle): ByteArray = nodes.getValue(entry.id()).bytes
 
     override fun readTimestamps(entry: FileHandle): FileTimestamps = nodes.getValue(entry.id()).timestamps
