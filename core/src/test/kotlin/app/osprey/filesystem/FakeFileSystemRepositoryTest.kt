@@ -102,6 +102,25 @@ class FakeFileSystemRepositoryTest {
         assertEquals(listOf("TODELETE"), repo.list(repo.root).map { it.name })
     }
 
+    @Test
+    fun `deleteEmptyFolder removes a folder with no children`() {
+        val repo = FakeFileSystemRepository()
+        val folder = repo.addFolder(repo.root, "06")
+
+        repo.deleteEmptyFolder(folder)
+
+        assertEquals(emptyList<FileEntry>(), repo.list(repo.root))
+    }
+
+    @Test(expected = DirectoryNotEmptyException::class)
+    fun `deleteEmptyFolder throws when the folder still has children`() {
+        val repo = FakeFileSystemRepository()
+        val folder = repo.addFolder(repo.root, "06")
+        repo.addFile(folder, "a.jpg")
+
+        repo.deleteEmptyFolder(folder)
+    }
+
     @Test(expected = FileAlreadyExistsException::class)
     fun `createFolder throws when the name already exists as a file`() {
         val repo = FakeFileSystemRepository()

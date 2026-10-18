@@ -35,6 +35,14 @@ interface FileSystemRepository {
      */
     fun createFolder(parent: FileHandle, name: String): FileHandle
 
+    /**
+     * Removes [folder], which must have no children.
+     * Throws [DirectoryNotEmptyException] if it has any — callers that want the POC's
+     * `rmdir()`-then-log-and-continue behavior (e.g. a file appeared after planning) catch it
+     * themselves, exactly as `apply_flatten` does.
+     */
+    fun deleteEmptyFolder(folder: FileHandle)
+
     /** The full contents of [entry], for content hashing. */
     fun readBytes(entry: FileHandle): ByteArray
 
