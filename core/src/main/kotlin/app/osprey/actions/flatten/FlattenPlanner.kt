@@ -1,5 +1,6 @@
 package app.osprey.actions.flatten
 
+import app.osprey.actions.splitStemAndSuffix
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
@@ -104,9 +105,7 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
     }
 
     private fun flatCandidateName(originalName: String, n: Int): String {
-        val dot = originalName.lastIndexOf('.')
-        val stem = if (dot > 0) originalName.substring(0, dot) else originalName
-        val suffix = if (dot > 0) originalName.substring(dot) else ""
+        val (stem, suffix) = splitStemAndSuffix(originalName)
         return "${stem}__flat$n$suffix"
     }
 }
