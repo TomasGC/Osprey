@@ -16,9 +16,9 @@ jobs:
     secrets: inherit
     with:
       app-name: osprey
-      unit-tasks: '[":core:test", ":app:testDebugUnitTest"]'
-      integration-mock-tasks: '[":core:integrationMock"]'
-      integration-real-tasks: '[":core:integrationReal"]'
+      unit-tasks: '[":core:test", ":app:testDebugUnitTest", ":desktop:test"]'
+      integration-mock-tasks: '[":core:integrationMock", ":desktop:integrationMock"]'
+      integration-real-tasks: '[":core:integrationReal", ":desktop:integrationReal"]'
       # #1 is scaffolding only, no application logic yet -- raise once :core ports real
       # behavior (#3+).
       coverage-threshold: 0

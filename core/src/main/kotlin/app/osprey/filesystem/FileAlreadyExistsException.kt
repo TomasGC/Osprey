@@ -7,4 +7,4 @@ package app.osprey.filesystem
  * collisions themselves first via [FileSystemRepository.list], exactly as the Python POC's
  * `plan_*` functions do before calling `rename`/`mkdir`.
  */
-class FileAlreadyExistsException(message: String) : Exception(message)
+class FileAlreadyExistsException(message: String, cause: Throwable? = null) : Exception(message, cause)
