@@ -1,11 +1,10 @@
 package app.osprey.actions.dates
 
-import app.osprey.actions.filenameDateTime
-import app.osprey.actions.splitStemAndSuffix
+import app.osprey.actions.displayName
+import app.osprey.actions.resolveMediaDate
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
-import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
 import app.osprey.media.MediaMetadataReader
 
@@ -23,15 +22,14 @@ class DatesPlanner(
 
     /**
      * Scans `root`'s immediate files — `TODELETE` and other subfolders are never touched, since
-     * they simply aren't files. A file resolves via [MediaMetadataReader.captureDateTime] (EXIF
-     * for images, video-container metadata for videos) first, [filenameDateTime] otherwise; one
-     * that resolves neither way ends up in [DatesPlan.unfixable].
+     * they simply aren't files. Each file's date is resolved via [resolveMediaDate]; one that
+     * resolves neither way ends up in [DatesPlan.unfixable].
      */
     fun plan(root: FileHandle): DatesPlan {
         val fixes = mutableListOf<DatesFix>()
         val unfixable = mutableListOf<FileEntry>()
         for (entry in fs.list(root).filterNot { it.isDirectory }) {
-            val resolved = resolveDate(entry)
+            val resolved = resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)
             if (resolved == null) {
                 unfixable += entry
             } else {
@@ -55,21 +53,5 @@ class DatesPlanner(
         val fixedFromMetadata = plan.fixes.count { it.source != MediaDateSource.FILENAME }
         val fixedFromFilename = plan.fixes.count { it.source == MediaDateSource.FILENAME }
         return fixedFromMetadata to fixedFromFilename
-    }
-
-    private fun resolveDate(entry: FileEntry): MediaDate? =
-        mediaMetadataReader.captureDateTime(entry.handle)
-            ?: filenameFallback(entry.name)
-
-    private fun filenameFallback(name: String): MediaDate? {
-        val stem = splitStemAndSuffix(name).first
-        val dateTime = filenameDateTime(stem) ?: return null
-        return MediaDate(dateTime, MediaDateSource.FILENAME)
-    }
-
-    private fun displayName(source: MediaDateSource): String = when (source) {
-        MediaDateSource.EXIF -> "EXIF"
-        MediaDateSource.VIDEO_METADATA -> "VIDEO-META"
-        MediaDateSource.FILENAME -> "FILENAME"
     }
 }
