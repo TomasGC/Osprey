@@ -1,7 +1,7 @@
 package app.osprey.media
 
 import app.osprey.filesystem.FakeFileSystemRepository
-import java.time.Instant
+import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -21,7 +21,7 @@ class FakeMediaMetadataReaderTest {
         val fs = FakeFileSystemRepository()
         val entry = fs.addFile(fs.root, "photo.jpg")
         val reader = FakeMediaMetadataReader()
-        val date = MediaDate(Instant.parse("2020-06-15T10:30:00Z"), MediaDateSource.EXIF)
+        val date = MediaDate(LocalDateTime.of(2020, 6, 15, 10, 30, 0), MediaDateSource.EXIF)
 
         reader.setCaptureDateTime(entry, date)
 
