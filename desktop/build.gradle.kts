@@ -15,6 +15,8 @@ dependencies {
     implementation(compose.material3)
     implementation(libs.metadata.extractor)
     implementation(libs.json)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.swing)
 
     testImplementation(libs.junit)
 }
