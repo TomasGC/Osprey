@@ -7,7 +7,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private object FakeHandle : FileHandle
+/** Shared no-op [FileHandle] stub, reused by other desktop unit tests that don't touch the filesystem. */
+object FakeHandle : FileHandle
 
 class SimpleActionControllerTest {
 

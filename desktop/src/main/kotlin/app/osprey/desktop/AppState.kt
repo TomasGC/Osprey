@@ -10,17 +10,18 @@ import app.osprey.media.MediaMetadataReader
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Which simple-action tab is showing. Visual Dupes is out of scope here (#12). */
+/** Which tab is showing, same order as the POC's nav list. */
 enum class ActionTab(val label: String) {
     FLATTEN("Flatten"),
     RENAME("Rename"),
     DEDUPE("Dedupe"),
+    VISUAL("Visual Dupes"),
     DATES("Dates"),
     STANDARDIZE("Standardize"),
 }
 
 /** Top-level app state: the sidebar's library/year selection, plus one controller per tab. */
-class AppState(fs: FileSystemRepository, mediaMetadataReader: MediaMetadataReader) {
+class AppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetadataReader) {
 
     var libraryPath by mutableStateOf<Path?>(null)
     var years by mutableStateOf<List<String>>(emptyList())

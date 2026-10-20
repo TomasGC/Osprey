@@ -41,6 +41,10 @@ private fun OspreyContent(state: AppState) {
         Text("Pick a year to get started.")
         return
     }
+    if (state.selectedTab == ActionTab.VISUAL) {
+        VisualDupesScreen(state, yearDir)
+        return
+    }
     val controller = controllerFor(state, state.selectedTab)
     ActionPane(controller.state, { controller.onScan(yearDir) }, { controller.onApply(yearDir) })
 }
@@ -51,4 +55,5 @@ private fun controllerFor(state: AppState, tab: ActionTab): SimpleActionControll
     ActionTab.DEDUPE -> state.dedupe
     ActionTab.DATES -> state.dates
     ActionTab.STANDARDIZE -> state.standardize
+    ActionTab.VISUAL -> error("Visual Dupes is handled separately above")
 }
