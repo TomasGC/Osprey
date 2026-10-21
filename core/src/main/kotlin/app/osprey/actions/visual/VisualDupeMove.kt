@@ -1,7 +1,6 @@
-package app.osprey.desktop
+package app.osprey.actions.visual
 
 import app.osprey.actions.splitStemAndSuffix
-import app.osprey.actions.visual.VisualDupeMember
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 
@@ -12,10 +11,10 @@ data class MoveDupsResult(val moved: List<String>, val skipped: List<String>)
 
 /**
  * Moves every member of [group] not in [keepNames] into `root`'s `TODELETEDUPS` subfolder --
- * #8's `VisualDupePlanner` has no `apply()` on purpose (review-before-apply lives entirely in
- * the UI), so this is where "move unchecked" actually happens, matching the POC's `move_dups`.
+ * [VisualDupePlanner] has no `apply()` on purpose (review-before-apply lives entirely in the
+ * UI), so this is where "move unchecked" actually happens, matching the POC's `move_dups`.
  * A member whose file no longer exists is skipped rather than failing the whole group; a name
- * collision in `TODELETEDUPS` gets a `__dupN` suffix, same as #5's Dedupe.
+ * collision in `TODELETEDUPS` gets a `__dupN` suffix, same as Dedupe.
  */
 fun moveUncheckedToTodeleteDups(
     fs: FileSystemRepository,
