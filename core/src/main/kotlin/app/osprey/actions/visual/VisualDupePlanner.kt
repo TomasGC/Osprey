@@ -7,8 +7,16 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.media.MediaMetadataReader
 
-/** Lower = stricter; 0 = pixel-identical-after-resize. Matches the POC's `VISUAL_HAMMING_THRESHOLD`. */
-const val VISUAL_HAMMING_THRESHOLD = 6
+/**
+ * Lower = stricter; 0 = pixel-identical-after-resize. The POC's own `VISUAL_HAMMING_THRESHOLD`
+ * was 6, but that number isn't portable as-is: [phash] is a hand-rolled, differently-scaled hash
+ * (see its own doc), not a port of Python's `imagehash.phash`. Measured directly against this
+ * hash on real photos (issue #26): a real recompression or a WhatsApp-style downscale-and-
+ * recompress of the same capture lands at distance 0, while three distinct-but-similar shots of
+ * the same scene, seconds apart, land at 4-6 -- so 6 was matching both. 2 keeps a safety margin
+ * above the measured dupe case and below the measured distinct-shot case.
+ */
+const val VISUAL_HAMMING_THRESHOLD = 2
 
 private const val BYTES_PER_KB = 1024
 
