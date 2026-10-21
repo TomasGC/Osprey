@@ -76,6 +76,26 @@ class VisualDupePlannerTest {
     }
 
     @Test
+    fun `plan does not group a genuinely different shot of the same scene as a dupe`() {
+        // Issue #26: a real "3 photos of the same scene seconds apart" case clustered as a
+        // false-positive dupe group under the old, looser threshold. A small re-randomized
+        // fraction of pixels stands in for that -- close enough to look similar, too far to be
+        // the same capture re-exported.
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val base = noisePixelBuffer(seed = 1)
+        val a = fs.addFile(fs.root, "a.jpg")
+        val b = fs.addFile(fs.root, "different_moment.jpg")
+        reader.setFrame(a, base)
+        reader.setFrame(b, perturbedPixelBuffer(base, seed = 42))
+        val planner = VisualDupePlanner(fs, reader)
+
+        val plan = planner.plan(fs.root)
+
+        assertEquals(emptyList<List<VisualDupeMember>>(), plan.groups)
+    }
+
+    @Test
     fun `plan excludes singleton clusters`() {
         val fs = FakeFileSystemRepository()
         val reader = FakeMediaMetadataReader()
