@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.actions.visual.moveUncheckedToTodeleteDups
+import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.desktop.AppState
 import app.osprey.desktop.VisualDupeGroupUi
 import app.osprey.filesystem.FileHandle
@@ -133,7 +133,7 @@ private fun GroupHeader(state: AppState, yearDir: FileHandle, group: VisualDupeG
                         moving = true
                         scope.launch {
                             val result = withContext(Dispatchers.IO) {
-                                moveUncheckedToTodeleteDups(state.fs, yearDir, group.members, keptNames)
+                                moveUncheckedToTrash(state.fs, state.trashLocation(), yearDir, group.members, keptNames)
                             }
                             moving = false
                             group.done = true

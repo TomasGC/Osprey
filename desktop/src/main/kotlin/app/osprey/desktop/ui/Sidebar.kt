@@ -98,7 +98,7 @@ private fun YearBlock(state: AppState) {
 
 @Composable
 private fun NavList(state: AppState) {
-    ActionTab.entries.forEach { tab ->
+    state.visibleTabs.forEach { tab ->
         val selected = state.selectedTab == tab
         val colors = if (selected) {
             ButtonDefaults.buttonColors()

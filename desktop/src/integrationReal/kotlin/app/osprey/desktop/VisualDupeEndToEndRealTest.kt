@@ -1,7 +1,8 @@
 package app.osprey.desktop
 
+import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.visual.VisualDupePlanner
-import app.osprey.actions.visual.moveUncheckedToTodeleteDups
+import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
@@ -32,16 +33,18 @@ class VisualDupeEndToEndRealTest {
 
     private val fs = DesktopFileSystemRepository()
     private val mediaMetadataReader = DesktopMediaMetadataReader()
+    private lateinit var libraryDir: Path
     private lateinit var yearDir: Path
 
     @Before
     fun setUp() {
-        yearDir = Files.createTempDirectory("osprey-visual-dupe-e2e-real-test")
+        libraryDir = Files.createTempDirectory("osprey-visual-dupe-e2e-real-test")
+        yearDir = Files.createDirectory(libraryDir.resolve("2019"))
     }
 
     @After
     fun tearDown() {
-        yearDir.toFile().deleteRecursively()
+        libraryDir.toFile().deleteRecursively()
     }
 
     @Test
@@ -59,10 +62,12 @@ class VisualDupeEndToEndRealTest {
         assertEquals(setOf("original.jpg", "whatsapp_recompressed.jpg"), group.map { it.name }.toSet())
 
         val keepName = group.maxBy { it.sizeBytes }.name
-        val result = moveUncheckedToTodeleteDups(fs, root, group, setOf(keepName))
+        val trash = TrashLocation(PathHandle(libraryDir), "2019")
+        val result = moveUncheckedToTrash(fs, trash, root, group, setOf(keepName))
 
         assertEquals(1, result.moved.size)
-        assertTrue(Files.exists(yearDir.resolve("TODELETEDUPS").resolve(result.moved.single())))
+        val trashed = libraryDir.resolve("Trash").resolve("2019").resolve("VisualDupes")
+        assertTrue(Files.exists(trashed.resolve(result.moved.single())))
         assertTrue(Files.exists(yearDir.resolve("unrelated.jpg")))
     }
 

@@ -1,33 +1,33 @@
 package app.osprey.actions.visual
 
-import app.osprey.actions.splitStemAndSuffix
+import app.osprey.actions.trash.TrashAction
+import app.osprey.actions.trash.TrashFolders
+import app.osprey.actions.trash.TrashLocation
+import app.osprey.actions.trash.freeTrashName
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 
-private const val TODELETEDUPS = "TODELETEDUPS"
-
-/** The outcome of [moveUncheckedToTodeleteDups]: matches the POC's `move_dups` return shape. */
-data class MoveDupsResult(val moved: List<String>, val skipped: List<String>)
-
 /**
- * Moves every member of [group] not in [keepNames] into `root`'s `TODELETEDUPS` subfolder --
+ * Moves every member of [group] not in [keepNames] into [trash]'s VisualDupes folder --
  * [VisualDupePlanner] has no `apply()` on purpose (review-before-apply lives entirely in the
  * UI), so this is where "move unchecked" actually happens, matching the POC's `move_dups`.
- * A member whose file no longer exists is skipped rather than failing the whole group; a name
- * collision in `TODELETEDUPS` gets a `__dupN` suffix, same as Dedupe.
+ * A member whose file no longer exists in [yearDir] is skipped rather than failing the whole
+ * group; a name collision in the trash gets a `__dupN` suffix, same as Dedupe.
  */
-fun moveUncheckedToTodeleteDups(
+fun moveUncheckedToTrash(
     fs: FileSystemRepository,
-    root: FileHandle,
+    trash: TrashLocation,
+    yearDir: FileHandle,
     group: List<VisualDupeMember>,
     keepNames: Set<String>,
 ): MoveDupsResult {
     val extras = group.filterNot { it.name in keepNames }
     if (extras.isEmpty()) return MoveDupsResult(emptyList(), emptyList())
 
-    val currentNames = fs.list(root).map { it.name }.toSet()
-    val todelete = fs.createFolder(root, TODELETEDUPS)
-    val reserved = fs.list(todelete).map { it.name }.toMutableSet()
+    val currentNames = fs.list(yearDir).map { it.name }.toSet()
+    val trashFolders = TrashFolders(fs)
+    val destination = trashFolders.ensure(trash, TrashAction.VISUAL_DUPES)
+    val taken = trashFolders.existingNames(trash, TrashAction.VISUAL_DUPES).toMutableSet()
 
     val moved = mutableListOf<String>()
     val skipped = mutableListOf<String>()
@@ -36,22 +36,10 @@ fun moveUncheckedToTodeleteDups(
             skipped += extra.name
             continue
         }
-        val targetName = firstFreeName(extra.name, reserved)
-        fs.move(extra.handle, todelete, targetName)
-        reserved += targetName
+        val targetName = freeTrashName(extra.name, taken)
+        fs.move(extra.handle, destination, targetName)
+        taken += targetName
         moved += extra.name
     }
     return MoveDupsResult(moved, skipped)
-}
-
-private fun firstFreeName(name: String, reserved: Set<String>): String {
-    if (name !in reserved) return name
-    val (stem, suffix) = splitStemAndSuffix(name)
-    var n = 1
-    var candidate = "${stem}__dup$n$suffix"
-    while (candidate in reserved) {
-        n++
-        candidate = "${stem}__dup$n$suffix"
-    }
-    return candidate
 }
