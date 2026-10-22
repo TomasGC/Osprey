@@ -29,6 +29,19 @@ class StandardizePlannerTest {
     }
 
     @Test
+    fun `plan renames from the filename when the reader date is before 1970`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20170425_152602.mp4")
+        reader.setCaptureDateTime(video, MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA))
+
+        val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
+
+        assertEquals("VID_2017-04-25_15-26-02.mp4", rename.targetName)
+        assertEquals(MediaDateSource.FILENAME, rename.source)
+    }
+
+    @Test
     fun `plan uses the VID prefix for a video`() {
         val fs = FakeFileSystemRepository()
         fs.addFile(fs.root, "VID_20170425_152602.mp4")

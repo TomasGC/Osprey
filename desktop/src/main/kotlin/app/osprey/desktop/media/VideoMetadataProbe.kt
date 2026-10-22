@@ -1,5 +1,6 @@
 package app.osprey.desktop.media
 
+import app.osprey.media.utcToLocal
 import java.io.IOException
 import java.nio.file.Path
 import java.time.LocalDateTime
@@ -10,9 +11,10 @@ import org.json.JSONObject
 private const val FFPROBE_TIMEOUT_SECONDS = 30L
 
 /**
- * `ffprobe`'s container `creation_time` for [path], or null if `ffprobe` isn't on PATH, times
- * out, fails, or the tag is absent/unparseable — video actions degrade gracefully rather than
- * crashing, same as the POC's `video_datetime`.
+ * `ffprobe`'s container `creation_time` for [path], converted from UTC to this machine's local
+ * time, or null if `ffprobe` isn't on PATH, times out, fails, or the tag is absent/unparseable —
+ * video actions degrade gracefully rather than crashing, same as the POC's `video_datetime`
+ * (which, unlike this, read the UTC clock value as local time).
  */
 fun probeVideoCreationTime(path: Path): LocalDateTime? {
     val json = runFfprobe(path) ?: return null
@@ -23,7 +25,7 @@ fun probeVideoCreationTime(path: Path): LocalDateTime? {
         ?.takeIf { it.isNotEmpty() }
         ?: return null
     return try {
-        LocalDateTime.parse(raw.removeSuffix("Z"))
+        utcToLocal(LocalDateTime.parse(raw.removeSuffix("Z")))
     } catch (e: DateTimeParseException) {
         null
     }
