@@ -1,5 +1,8 @@
 package app.osprey.actions.visual
 
+import app.osprey.actions.trash.TrashAction
+import app.osprey.actions.trash.TrashFolders
+import app.osprey.actions.trash.TrashLocation
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
 import org.junit.Assert.assertEquals
@@ -9,64 +12,67 @@ import org.junit.Test
 class VisualDupeMoveTest {
 
     private val fs = FakeFileSystemRepository()
-    private val root = fs.root
+    private val year = fs.addFolder(fs.root, "2019")
+    private val trash = TrashLocation(fs.root, "2019")
 
     private fun write(name: String, sizeBytes: Int = 1): VisualDupeMember {
-        val handle = fs.addFile(root, name, ByteArray(sizeBytes))
+        val handle = fs.addFile(year, name, ByteArray(sizeBytes))
         return VisualDupeMember(handle, name, sizeBytes.toLong())
     }
 
     private fun exists(parent: FileHandle, name: String): Boolean = fs.list(parent).any { it.name == name }
 
+    private fun trashFolder(): FileHandle = TrashFolders(fs).ensure(trash, TrashAction.VISUAL_DUPES)
+
     @Test
-    fun `moves every non-kept member into TODELETEDUPS`() {
+    fun `moves every non-kept member into Trash, year, VisualDupes`() {
         val keep = write("keep.jpg")
         val dup1 = write("dup1.jpg")
         val dup2 = write("dup2.jpg")
 
-        val result = moveUncheckedToTodeleteDups(fs, root, listOf(keep, dup1, dup2), setOf("keep.jpg"))
+        val result = moveUncheckedToTrash(fs, trash, year, listOf(keep, dup1, dup2), setOf("keep.jpg"))
 
         assertEquals(setOf("dup1.jpg", "dup2.jpg"), result.moved.toSet())
         assertTrue(result.skipped.isEmpty())
-        assertTrue(exists(root, "keep.jpg"))
-        val todelete = fs.list(root).single { it.name == "TODELETEDUPS" }.handle
-        assertTrue(exists(todelete, "dup1.jpg"))
-        assertTrue(exists(todelete, "dup2.jpg"))
+        assertTrue(exists(year, "keep.jpg"))
+        assertTrue(exists(trashFolder(), "dup1.jpg"))
+        assertTrue(exists(trashFolder(), "dup2.jpg"))
+        assertTrue(fs.list(year).none { it.isDirectory })
     }
 
     @Test
-    fun `keeping every member moves nothing and never creates TODELETEDUPS`() {
+    fun `keeping every member moves nothing and never creates Trash`() {
         val a = write("a.jpg")
         val b = write("b.jpg")
 
-        val result = moveUncheckedToTodeleteDups(fs, root, listOf(a, b), setOf("a.jpg", "b.jpg"))
+        val result = moveUncheckedToTrash(fs, trash, year, listOf(a, b), setOf("a.jpg", "b.jpg"))
 
         assertTrue(result.moved.isEmpty())
         assertTrue(result.skipped.isEmpty())
-        assertTrue(fs.list(root).none { it.name == "TODELETEDUPS" })
+        assertTrue(fs.list(fs.root).none { it.name == "Trash" })
     }
 
     @Test
-    fun `a name collision in TODELETEDUPS gets a __dup suffix`() {
+    fun `a name collision in the trash folder gets a __dup suffix`() {
         val keep = write("keep.jpg")
         val dup = write("photo.jpg")
-        val todelete = fs.addFolder(root, "TODELETEDUPS")
-        fs.addFile(todelete, "photo.jpg", "already here".toByteArray())
+        val folder = trashFolder()
+        fs.addFile(folder, "photo.jpg", "already here".toByteArray())
 
-        val result = moveUncheckedToTodeleteDups(fs, root, listOf(keep, dup), setOf("keep.jpg"))
+        val result = moveUncheckedToTrash(fs, trash, year, listOf(keep, dup), setOf("keep.jpg"))
 
         assertEquals(listOf("photo.jpg"), result.moved)
-        assertTrue(exists(todelete, "photo__dup1.jpg"))
-        assertEquals("already here", String(fs.readBytes(fs.list(todelete).single { it.name == "photo.jpg" }.handle)))
+        assertTrue(exists(folder, "photo__dup1.jpg"))
+        assertEquals("already here", String(fs.readBytes(fs.list(folder).single { it.name == "photo.jpg" }.handle)))
     }
 
     @Test
     fun `a member whose file is already gone is skipped, not failed`() {
         val keep = write("keep.jpg")
-        val vanished = VisualDupeMember(fs.addFile(root, "vanished.jpg"), "vanished.jpg", 0)
+        val vanished = VisualDupeMember(fs.addFile(year, "vanished.jpg"), "vanished.jpg", 0)
         fs.rename(vanished.handle, "renamed_away.jpg")
 
-        val result = moveUncheckedToTodeleteDups(fs, root, listOf(keep, vanished), setOf("keep.jpg"))
+        val result = moveUncheckedToTrash(fs, trash, year, listOf(keep, vanished), setOf("keep.jpg"))
 
         assertTrue(result.moved.isEmpty())
         assertEquals(listOf("vanished.jpg"), result.skipped)

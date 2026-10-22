@@ -35,7 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.actions.visual.moveUncheckedToTodeleteDups
+import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.android.AndroidAppState
 import app.osprey.android.VisualDupeGroupUi
 import app.osprey.filesystem.FileHandle
@@ -155,7 +155,7 @@ private suspend fun moveUnchecked(state: AndroidAppState, yearDir: FileHandle, g
         keptNames.size == group.members.size -> group.status = "Nothing unchecked -- nothing to move."
         else -> {
             val result = withContext(Dispatchers.IO) {
-                moveUncheckedToTodeleteDups(state.fs, yearDir, group.members, keptNames)
+                moveUncheckedToTrash(state.fs, state.trashLocation(), yearDir, group.members, keptNames)
             }
             group.done = true
             val skippedNote = if (result.skipped.isNotEmpty()) {

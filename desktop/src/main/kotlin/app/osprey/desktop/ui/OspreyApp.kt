@@ -37,14 +37,15 @@ private fun OspreyContent(state: AppState) {
         return
     }
     val libraryDir = state.libraryHandle()
-    if (state.selectedTab == ActionTab.YEAR_FOLDERS && libraryDir != null) {
-        val controller = state.yearFolders
+    val rootController = rootControllerFor(state, state.selectedTab)
+    if (rootController != null && libraryDir != null) {
         ActionPane(
-            controller.state,
-            { controller.onScan(libraryDir) },
+            rootController.state,
+            { rootController.onScan(libraryDir) },
             {
-                controller.onApply(libraryDir)
+                rootController.onApply(libraryDir)
                 state.refreshYears()
+                state.refreshLegacyTrash()
             },
         )
         return
@@ -62,9 +63,17 @@ private fun OspreyContent(state: AppState) {
     ActionPane(controller.state, { controller.onScan(yearDir) }, { controller.onApply(yearDir) })
 }
 
+/** The tabs that run on the library root instead of the selected year folder. */
+private fun rootControllerFor(state: AppState, tab: ActionTab): SimpleActionController<*>? = when (tab) {
+    ActionTab.YEAR_FOLDERS -> state.yearFolders
+    ActionTab.TRASH_MIGRATION -> state.trashMigration
+    else -> null
+}
+
 private fun controllerFor(state: AppState, tab: ActionTab): SimpleActionController<*> = when (tab) {
     ActionTab.FLATTEN -> state.flatten
     ActionTab.YEAR_FOLDERS -> error("Year folders is handled separately above")
+    ActionTab.TRASH_MIGRATION -> error("Trash migration is handled separately above")
     ActionTab.RENAME -> state.rename
     ActionTab.DEDUPE -> state.dedupe
     ActionTab.DATES -> state.dates

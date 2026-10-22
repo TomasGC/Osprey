@@ -94,14 +94,15 @@ private fun OspreyContent(state: AndroidAppState) {
         return
     }
     val libraryRoot = state.libraryRoot ?: return
-    if (state.selectedTab == ActionTab.YEAR_FOLDERS) {
-        val controller = state.yearFolders
+    val rootController = rootControllerFor(state, state.selectedTab)
+    if (rootController != null) {
         ActionPane(
-            controller.state,
-            { controller.onScan(libraryRoot) },
+            rootController.state,
+            { rootController.onScan(libraryRoot) },
             {
-                controller.onApply(libraryRoot)
+                rootController.onApply(libraryRoot)
                 state.refreshYears()
+                state.refreshLegacyTrash()
             },
         )
         return
@@ -126,9 +127,17 @@ private fun OspreyContent(state: AndroidAppState) {
     }
 }
 
+/** The tabs that run on the library root instead of the selected year folder. */
+private fun rootControllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionController<*>? = when (tab) {
+    ActionTab.YEAR_FOLDERS -> state.yearFolders
+    ActionTab.TRASH_MIGRATION -> state.trashMigration
+    else -> null
+}
+
 private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionController<*> = when (tab) {
     ActionTab.FLATTEN -> state.flatten
     ActionTab.YEAR_FOLDERS -> error("Year folders is handled separately above")
+    ActionTab.TRASH_MIGRATION -> error("Trash migration is handled separately above")
     ActionTab.RENAME -> state.rename
     ActionTab.DEDUPE -> state.dedupe
     ActionTab.STANDARDIZE -> state.standardize
@@ -159,7 +168,7 @@ private fun DrawerContent(
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
-        ActionTab.entries.forEach { tab ->
+        state.visibleTabs.forEach { tab ->
             NavigationDrawerItem(
                 label = { Text(tab.label) },
                 selected = state.selectedTab == tab,

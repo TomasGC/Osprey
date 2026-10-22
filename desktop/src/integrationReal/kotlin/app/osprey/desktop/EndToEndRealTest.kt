@@ -4,6 +4,8 @@ import app.osprey.actions.dedupe.DedupePlanner
 import app.osprey.actions.flatten.FlattenPlanner
 import app.osprey.actions.rename.RenamePlanner
 import app.osprey.actions.standardize.StandardizePlanner
+import app.osprey.actions.trash.TrashLocation
+import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.actions.yearfolders.YearFoldersPlanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
@@ -26,16 +28,18 @@ class EndToEndRealTest {
 
     private val fs = DesktopFileSystemRepository()
     private val mediaMetadataReader = DesktopMediaMetadataReader()
+    private lateinit var libraryDir: Path
     private lateinit var yearDir: Path
 
     @Before
     fun setUp() {
-        yearDir = Files.createTempDirectory("osprey-e2e-real-test")
+        libraryDir = Files.createTempDirectory("osprey-e2e-real-test")
+        yearDir = Files.createDirectory(libraryDir.resolve("2016"))
     }
 
     @After
     fun tearDown() {
-        yearDir.toFile().deleteRecursively()
+        libraryDir.toFile().deleteRecursively()
     }
 
     @Test
@@ -64,24 +68,25 @@ class EndToEndRealTest {
         assertTrue(Files.exists(yearDir.resolve("photo.jpg")))
 
         // Dedupe: the byte-identical duplicate (still named "photo (3).jpg", skipped by rename
-        // because "photo.jpg" was already claimed) moves into TODELETE.
+        // because "photo.jpg" was already claimed) moves into Trash/2016/Dedupe.
         val dedupePlanner = DedupePlanner(fs)
-        val dedupePlan = dedupePlanner.plan(root)
-        dedupePlanner.apply(dedupePlan, root)
+        val trash = TrashLocation(PathHandle(libraryDir), "2016")
+        val dedupePlan = dedupePlanner.plan(root, trash)
+        dedupePlanner.apply(dedupePlan, trash)
         assertEquals(1, dedupePlan.moves.size)
-        assertTrue(Files.exists(yearDir.resolve("TODELETE").resolve("photo (3).jpg")))
+        assertTrue(Files.exists(libraryDir.resolve("Trash").resolve("2016").resolve("Dedupe").resolve("photo (3).jpg")))
         assertFalse(Files.exists(yearDir.resolve("photo (3).jpg")))
 
-        // Standardize: the filename-dateable file gets its real IMG_ name; the TODELETE
-        // duplicate is never touched, since it's a subfolder, not a file.
+        // Standardize: the filename-dateable file gets its real IMG_ name; the trashed
+        // duplicate is never touched, since it lives outside the year folder.
         val standardizePlanner = StandardizePlanner(fs, mediaMetadataReader)
         val standardizePlan = standardizePlanner.plan(root)
         standardizePlanner.apply(standardizePlan)
         assertTrue(Files.exists(yearDir.resolve("IMG_2016-08-28_19-30-34.jpeg")))
 
-        // Final real directory state: exactly the two surviving files, plus TODELETE.
+        // Final real directory state: exactly the two surviving files.
         val finalNames = fs.list(root).map { it.name }.toSet()
-        assertEquals(setOf("photo.jpg", "IMG_2016-08-28_19-30-34.jpeg", "TODELETE"), finalNames)
+        assertEquals(setOf("photo.jpg", "IMG_2016-08-28_19-30-34.jpeg"), finalNames)
     }
 
     @Test
@@ -108,6 +113,28 @@ class EndToEndRealTest {
         assertTrue(Files.exists(yearDir.resolve("2017").resolve("IMG_20170425_152602.jpg")))
         assertTrue(Files.exists(yearDir.resolve("mystery.jpg")))
         assertTrue(Files.exists(yearDir.resolve("TODELETE").resolve("IMG_20150101_000000.jpg")))
+        assertEquals(emptyList<Any>(), planner.plan(root).moves)
+    }
+
+    @Test
+    fun `trash migration moves old TODELETE folders into Trash and a second run plans nothing`() {
+        Files.createDirectory(yearDir.resolve("TODELETE"))
+        Files.write(yearDir.resolve("TODELETE").resolve("a.jpg"), "a".toByteArray())
+        Files.createDirectory(yearDir.resolve("TODELETEDUPS"))
+        Files.write(yearDir.resolve("TODELETEDUPS").resolve("b.jpg"), "b".toByteArray())
+        Files.write(yearDir.resolve("keep.jpg"), "k".toByteArray())
+
+        val root = PathHandle(libraryDir)
+        val planner = TrashMigrationPlanner(fs)
+        assertTrue(planner.hasLegacy(root))
+        planner.apply(planner.plan(root), root) {}
+
+        assertTrue(Files.exists(libraryDir.resolve("Trash").resolve("2016").resolve("Dedupe").resolve("a.jpg")))
+        assertTrue(Files.exists(libraryDir.resolve("Trash").resolve("2016").resolve("VisualDupes").resolve("b.jpg")))
+        assertFalse(Files.exists(yearDir.resolve("TODELETE")))
+        assertFalse(Files.exists(yearDir.resolve("TODELETEDUPS")))
+        assertTrue(Files.exists(yearDir.resolve("keep.jpg")))
+        assertFalse(planner.hasLegacy(root))
         assertEquals(emptyList<Any>(), planner.plan(root).moves)
     }
 }
