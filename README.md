@@ -48,8 +48,9 @@ system folder picker on first launch.
 ## Platform notes
 
 - Dates sets the Created time on Windows only; elsewhere on desktop it sets the modified time.
-- Android cannot set file modified times through the Storage Access Framework, so Dates is
-  scan-only there (Apply disabled). Tracked in #29.
+- Android cannot write file timestamps through the Storage Access Framework, so Dates is
+  scan-only there (Apply disabled). Android has no API to set a creation time at all; #29
+  explores `MANAGE_EXTERNAL_STORAGE` for the modified time only.
 
 ## Tests
 
