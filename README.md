@@ -1,23 +1,18 @@
 # Osprey
 
-Photo and video library cleanup tool, named for how the bird hunts: patient scanning before
-picking the one true target out of clutter. Scan first, review, then apply. Nothing is deleted:
-unwanted files are moved aside for you to clear out yourself.
+Photo and video library cleanup tool for desktop (Compose Multiplatform) and Android (Jetpack Compose).
+It sorts a library into year folders, strips sync copy-suffix noise, finds exact and visually-identical
+duplicates, fixes timestamps and standardizes file names. Scan first, review, then apply. Nothing is
+deleted: unwanted files are moved to a `Trash` folder for you to clear out yourself.
 
-Runs as a desktop app (Compose Multiplatform) and as an Android app (Jetpack Compose).
+## Documentation
 
-## Actions
+Everything about what Osprey does and how it is built lives in the [wiki](https://github.com/TomasGC/Osprey/wiki):
 
-Expects a library laid out as `<library root>/<year>/<files>`. Each action works on one year folder.
-
-1. **Flatten**: moves files out of nested subfolders into the year folder; collisions get a `__flatN` suffix.
-2. **Rename**: strips OS/sync duplicate-copy suffixes (`(2)`, `_1`, `- Copy`, `copy 2`) when safe.
-3. **Dedupe**: groups files by size then content hash; exact duplicates move to `TODELETE/`.
-4. **Visual Dupes**: perceptual-hash near-duplicates (same picture, different bytes), images and video.
-   Burst-mode frames are never treated as duplicates of each other. You review each group and
-   the ones you don't want move to `TODELETEDUPS/`.
-5. **Dates**: sets file timestamps from EXIF (images), video metadata, or a date parsed from the filename.
-6. **Standardize**: renames to `IMG_YYYY-MM-DD_HH-MM-SS` / `VID_...` from the resolved capture date.
+- [Product Requirements](https://github.com/TomasGC/Osprey/wiki/Product-Requirements): the actions, the library layout, platform limits
+- [Architecture](https://github.com/TomasGC/Osprey/wiki/Architecture): modules, platform interfaces, UI structure, CI
+- [Roadmap](https://github.com/TomasGC/Osprey/wiki/Roadmap): what is done and what is next
+- [Development Conventions](https://github.com/TomasGC/Osprey/wiki/Development-Conventions): commits, branches, tests, the local gate
 
 ## Requirements
 
@@ -34,35 +29,12 @@ Expects a library laid out as `<library root>/<year>/<files>`. Each action works
 ./gradlew build detekt          # build + static analysis
 ```
 
-Desktop remembers the library folder in `~/.osprey/config.json`. Android asks for it through the
-system folder picker on first launch.
-
-## Modules
-
-| Module | Contents |
-|--------|----------|
-| `:core` | Platform-independent logic: the six planners, filesystem and media interfaces |
-| `:desktop` | Compose Desktop UI, `java.nio` filesystem, metadata-extractor and ffmpeg/ffprobe |
-| `:app` | Android UI, Storage Access Framework filesystem and media reading |
-
-## Platform notes
-
-- Dates sets the Created time on Windows only; elsewhere on desktop it sets the modified time.
-- Android cannot write file timestamps through the Storage Access Framework, so Dates is
-  scan-only there (Apply disabled). Android has no API to set a creation time at all; #29
-  explores `MANAGE_EXTERNAL_STORAGE` for the modified time only.
-
 ## Tests
 
 ```
 ./gradlew :core:test :core:integrationMock :core:integrationReal \
   :desktop:test :desktop:integrationMock :desktop:integrationReal :app:testDebugUnitTest
 ```
-
-## Origin
-
-Osprey was first prototyped in Python as a throwaway proof of concept. That prototype was never
-published; this repository is the Kotlin rewrite, and the Python behavior served as its spec.
 
 ## License
 
