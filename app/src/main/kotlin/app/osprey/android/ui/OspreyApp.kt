@@ -93,6 +93,19 @@ private fun OspreyContent(state: AndroidAppState) {
         Text("Pick a library from the menu (☰) to get started.", modifier = Modifier.padding(24.dp))
         return
     }
+    val libraryRoot = state.libraryRoot ?: return
+    if (state.selectedTab == ActionTab.YEAR_FOLDERS) {
+        val controller = state.yearFolders
+        ActionPane(
+            controller.state,
+            { controller.onScan(libraryRoot) },
+            {
+                controller.onApply(libraryRoot)
+                state.refreshYears()
+            },
+        )
+        return
+    }
     val yearDir = state.yearHandle()
     if (yearDir == null) {
         Text("Pick a year from the menu (☰) to get started.", modifier = Modifier.padding(24.dp))
@@ -115,6 +128,7 @@ private fun OspreyContent(state: AndroidAppState) {
 
 private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionController<*> = when (tab) {
     ActionTab.FLATTEN -> state.flatten
+    ActionTab.YEAR_FOLDERS -> error("Year folders is handled separately above")
     ActionTab.RENAME -> state.rename
     ActionTab.DEDUPE -> state.dedupe
     ActionTab.STANDARDIZE -> state.standardize

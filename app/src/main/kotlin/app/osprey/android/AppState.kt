@@ -7,9 +7,10 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.media.MediaMetadataReader
 
-/** Which screen is showing, same six actions and order as desktop's `ActionTab` (#11). */
+/** Which screen is showing, same seven actions and order as desktop's `ActionTab` (#11). */
 enum class ActionTab(val label: String) {
     FLATTEN("Flatten"),
+    YEAR_FOLDERS("Year folders"),
     RENAME("Rename"),
     DEDUPE("Dedupe"),
     VISUAL("Visual Dupes"),
@@ -26,6 +27,7 @@ class AndroidAppState(val fs: FileSystemRepository, val mediaMetadataReader: Med
     var selectedTab by mutableStateOf(ActionTab.FLATTEN)
 
     val flatten = flattenController(fs)
+    val yearFolders = yearFoldersController(fs, mediaMetadataReader)
     val rename = renameController(fs)
     val dedupe = dedupeController(fs)
     val dates = datesController(fs, mediaMetadataReader)
@@ -35,6 +37,13 @@ class AndroidAppState(val fs: FileSystemRepository, val mediaMetadataReader: Med
         libraryRoot = root
         years = listYears(fs, root)
         selectedYear = years.lastOrNull()
+    }
+
+    /** Re-reads the year folders on disk, keeping the selection when its folder still exists. */
+    fun refreshYears() {
+        val root = libraryRoot ?: return
+        years = listYears(fs, root)
+        if (selectedYear !in years) selectedYear = years.lastOrNull()
     }
 
     /** The currently selected year folder, or null until a library and a year are both chosen. */

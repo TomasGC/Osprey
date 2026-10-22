@@ -10,6 +10,8 @@ import app.osprey.actions.rename.RenamePlan
 import app.osprey.actions.rename.RenamePlanner
 import app.osprey.actions.standardize.StandardizePlan
 import app.osprey.actions.standardize.StandardizePlanner
+import app.osprey.actions.yearfolders.YearFoldersPlan
+import app.osprey.actions.yearfolders.YearFoldersPlanner
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTimestamps
 import app.osprey.media.MediaMetadataReader
@@ -25,6 +27,24 @@ fun flattenController(fs: FileSystemRepository) = SimpleActionController<Flatten
     },
     apply = { yearDir, plan ->
         FlattenPlanner(fs).apply(plan, yearDir) {}
+        plan.moves.size
+    },
+)
+
+/** Unlike the other tabs this one runs on the library root, not the selected year folder (#36). */
+fun yearFoldersController(
+    fs: FileSystemRepository,
+    mediaMetadataReader: MediaMetadataReader,
+) = SimpleActionController<YearFoldersPlan>(
+    scan = { root ->
+        val planner = YearFoldersPlanner(fs, mediaMetadataReader)
+        val plan = planner.plan(root)
+        val lines = mutableListOf<String>()
+        val count = planner.describe(plan, lines::add)
+        ScanResult(plan, "count=$count  undated=${plan.undated.size}", lines, count)
+    },
+    apply = { root, plan ->
+        YearFoldersPlanner(fs, mediaMetadataReader).apply(plan, root)
         plan.moves.size
     },
 )

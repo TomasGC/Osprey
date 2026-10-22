@@ -13,6 +13,7 @@ import java.nio.file.Path
 /** Which tab is showing, same order as the POC's nav list. */
 enum class ActionTab(val label: String) {
     FLATTEN("Flatten"),
+    YEAR_FOLDERS("Year folders"),
     RENAME("Rename"),
     DEDUPE("Dedupe"),
     VISUAL("Visual Dupes"),
@@ -30,6 +31,7 @@ class AppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetad
     var sidebarCollapsed by mutableStateOf(false)
 
     val flatten = flattenController(fs)
+    val yearFolders = yearFoldersController(fs, mediaMetadataReader)
     val rename = renameController(fs)
     val dedupe = dedupeController(fs)
     val dates = datesController(fs, mediaMetadataReader)
@@ -40,6 +42,16 @@ class AppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetad
         OspreyConfig.saveLibraryPath(path)
         years = listYears(path)
         selectedYear = years.lastOrNull()
+    }
+
+    /** The library root itself, for the action that creates the year folders; null until a library is chosen. */
+    fun libraryHandle(): FileHandle? = libraryPath?.let { PathHandle(it) }
+
+    /** Re-reads the year folders on disk, keeping the selection when its folder still exists. */
+    fun refreshYears() {
+        val library = libraryPath ?: return
+        years = listYears(library)
+        if (selectedYear !in years) selectedYear = years.lastOrNull()
     }
 
     /** The currently selected year folder, or null until a library and a year are both chosen. */
