@@ -66,6 +66,60 @@ class DatesPlannerTest {
     }
 
     @Test
+    fun `plan ignores a reader date before 1970 and falls back to the filename`() {
+        // An MP4 with no creation time reports its 1904 epoch (Android's MediaMetadataRetriever).
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20170425_152602.mp4")
+        reader.setCaptureDateTime(video, MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA))
+
+        val fix = DatesPlanner(fs, reader).plan(fs.root).fixes.single()
+
+        assertEquals(LocalDateTime.of(2017, 4, 25, 15, 26, 2), fix.dateTime)
+        assertEquals(MediaDateSource.FILENAME, fix.source)
+    }
+
+    @Test
+    fun `plan ignores a year-zero EXIF date and falls back to the filename`() {
+        // EXIF "0000:00:00 00:00:00" (an unset camera clock) parses to year 0 on desktop.
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val photo = fs.addFile(fs.root, "IMG_20230101_000000.jpg")
+        reader.setCaptureDateTime(photo, MediaDate(LocalDateTime.of(-1, 11, 27, 23, 9, 2), MediaDateSource.EXIF))
+
+        val fix = DatesPlanner(fs, reader).plan(fs.root).fixes.single()
+
+        assertEquals(LocalDateTime.of(2023, 1, 1, 0, 0, 0), fix.dateTime)
+        assertEquals(MediaDateSource.FILENAME, fix.source)
+    }
+
+    @Test
+    fun `plan marks a file unfixable when its reader date is before 1970 and its name has no date`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val photo = fs.addFile(fs.root, "DSC_0210.jpg")
+        reader.setCaptureDateTime(photo, MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.EXIF))
+
+        val plan = DatesPlanner(fs, reader).plan(fs.root)
+
+        assertEquals(emptyList<DatesFix>(), plan.fixes)
+        assertEquals(listOf("DSC_0210.jpg"), plan.unfixable.map { it.name })
+    }
+
+    @Test
+    fun `plan keeps a reader date of exactly 1970-01-01`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val photo = fs.addFile(fs.root, "DSC_0210.jpg")
+        reader.setCaptureDateTime(photo, MediaDate(LocalDateTime.of(1970, 1, 1, 0, 0, 0), MediaDateSource.EXIF))
+
+        val fix = DatesPlanner(fs, reader).plan(fs.root).fixes.single()
+
+        assertEquals(LocalDateTime.of(1970, 1, 1, 0, 0, 0), fix.dateTime)
+        assertEquals(MediaDateSource.EXIF, fix.source)
+    }
+
+    @Test
     fun `describe separates metadata from filename sources and logs the unfixable`() {
         val fs = FakeFileSystemRepository()
         val planner = DatesPlanner(fs, FakeMediaMetadataReader())
