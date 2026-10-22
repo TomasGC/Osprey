@@ -36,9 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.osprey.actions.visual.VisualDupeMember
+import app.osprey.actions.visual.moveUncheckedToTodeleteDups
 import app.osprey.desktop.AppState
 import app.osprey.desktop.VisualDupeGroupUi
-import app.osprey.desktop.moveUncheckedToTodeleteDups
 import app.osprey.filesystem.FileHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -1,6 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.actions.visual.VisualDupePlanner
+import app.osprey.actions.visual.moveUncheckedToTodeleteDups
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
@@ -21,7 +22,7 @@ import org.junit.Test
 private const val IMAGE_SIZE = 256
 
 /**
- * Runs #8's real [VisualDupePlanner] and #12's [moveUncheckedToTodeleteDups] against real JPEGs
+ * Runs #8's real [VisualDupePlanner] and [moveUncheckedToTodeleteDups] against real JPEGs
  * -- the spot-check #12's DoD asks for, for the WhatsApp-recompression case specifically: same
  * picture, re-encoded at a different JPEG quality, must still cluster as a visual dupe. The
  * burst-set case (a real camera burst, e.g. the POC's zoo-bears set) needs the real library on a
