@@ -6,7 +6,7 @@ package app.osprey.filesystem
  * `java.nio.file.Path` or a SAF `Uri`/`DocumentFile` — so planning logic in `:core` never has to
  * know which platform it is running on.
  */
-interface FileSystemRepository {
+interface FileSystemRepository : FileTransfer {
 
     /**
      * The immediate children of [folder] — files and subfolders, not recursive.

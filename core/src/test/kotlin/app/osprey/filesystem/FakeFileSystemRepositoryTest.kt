@@ -2,6 +2,7 @@ package app.osprey.filesystem
 
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -151,5 +152,46 @@ class FakeFileSystemRepositoryTest {
         val timestamps = repo.readTimestamps(entry)
         assertEquals(created, timestamps.created)
         assertEquals(secondModified, timestamps.modified)
+    }
+
+    @Test
+    fun `copyTo adds a copy with the same content and keeps the source`() {
+        val repo = FakeFileSystemRepository()
+        val dest = repo.addFolder(repo.root, "2018")
+        val source = repo.addFile(repo.root, "a.jpg", byteArrayOf(1, 2, 3))
+
+        val copy = repo.copyTo(source, dest, "b.jpg")
+
+        assertEquals(listOf("b.jpg"), repo.list(dest).map { it.name })
+        assertEquals(listOf("a.jpg", "2018"), repo.list(repo.root).map { it.name }.sortedDescending())
+        assertEquals(listOf<Byte>(1, 2, 3), repo.readBytes(copy).toList())
+    }
+
+    @Test
+    fun `copyTo never overwrites`() {
+        val repo = FakeFileSystemRepository()
+        val dest = repo.addFolder(repo.root, "2018")
+        repo.addFile(dest, "a.jpg", byteArrayOf(9))
+        val source = repo.addFile(repo.root, "a.jpg", byteArrayOf(1))
+
+        assertThrows(FileAlreadyExistsException::class.java) { repo.copyTo(source, dest) }
+    }
+
+    @Test
+    fun `delete removes a file`() {
+        val repo = FakeFileSystemRepository()
+        val file = repo.addFile(repo.root, "a.jpg")
+
+        repo.delete(file)
+
+        assertEquals(emptyList<FileEntry>(), repo.list(repo.root))
+    }
+
+    @Test
+    fun `contentHash is the SHA-256 of the content`() {
+        val repo = FakeFileSystemRepository()
+        val file = repo.addFile(repo.root, "a.jpg", "abc".toByteArray())
+
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", repo.contentHash(file))
     }
 }

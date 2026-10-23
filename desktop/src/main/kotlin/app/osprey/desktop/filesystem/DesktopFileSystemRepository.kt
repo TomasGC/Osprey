@@ -5,6 +5,7 @@ import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.FileTransfer
 import app.osprey.filesystem.FileTimestamps
 import java.nio.file.Files
 import java.nio.file.Path
@@ -20,7 +21,9 @@ import java.nio.file.FileAlreadyExistsException as NioFileAlreadyExistsException
  * [BasicFileAttributeView], no `pywin32`/JNI workaround needed this time; on Unix it's a no-op,
  * same portability story the POC already had.
  */
-class DesktopFileSystemRepository : FileSystemRepository {
+class DesktopFileSystemRepository(
+    transfer: FileTransfer = DesktopFileTransfer(),
+) : FileSystemRepository, FileTransfer by transfer {
 
     override fun list(folder: FileHandle): List<FileEntry> {
         val path = folder.path()

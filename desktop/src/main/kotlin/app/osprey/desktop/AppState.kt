@@ -3,6 +3,8 @@ package app.osprey.desktop
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.osprey.actions.reorg.ReorgPlanner
+import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.desktop.filesystem.PathHandle
@@ -15,8 +17,8 @@ import java.nio.file.Path
 
 /** Which tab is showing, same order as the POC's nav list. */
 enum class ActionTab(val label: String) {
+    REORG("Reorg"),
     FLATTEN("Flatten"),
-    YEAR_FOLDERS("Year folders"),
     RENAME("Rename"),
     DEDUPE("Dedupe"),
     VISUAL("Visual Dupes"),
@@ -36,12 +38,12 @@ class AppState(
     var libraryPath by mutableStateOf<Path?>(null)
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
-    var selectedTab by mutableStateOf(ActionTab.FLATTEN)
+    var selectedTab by mutableStateOf(ActionTab.REORG)
     var sidebarCollapsed by mutableStateOf(false)
     var hasLegacyTrash by mutableStateOf(false)
 
     val flatten = flattenController(fs)
-    val yearFolders = yearFoldersController(fs, mediaMetadataReader)
+    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader)) { reorgSources() }
     val rename = renameController(fs)
     val dedupe = dedupeController(fs, ::trashLocation)
     val trashMigration = trashMigrationController(fs)
@@ -72,8 +74,14 @@ class AppState(
         hasLegacyTrash = root != null && TrashMigrationPlanner(fs).hasLegacy(root)
     }
 
-    /** The library root itself, for the action that creates the year folders; null until a library is chosen. */
+    /** The library root itself, for the actions that run on the whole library; null until a library is chosen. */
     fun libraryHandle(): FileHandle? = libraryPath?.let { PathHandle(it) }
+
+    /** The saved input folders as Reorg sources; one that is gone or not a folder has no handle (unreachable). */
+    private fun reorgSources(): List<ReorgSource> = settingsState.settings.inputs.map { input ->
+        val path = Path.of(input.folder.reference)
+        ReorgSource(if (Files.isDirectory(path)) PathHandle(path) else null, input.folder.displayName, input.mode)
+    }
 
     /** Re-reads the year folders on disk, keeping the selection when its folder still exists. */
     fun refreshYears() {

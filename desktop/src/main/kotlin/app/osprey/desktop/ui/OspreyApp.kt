@@ -12,7 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.osprey.desktop.ActionTab
 import app.osprey.desktop.AppState
+import app.osprey.desktop.ActionUiState
 import app.osprey.desktop.SimpleActionController
+import app.osprey.filesystem.FileHandle
 
 /** App shell: collapsible sidebar + a content area switching between the five simple-action tabs. */
 @Composable
@@ -36,17 +38,9 @@ private fun OspreyContent(state: AppState) {
         return
     }
     val libraryDir = state.libraryHandle()
-    val rootController = rootControllerFor(state, state.selectedTab)
-    if (rootController != null && libraryDir != null) {
-        ActionPane(
-            rootController.state,
-            { rootController.onScan(libraryDir) },
-            {
-                rootController.onApply(libraryDir)
-                state.refreshYears()
-                state.refreshLegacyTrash()
-            },
-        )
+    val rootAction = libraryDir?.let { rootActionFor(state, state.selectedTab, it) }
+    if (rootAction != null) {
+        ActionPane(rootAction.ui, rootAction.scan, rootAction.apply, onCancel = rootAction.cancel)
         return
     }
     val yearDir = state.yearHandle()
@@ -62,16 +56,40 @@ private fun OspreyContent(state: AppState) {
     ActionPane(controller.state, { controller.onScan(yearDir) }, { controller.onApply(yearDir) })
 }
 
+/** A pane that runs on the library root: what it shows, how it scans and applies, and whether it can stop. */
+private class RootAction(
+    val ui: ActionUiState,
+    val scan: suspend () -> Unit,
+    val apply: suspend () -> Unit,
+    val cancel: (() -> Unit)? = null,
+)
+
 /** The tabs that run on the library root instead of the selected year folder. */
-private fun rootControllerFor(state: AppState, tab: ActionTab): SimpleActionController<*>? = when (tab) {
-    ActionTab.YEAR_FOLDERS -> state.yearFolders
-    ActionTab.TRASH_MIGRATION -> state.trashMigration
+private fun rootActionFor(state: AppState, tab: ActionTab, root: FileHandle): RootAction? = when (tab) {
+    ActionTab.REORG -> RootAction(
+        state.reorg.state,
+        { state.reorg.onScan(root) },
+        {
+            state.reorg.onApply(root)
+            state.refreshYears()
+        },
+        state.reorg::onCancel,
+    )
+    ActionTab.TRASH_MIGRATION -> RootAction(
+        state.trashMigration.state,
+        { state.trashMigration.onScan(root) },
+        {
+            state.trashMigration.onApply(root)
+            state.refreshYears()
+            state.refreshLegacyTrash()
+        },
+    )
     else -> null
 }
 
 private fun controllerFor(state: AppState, tab: ActionTab): SimpleActionController<*> = when (tab) {
     ActionTab.FLATTEN -> state.flatten
-    ActionTab.YEAR_FOLDERS -> error("Year folders is handled separately above")
+    ActionTab.REORG -> error("Reorg is handled separately above")
     ActionTab.TRASH_MIGRATION -> error("Trash migration is handled separately above")
     ActionTab.RENAME -> state.rename
     ActionTab.DEDUPE -> state.dedupe
