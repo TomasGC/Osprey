@@ -2,6 +2,7 @@ package app.osprey.android.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,11 +61,17 @@ fun OspreyApp(state: AndroidAppState) {
                     DrawerContent(
                         state = state,
                         onOpenSettings = {
+                            state.showsTrash = false
                             state.settingsState.showing = true
+                            scope.launch { drawerState.close() }
+                        },
+                        onOpenTrash = {
+                            state.toggleTrash()
                             scope.launch { drawerState.close() }
                         },
                         onTabSelected = { tab ->
                             state.selectedTab = tab
+                            state.showsTrash = false
                             state.settingsState.showing = false
                             scope.launch { drawerState.close() }
                         },
@@ -75,7 +82,7 @@ fun OspreyApp(state: AndroidAppState) {
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(if (state.showsSettings) "Settings" else state.selectedTab.label) },
+                        title = { Text(screenTitle(state)) },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Text("☰", fontSize = 20.sp)
@@ -99,11 +106,21 @@ private fun OspreyContent(state: AndroidAppState) {
         return
     }
     val libraryRoot = state.libraryRoot ?: return
+    if (state.showsTrash) {
+        TrashScreen(state, libraryRoot)
+        return
+    }
     val rootAction = rootActionFor(state, state.selectedTab, libraryRoot)
     if (rootAction != null) {
         ActionPane(rootAction.ui, rootAction.scan, rootAction.apply, onCancel = rootAction.cancel)
         return
     }
+    YearContent(state)
+}
+
+/** The selected action on the selected year folder. */
+@Composable
+private fun YearContent(state: AndroidAppState) {
     val yearDir = state.yearHandle()
     if (yearDir == null) {
         Text("Pick a year from the menu (☰) to get started.", modifier = Modifier.padding(24.dp))
@@ -170,6 +187,7 @@ private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionC
 private fun DrawerContent(
     state: AndroidAppState,
     onOpenSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
     onTabSelected: (ActionTab) -> Unit,
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
@@ -188,19 +206,33 @@ private fun DrawerContent(
         state.visibleTabs.forEach { tab ->
             NavigationDrawerItem(
                 label = { Text(tab.label) },
-                selected = state.selectedTab == tab && !state.showsSettings,
+                selected = state.selectedTab == tab && !state.showsSettings && !state.showsTrash,
                 onClick = { onTabSelected(tab) },
                 modifier = Modifier.padding(vertical = 2.dp),
             )
         }
         HorizontalDivider()
-        NavigationDrawerItem(
-            label = { Text("⚙ Settings") },
-            selected = state.showsSettings,
-            onClick = onOpenSettings,
-            modifier = Modifier.padding(vertical = 2.dp),
-        )
+        Row {
+            NavigationDrawerItem(
+                label = { Text("⚙ Settings") },
+                selected = state.showsSettings,
+                onClick = onOpenSettings,
+                modifier = Modifier.weight(1f).padding(vertical = 2.dp),
+            )
+            NavigationDrawerItem(
+                label = { Text("🗑 Trash") },
+                selected = state.showsTrash && !state.showsSettings,
+                onClick = onOpenTrash,
+                modifier = Modifier.weight(1f).padding(vertical = 2.dp),
+            )
+        }
     }
+}
+
+private fun screenTitle(state: AndroidAppState): String = when {
+    state.showsSettings -> "Settings"
+    state.showsTrash -> "Trash"
+    else -> state.selectedTab.label
 }
 
 @Composable

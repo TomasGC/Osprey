@@ -55,8 +55,6 @@ private val BURST_BADGE = Color(0xFFE8B400)
 @Suppress("MagicNumber")
 private val BURST_BADGE_TEXT = Color(0xFF1A1500)
 
-@Suppress("MagicNumber")
-private val DANGER = Color(0xFFAA3333)
 private const val DONE_ALPHA = 0.4f
 
 /** One group: index badge, burst badge or plain count, status, "Move unchecked", and the member grid. */
