@@ -38,11 +38,21 @@ private fun OspreyContent(state: AppState) {
         return
     }
     val libraryDir = state.libraryHandle()
+    if (state.showsTrash && libraryDir != null) {
+        TrashScreen(state, libraryDir)
+        return
+    }
     val rootAction = libraryDir?.let { rootActionFor(state, state.selectedTab, it) }
     if (rootAction != null) {
         ActionPane(rootAction.ui, rootAction.scan, rootAction.apply, onCancel = rootAction.cancel)
         return
     }
+    YearContent(state)
+}
+
+/** The selected action on the selected year folder. */
+@Composable
+private fun YearContent(state: AppState) {
     val yearDir = state.yearHandle()
     if (yearDir == null) {
         Text("Pick a year to get started.")
