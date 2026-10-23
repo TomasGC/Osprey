@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -146,5 +147,56 @@ class DesktopFileSystemRepositoryTest {
         repo.writeTimestamps(entry.handle, FileTimestamps(modified = modified))
 
         assertEquals(modified, repo.readTimestamps(entry.handle).modified)
+    }
+
+    @Test
+    fun `copyTo copies the content, keeps the source and leaves no temporary file`() {
+        val dest = Files.createDirectory(tempDir.resolve("2018"))
+        val source = tempDir.resolve("a.jpg").also { Files.writeString(it, "abc") }
+
+        val copy = repo.copyTo(PathHandle(source), PathHandle(dest), "b.jpg")
+
+        assertEquals("abc", Files.readString(dest.resolve("b.jpg")))
+        assertEquals(dest.resolve("b.jpg"), (copy as PathHandle).path)
+        assertTrue(Files.exists(source))
+        assertEquals(listOf("b.jpg"), Files.list(dest).use { s -> s.map { it.fileName.toString() }.toList() })
+    }
+
+    @Test
+    fun `copyTo never overwrites an existing file`() {
+        val dest = Files.createDirectory(tempDir.resolve("2018"))
+        Files.writeString(dest.resolve("a.jpg"), "old")
+        val source = tempDir.resolve("a.jpg").also { Files.writeString(it, "new") }
+
+        assertThrows(FileAlreadyExistsException::class.java) { repo.copyTo(PathHandle(source), PathHandle(dest)) }
+
+        assertEquals("old", Files.readString(dest.resolve("a.jpg")))
+        assertEquals(listOf("a.jpg"), Files.list(dest).use { s -> s.map { it.fileName.toString() }.toList() })
+    }
+
+    @Test
+    fun `delete removes a file`() {
+        val file = tempDir.resolve("a.jpg").also { Files.writeString(it, "abc") }
+
+        repo.delete(PathHandle(file))
+
+        assertFalse(Files.exists(file))
+    }
+
+    @Test
+    fun `contentHash is the SHA-256 of the content`() {
+        val file = tempDir.resolve("a.jpg").also { Files.writeString(it, "abc") }
+
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", repo.contentHash(PathHandle(file)))
+    }
+
+    @Test
+    fun `contentHash reads a file larger than one chunk`() {
+        val file = tempDir.resolve("big.mp4")
+        Files.write(file, ByteArray(3_000_000) { (it % 251).toByte() })
+
+        val expected = java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file))
+            .joinToString("") { "%02x".format(it) }
+        assertEquals(expected, repo.contentHash(PathHandle(file)))
     }
 }

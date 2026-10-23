@@ -1,5 +1,7 @@
 package app.osprey.filesystem
 
+import java.io.ByteArrayInputStream
+
 /**
  * In-memory [FileSystemRepository], backing every `:core` planner's unit tests from here on.
  * Seeded and inspected through [addFile]/[addFolder]/[root] — those are fake-only test
@@ -74,6 +76,21 @@ class FakeFileSystemRepository : FileSystemRepository {
         if (hasChildren) throw DirectoryNotEmptyException("folder is not empty")
         nodes.remove(id)
     }
+
+    override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
+        val node = nodes.getValue(entry.id())
+        val destId = destFolder.id()
+        val targetName = newName ?: node.name
+        requireNoCollision(destId, targetName, exceptId = -1L)
+        return newNode(destFolder, targetName, isDirectory = false, bytes = node.bytes.copyOf())
+    }
+
+    override fun delete(entry: FileHandle) {
+        nodes.remove(entry.id())
+    }
+
+    override fun contentHash(entry: FileHandle): String =
+        sha256Hex(ByteArrayInputStream(nodes.getValue(entry.id()).bytes))
 
     override fun readBytes(entry: FileHandle): ByteArray = nodes.getValue(entry.id()).bytes
 

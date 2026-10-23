@@ -8,6 +8,7 @@ import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.FileTransfer
 import app.osprey.filesystem.FileTimestamps
 import java.time.Instant
 
@@ -26,7 +27,10 @@ import java.time.Instant
  * no other SAF-level API to set modified-time, so this never becomes a crash; it is always a
  * silent no-op, surfaced as user-facing copy in #14 rather than attempted here.
  */
-class AndroidFileSystemRepository(private val context: Context) : FileSystemRepository {
+class AndroidFileSystemRepository(
+    private val context: Context,
+    transfer: FileTransfer = AndroidFileTransfer(context),
+) : FileSystemRepository, FileTransfer by transfer {
 
     override fun list(folder: FileHandle): List<FileEntry> {
         val doc = folder.documentFile()
