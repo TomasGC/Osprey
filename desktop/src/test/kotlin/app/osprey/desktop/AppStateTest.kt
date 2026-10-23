@@ -24,7 +24,7 @@ class AppStateTest {
         tempDir.toFile().deleteRecursively()
     }
 
-    private fun newState() = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader())
+    private fun newState() = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), FakeSettingsStore())
 
     @Test
     fun `openLibrary lists only numeric-named subfolders, sorted, as years`() {

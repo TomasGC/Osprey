@@ -47,7 +47,7 @@ private const val DATES_LIMITATION =
 /** App shell: a drawer (library/year picker + the six action screens) behind a top app bar. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OspreyApp(state: AndroidAppState, onChooseLibrary: () -> Unit) {
+fun OspreyApp(state: AndroidAppState) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -58,9 +58,13 @@ fun OspreyApp(state: AndroidAppState, onChooseLibrary: () -> Unit) {
                 ModalDrawerSheet {
                     DrawerContent(
                         state = state,
-                        onChangeLibrary = onChooseLibrary,
+                        onOpenSettings = {
+                            state.settingsState.showing = true
+                            scope.launch { drawerState.close() }
+                        },
                         onTabSelected = { tab ->
                             state.selectedTab = tab
+                            state.settingsState.showing = false
                             scope.launch { drawerState.close() }
                         },
                     )
@@ -70,7 +74,7 @@ fun OspreyApp(state: AndroidAppState, onChooseLibrary: () -> Unit) {
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = { Text(state.selectedTab.label) },
+                        title = { Text(if (state.showsSettings) "Settings" else state.selectedTab.label) },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Text("☰", fontSize = 20.sp)
@@ -89,8 +93,8 @@ fun OspreyApp(state: AndroidAppState, onChooseLibrary: () -> Unit) {
 
 @Composable
 private fun OspreyContent(state: AndroidAppState) {
-    if (state.libraryRoot == null) {
-        Text("Pick a library from the menu (☰) to get started.", modifier = Modifier.padding(24.dp))
+    if (state.showsSettings) {
+        SettingsScreen(state)
         return
     }
     val libraryRoot = state.libraryRoot ?: return
@@ -148,17 +152,13 @@ private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionC
 @Composable
 private fun DrawerContent(
     state: AndroidAppState,
-    onChangeLibrary: () -> Unit,
+    onOpenSettings: () -> Unit,
     onTabSelected: (ActionTab) -> Unit,
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Osprey", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(16.dp))
         Text(libraryLabel(state.libraryRoot), fontSize = 12.sp)
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onChangeLibrary, modifier = Modifier.fillMaxWidth()) {
-            Text("Change library")
-        }
         if (state.years.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Text("Year", fontSize = 12.sp)
@@ -171,11 +171,18 @@ private fun DrawerContent(
         state.visibleTabs.forEach { tab ->
             NavigationDrawerItem(
                 label = { Text(tab.label) },
-                selected = state.selectedTab == tab,
+                selected = state.selectedTab == tab && !state.showsSettings,
                 onClick = { onTabSelected(tab) },
                 modifier = Modifier.padding(vertical = 2.dp),
             )
         }
+        HorizontalDivider()
+        NavigationDrawerItem(
+            label = { Text("⚙ Settings") },
+            selected = state.showsSettings,
+            onClick = onOpenSettings,
+            modifier = Modifier.padding(vertical = 2.dp),
+        )
     }
 }
 

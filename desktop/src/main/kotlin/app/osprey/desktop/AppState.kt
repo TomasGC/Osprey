@@ -9,6 +9,7 @@ import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.media.MediaMetadataReader
+import app.osprey.settings.SettingsStore
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -25,8 +26,13 @@ enum class ActionTab(val label: String) {
 }
 
 /** Top-level app state: the sidebar's library/year selection, plus one controller per tab. */
-class AppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetadataReader) {
+class AppState(
+    val fs: FileSystemRepository,
+    val mediaMetadataReader: MediaMetadataReader,
+    private val settingsStore: SettingsStore,
+) {
 
+    val settingsState = SettingsState(settingsStore) { openLibrary(it) }
     var libraryPath by mutableStateOf<Path?>(null)
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
@@ -42,9 +48,11 @@ class AppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetad
     val dates = datesController(fs, mediaMetadataReader)
     val standardize = standardizeController(fs, mediaMetadataReader)
 
+    /** Loads the saved settings, which open their output folder as the library. */
+    fun start() = settingsState.start()
+
     fun openLibrary(path: Path) {
         libraryPath = path
-        OspreyConfig.saveLibraryPath(path)
         years = listYears(path)
         selectedYear = years.lastOrNull()
         refreshLegacyTrash()
