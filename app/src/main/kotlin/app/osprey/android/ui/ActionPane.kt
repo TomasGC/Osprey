@@ -89,7 +89,7 @@ fun ActionPane(
 
 /** A bar under the buttons while work runs: filled as files are handled, indeterminate while scanning. */
 @Composable
-private fun ProgressBlock(state: ActionUiState) {
+fun ProgressBlock(state: ActionUiState) {
     Column(modifier = Modifier.padding(top = 10.dp)) {
         val progress = state.progress
         if (progress == null) {

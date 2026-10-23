@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -29,8 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.android.VisualDupeGroupUi
+import app.osprey.filesystem.FileHandle
 import app.osprey.media.MediaMetadataReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,22 +41,23 @@ private const val PREVIEW_WIDTH_FRACTION = 0.95f
 private val PREVIEW_MAX_HEIGHT = 480.dp
 
 /**
- * Fullscreen image preview with its own keep/dup toggle, kept in sync with the grid. No Escape
- * key on a phone -- tapping the scrim closes it instead, same gesture as the thumbnail that
- * opened it.
+ * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. Tapping the
+ * scrim closes it: there is no Escape key on a phone.
  */
 @Composable
-fun PreviewLightbox(
-    group: VisualDupeGroupUi,
-    member: VisualDupeMember,
+fun MediaPreview(
     mediaMetadataReader: MediaMetadataReader,
+    handle: FileHandle,
+    name: String,
+    checked: Boolean,
+    checkLabel: String,
+    onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    var frame by remember(member.handle) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(member.handle) {
-        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(member.handle)?.toImageBitmap() }
+    var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(handle) {
+        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(handle)?.toImageBitmap() }
     }
-    val kept = group.keep[member.name] == true
 
     Column(
         modifier = Modifier
@@ -75,19 +74,19 @@ fun PreviewLightbox(
         frame?.let {
             Image(
                 it,
-                contentDescription = member.name,
+                contentDescription = name,
                 modifier = Modifier.fillMaxWidth(PREVIEW_WIDTH_FRACTION).heightIn(max = PREVIEW_MAX_HEIGHT),
                 contentScale = ContentScale.Fit,
             )
         }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = kept, onCheckedChange = { group.keep[member.name] = it })
-            Text("Keep this one", color = Color.White)
+            Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+            Text(checkLabel, color = Color.White)
             Spacer(Modifier.width(14.dp))
             Button(onClick = onClose) { Text("Close") }
         }
         Spacer(Modifier.height(4.dp))
-        Text(member.name, color = Color.Gray)
+        Text(name, color = Color.Gray)
     }
 }

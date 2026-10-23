@@ -46,6 +46,9 @@ class AndroidAppState(
     var selectedTab by mutableStateOf(ActionTab.REORG)
     var hasLegacyTrash by mutableStateOf(false)
 
+    /** Whether the Trash screen is showing instead of the selected action. */
+    var showsTrash by mutableStateOf(false)
+
     /** True while the Settings screen is up, which is also the only screen until an output folder is set. */
     val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
@@ -56,6 +59,7 @@ class AndroidAppState(
     val trashMigration = trashMigrationController(fs)
     val dates = datesController(fs, mediaMetadataReader)
     val standardize = standardizeController(fs, mediaMetadataReader)
+    val trash = TrashController(fs)
 
     /** Loads the saved settings, which open their output folder as the library. */
     fun start() = settingsState.start()
@@ -65,6 +69,18 @@ class AndroidAppState(
         years = listYears(fs, root)
         selectedYear = years.lastOrNull()
         refreshLegacyTrash()
+    }
+
+    /** Opens the Trash screen, freshly read, or goes back to the actions when it is already open. */
+    fun toggleTrash() {
+        val root = libraryRoot
+        if (showsTrash || root == null) {
+            showsTrash = false
+            return
+        }
+        settingsState.showing = false
+        trash.refresh(root)
+        showsTrash = true
     }
 
     /** The tabs to show: "Migrate old trash" only while an old `TODELETE*` folder is left. */

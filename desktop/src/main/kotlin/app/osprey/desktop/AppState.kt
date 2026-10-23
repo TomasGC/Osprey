@@ -42,6 +42,9 @@ class AppState(
     var sidebarCollapsed by mutableStateOf(false)
     var hasLegacyTrash by mutableStateOf(false)
 
+    /** Whether the Trash screen is showing instead of the selected action. */
+    var showsTrash by mutableStateOf(false)
+
     val flatten = flattenController(fs)
     val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader)) { reorgSources() }
     val rename = renameController(fs)
@@ -49,6 +52,7 @@ class AppState(
     val trashMigration = trashMigrationController(fs)
     val dates = datesController(fs, mediaMetadataReader)
     val standardize = standardizeController(fs, mediaMetadataReader)
+    val trash = TrashController(fs)
 
     /** Loads the saved settings, which open their output folder as the library. */
     fun start() = settingsState.start()
@@ -58,6 +62,18 @@ class AppState(
         years = listYears(path)
         selectedYear = years.lastOrNull()
         refreshLegacyTrash()
+    }
+
+    /** Opens the Trash screen, freshly read, or goes back to the actions when it is already open. */
+    fun toggleTrash() {
+        val root = libraryHandle()
+        if (showsTrash || root == null) {
+            showsTrash = false
+            return
+        }
+        settingsState.showing = false
+        trash.refresh(root)
+        showsTrash = true
     }
 
     /** The tabs to show: "Migrate old trash" only while an old `TODELETE*` folder is left. */

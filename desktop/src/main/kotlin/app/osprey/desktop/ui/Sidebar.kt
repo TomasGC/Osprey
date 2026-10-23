@@ -73,11 +73,20 @@ private fun LibraryBlock(state: AppState) {
 @Composable
 private fun SettingsButton(state: AppState) {
     Row(modifier = Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { state.settingsState.showing = !state.settingsState.showing }) {
+        IconButton(
+            onClick = {
+                state.showsTrash = false
+                state.settingsState.showing = !state.settingsState.showing
+            },
+        ) {
             Text("⚙")
         }
         if (!state.sidebarCollapsed) {
             Text("Settings")
+            Spacer(Modifier.weight(1f))
+        }
+        IconButton(onClick = state::toggleTrash) {
+            Text("🗑")
         }
     }
 }
@@ -117,7 +126,10 @@ private fun NavList(state: AppState) {
             ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         }
         Button(
-            onClick = { state.selectedTab = tab },
+            onClick = {
+                state.showsTrash = false
+                state.selectedTab = tab
+            },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
             colors = colors,
         ) {
