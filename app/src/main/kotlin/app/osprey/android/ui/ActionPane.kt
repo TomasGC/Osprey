@@ -13,7 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +40,7 @@ fun ActionPane(
     onApply: suspend () -> Unit,
     scanLabel: String = "Scan",
     applyBlockedReason: String? = null,
+    onCancel: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -51,6 +54,12 @@ fun ActionPane(
             ) {
                 Text(if (state.busy) "Working..." else "Apply")
             }
+            if (onCancel != null && state.canCancel) {
+                OutlinedButton(onClick = onCancel) { Text("Stop") }
+            }
+        }
+        if (state.busy) {
+            ProgressBlock(state)
         }
         Spacer(Modifier.height(8.dp))
         Text(state.summary + state.appliedSuffix, fontSize = 14.sp)
@@ -75,5 +84,19 @@ fun ActionPane(
                 Text(state.lines.joinToString("\n"), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             }
         }
+    }
+}
+
+/** A bar under the buttons while work runs: filled as files are handled, indeterminate while scanning. */
+@Composable
+private fun ProgressBlock(state: ActionUiState) {
+    Column(modifier = Modifier.padding(top = 10.dp)) {
+        val progress = state.progress
+        if (progress == null) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        }
+        if (state.progressText.isNotEmpty()) Text(state.progressText, fontSize = 12.sp)
     }
 }

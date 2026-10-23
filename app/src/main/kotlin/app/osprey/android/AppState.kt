@@ -3,6 +3,8 @@ package app.osprey.android
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.osprey.actions.reorg.ReorgPlanner
+import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.filesystem.FileHandle
@@ -13,8 +15,8 @@ import app.osprey.settings.SettingsStore
 
 /** Which screen is showing, same actions and order as desktop's `ActionTab` (#11). */
 enum class ActionTab(val label: String) {
+    REORG("Reorg"),
     FLATTEN("Flatten"),
-    YEAR_FOLDERS("Year folders"),
     RENAME("Rename"),
     DEDUPE("Dedupe"),
     VISUAL("Visual Dupes"),
@@ -28,7 +30,7 @@ class AndroidAppState(
     val fs: FileSystemRepository,
     val mediaMetadataReader: MediaMetadataReader,
     settingsStore: SettingsStore,
-    resolveFolder: (FolderSetting) -> FileHandle?,
+    private val resolveFolder: (FolderSetting) -> FileHandle?,
     releaseGrant: (String) -> Unit,
 ) {
 
@@ -41,14 +43,14 @@ class AndroidAppState(
     var libraryRoot by mutableStateOf<FileHandle?>(null)
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
-    var selectedTab by mutableStateOf(ActionTab.FLATTEN)
+    var selectedTab by mutableStateOf(ActionTab.REORG)
     var hasLegacyTrash by mutableStateOf(false)
 
     /** True while the Settings screen is up, which is also the only screen until an output folder is set. */
     val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
     val flatten = flattenController(fs)
-    val yearFolders = yearFoldersController(fs, mediaMetadataReader)
+    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader)) { reorgSources() }
     val rename = renameController(fs)
     val dedupe = dedupeController(fs, ::trashLocation)
     val trashMigration = trashMigrationController(fs)
@@ -77,6 +79,11 @@ class AndroidAppState(
     fun refreshLegacyTrash() {
         val root = libraryRoot
         hasLegacyTrash = root != null && TrashMigrationPlanner(fs).hasLegacy(root)
+    }
+
+    /** The saved input folders as Reorg sources; one whose grant no longer resolves has no handle (unreachable). */
+    private fun reorgSources(): List<ReorgSource> = settingsState.settings.inputs.map { input ->
+        ReorgSource(resolveFolder(input.folder), input.folder.displayName, input.mode)
     }
 
     /** Re-reads the year folders on disk, keeping the selection when its folder still exists. */
