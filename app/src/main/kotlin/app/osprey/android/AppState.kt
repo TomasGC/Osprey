@@ -8,6 +8,8 @@ import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.media.MediaMetadataReader
+import app.osprey.settings.FolderSetting
+import app.osprey.settings.SettingsStore
 
 /** Which screen is showing, same actions and order as desktop's `ActionTab` (#11). */
 enum class ActionTab(val label: String) {
@@ -22,13 +24,28 @@ enum class ActionTab(val label: String) {
 }
 
 /** Top-level app state: the chosen library root, year selection, plus one controller per tab. */
-class AndroidAppState(val fs: FileSystemRepository, val mediaMetadataReader: MediaMetadataReader) {
+class AndroidAppState(
+    val fs: FileSystemRepository,
+    val mediaMetadataReader: MediaMetadataReader,
+    settingsStore: SettingsStore,
+    resolveFolder: (FolderSetting) -> FileHandle?,
+    releaseGrant: (String) -> Unit,
+) {
+
+    val settingsState = SettingsState(
+        settingsStore,
+        onOutputChosen = { folder -> resolveFolder(folder)?.let { openLibrary(it) } },
+        releaseGrant = releaseGrant,
+    )
 
     var libraryRoot by mutableStateOf<FileHandle?>(null)
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
     var selectedTab by mutableStateOf(ActionTab.FLATTEN)
     var hasLegacyTrash by mutableStateOf(false)
+
+    /** True while the Settings screen is up, which is also the only screen until an output folder is set. */
+    val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
     val flatten = flattenController(fs)
     val yearFolders = yearFoldersController(fs, mediaMetadataReader)
@@ -37,6 +54,9 @@ class AndroidAppState(val fs: FileSystemRepository, val mediaMetadataReader: Med
     val trashMigration = trashMigrationController(fs)
     val dates = datesController(fs, mediaMetadataReader)
     val standardize = standardizeController(fs, mediaMetadataReader)
+
+    /** Loads the saved settings, which open their output folder as the library. */
+    fun start() = settingsState.start()
 
     fun openLibrary(root: FileHandle) {
         libraryRoot = root

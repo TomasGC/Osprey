@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import app.osprey.desktop.ActionTab
 import app.osprey.desktop.AppState
 import app.osprey.desktop.SimpleActionController
-import app.osprey.desktop.pickFolder
 
 /** App shell: collapsible sidebar + a content area switching between the five simple-action tabs. */
 @Composable
@@ -21,7 +20,7 @@ fun OspreyApp(state: AppState) {
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxSize()) {
-                Sidebar(state, onChangeLibrary = { pickFolder()?.let { state.openLibrary(it) } })
+                Sidebar(state)
                 Box(modifier = Modifier.fillMaxHeight()) {
                     OspreyContent(state)
                 }
@@ -32,8 +31,8 @@ fun OspreyApp(state: AppState) {
 
 @Composable
 private fun OspreyContent(state: AppState) {
-    if (state.libraryPath == null) {
-        NoLibraryScreen(onChooseLibrary = { pickFolder()?.let { state.openLibrary(it) } })
+    if (state.settingsState.showing || state.libraryPath == null) {
+        SettingsScreen(state)
         return
     }
     val libraryDir = state.libraryHandle()
