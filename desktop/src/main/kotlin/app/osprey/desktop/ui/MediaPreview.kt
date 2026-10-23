@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -35,8 +34,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.desktop.VisualDupeGroupUi
+import app.osprey.filesystem.FileHandle
 import app.osprey.media.MediaMetadataReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,19 +46,21 @@ private const val PREVIEW_WIDTH_FRACTION = 0.8f
 @Suppress("MagicNumber")
 private val PREVIEW_MAX_HEIGHT = 560.dp
 
-/** Fullscreen image preview with its own keep/dup toggle, kept in sync with the grid. Escape closes. */
+/** Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. Escape closes. */
 @Composable
-fun PreviewLightbox(
-    group: VisualDupeGroupUi,
-    member: VisualDupeMember,
+fun MediaPreview(
     mediaMetadataReader: MediaMetadataReader,
+    handle: FileHandle,
+    name: String,
+    checked: Boolean,
+    checkLabel: String,
+    onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    var frame by remember(member.handle) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(member.handle) {
-        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(member.handle)?.toImageBitmap() }
+    var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(handle) {
+        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(handle)?.toImageBitmap() }
     }
-    val kept = group.keep[member.name] == true
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -89,17 +89,17 @@ fun PreviewLightbox(
         frame?.let {
             Image(
                 it,
-                contentDescription = member.name,
+                contentDescription = name,
                 modifier = Modifier.fillMaxWidth(PREVIEW_WIDTH_FRACTION).heightIn(max = PREVIEW_MAX_HEIGHT),
                 contentScale = ContentScale.Fit,
             )
         }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = kept, onCheckedChange = { group.keep[member.name] = it })
-            Text("Keep this one", color = Color.White)
+            Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+            Text(checkLabel, color = Color.White)
             Spacer(Modifier.width(14.dp))
-            Text(member.name, color = Color.Gray)
+            Text(name, color = Color.Gray)
             Spacer(Modifier.width(14.dp))
             Button(onClick = onClose) { Text("Close") }
         }

@@ -83,10 +83,13 @@ fun VisualDupeGroupCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 group.members.forEach { member ->
-                    VisualDupeThumbnail(
+                    MediaCard(
                         mediaMetadataReader = state.mediaMetadataReader,
-                        member = member,
-                        kept = group.keep[member.name] == true,
+                        handle = member.handle,
+                        name = member.name,
+                        sizeBytes = member.sizeBytes,
+                        checked = group.keep[member.name] == true,
+                        badge = "KEEP",
                         onToggle = { group.keep[member.name] = group.keep[member.name] != true },
                         onOpen = { onPreview(member) },
                     )

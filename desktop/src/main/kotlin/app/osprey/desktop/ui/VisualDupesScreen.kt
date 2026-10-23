@@ -72,6 +72,14 @@ fun VisualDupesScreen(state: AppState, yearDir: FileHandle) {
     }
 
     preview?.let { (group, member) ->
-        PreviewLightbox(group, member, state.mediaMetadataReader, onClose = { preview = null })
+        MediaPreview(
+            mediaMetadataReader = state.mediaMetadataReader,
+            handle = member.handle,
+            name = member.name,
+            checked = group.keep[member.name] == true,
+            checkLabel = "Keep this one",
+            onCheckedChange = { group.keep[member.name] = it },
+            onClose = { preview = null },
+        )
     }
 }
