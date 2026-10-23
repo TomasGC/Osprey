@@ -1,5 +1,6 @@
 package app.osprey.desktop.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -125,7 +126,10 @@ private fun TrashTabs(controller: TrashController) {
             )
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 6.dp).clickable(onClick = controller::toggleTab),
+    ) {
         Checkbox(checked = controller.tabFullySelected, onCheckedChange = { controller.toggleTab() })
         Text("Select all in this tab")
     }
