@@ -9,7 +9,6 @@ import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashClearer
 import app.osprey.actions.trash.TrashContents
 import app.osprey.actions.trash.TrashEntry
-import app.osprey.actions.trash.TrashProgress
 import app.osprey.actions.trash.TrashRestorer
 import app.osprey.actions.trash.TrashScanner
 import app.osprey.actions.trash.TrashSelection
@@ -18,6 +17,9 @@ import app.osprey.actions.trash.clearResultLines
 import app.osprey.actions.trash.restoreResultLines
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.JobProgress
+import app.osprey.jobs.progressText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -98,8 +100,8 @@ class TrashController(private val fs: FileSystemRepository) {
         val selected = selection.entriesIn(contents)
         if (selected.isEmpty()) return
         stopRequested = false
-        val result = runWithProgress(state, { stopRequested }) { stop, progress ->
-            TrashClearer(fs).clear(root, selected, stop, progress)
+        val result = runWithProgress(state, { stopRequested }) { control ->
+            TrashClearer(fs).clear(root, selected, control)
         }
         report = clearResultLines(result)
         refresh(root)
@@ -111,8 +113,8 @@ class TrashController(private val fs: FileSystemRepository) {
         val restorer = TrashRestorer(fs)
         val plan = restorer.plan(root, selected)
         stopRequested = false
-        val result = runWithProgress(state, { stopRequested }) { stop, progress ->
-            restorer.restore(root, plan, stop, progress)
+        val result = runWithProgress(state, { stopRequested }) { control ->
+            restorer.restore(root, plan, control)
         }
         conflicts = plan.conflicts
         report = restoreResultLines(result, plan.conflicts.size)
@@ -141,17 +143,20 @@ class TrashController(private val fs: FileSystemRepository) {
 /** Runs [work] off the UI thread with [state] showing a progress bar and a Stop button. */
 private suspend fun <T> runWithProgress(
     state: ActionUiState,
-    shouldStop: () -> Boolean,
-    work: (() -> Boolean, (TrashProgress) -> Unit) -> T,
+    isStopRequested: () -> Boolean,
+    work: (JobControl) -> T,
 ): T {
     state.busy = true
     state.canCancel = true
-    val result = withContext(Dispatchers.IO) {
-        work(shouldStop) { progress ->
-            state.progress = progress.done.toFloat() / progress.total
-            state.progressText = "${progress.done + 1} of ${progress.total}: ${progress.current}"
+    val control = object : JobControl {
+        override fun shouldStop(): Boolean = isStopRequested()
+
+        override fun report(done: Int, total: Int, current: String) {
+            state.progress = done.toFloat() / total
+            state.progressText = progressText(JobProgress(done, total, current))
         }
     }
+    val result = withContext(Dispatchers.IO) { work(control) }
     state.progress = null
     state.progressText = ""
     state.canCancel = false

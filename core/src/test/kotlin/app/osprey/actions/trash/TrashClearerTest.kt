@@ -1,5 +1,8 @@
 package app.osprey.actions.trash
 
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.RecordingJobControl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,8 +12,8 @@ class TrashClearerTest {
 
     private val lib = TrashTestLibrary()
 
-    private fun clear(entries: Collection<TrashEntry>, shouldStop: () -> Boolean = { false }) =
-        TrashClearer(lib.fs).clear(lib.root, entries, shouldStop)
+    private fun clear(entries: Collection<TrashEntry>, control: JobControl = NoJobControl) =
+        TrashClearer(lib.fs).clear(lib.root, entries, control = control)
 
     @Test
     fun `deletes exactly the given files and nothing else`() {
@@ -92,9 +95,8 @@ class TrashClearerTest {
     fun `stops between two files when asked and keeps the rest`() {
         val a = lib.trash("2019", TrashAction.DEDUPE, "a.jpg")
         val b = lib.trash("2019", TrashAction.DEDUPE, "b.jpg")
-        var calls = 0
 
-        val result = clear(listOf(a, b), shouldStop = { calls++ >= 1 })
+        val result = clear(listOf(a, b), RecordingJobControl(stopAfterReports = 1))
 
         assertTrue(result.cancelled)
         assertEquals(1, result.deleted)
@@ -105,11 +107,22 @@ class TrashClearerTest {
     fun `reports progress per file`() {
         val a = lib.trash("2019", TrashAction.DEDUPE, "a.jpg")
         val b = lib.trash("2019", TrashAction.DEDUPE, "b.jpg")
-        val seen = mutableListOf<TrashProgress>()
+        val control = RecordingJobControl()
 
-        TrashClearer(lib.fs).clear(lib.root, listOf(a, b), progress = { seen += it })
+        clear(listOf(a, b), control)
 
-        assertEquals(listOf(0, 1), seen.map { it.done })
-        assertTrue(seen.all { it.total == 2 })
+        assertEquals(listOf(0, 1), control.reports.map { it.done })
+        assertTrue(control.reports.all { it.total == 2 })
+        assertEquals(listOf("Trash/2019/Dedupe/a.jpg", "Trash/2019/Dedupe/b.jpg"), control.reports.map { it.current })
+    }
+
+    @Test
+    fun `clears without a job around it, as a script or a test would`() {
+        val a = lib.trash("2019", TrashAction.DEDUPE, "a.jpg")
+
+        val result = TrashClearer(lib.fs).clear(lib.root, listOf(a))
+
+        assertEquals(1, result.deleted)
+        assertFalse(result.cancelled)
     }
 }

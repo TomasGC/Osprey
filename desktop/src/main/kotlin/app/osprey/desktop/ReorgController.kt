@@ -6,6 +6,9 @@ import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.reorg.reorgResultLines
 import app.osprey.actions.reorg.reorgSummary
 import app.osprey.filesystem.FileHandle
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.JobProgress
+import app.osprey.jobs.progressText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -47,12 +50,15 @@ class ReorgController(
         state.applyEnabled = false
         state.busy = true
         state.canCancel = true
-        val result = withContext(Dispatchers.IO) {
-            planner.apply(plan, output, shouldStop = { stopRequested }) { progress ->
-                state.progress = progress.done.toFloat() / progress.total
-                state.progressText = "${progress.done + 1} of ${progress.total}: ${progress.current}"
+        val control = object : JobControl {
+            override fun shouldStop(): Boolean = stopRequested
+
+            override fun report(done: Int, total: Int, current: String) {
+                state.progress = done.toFloat() / total
+                state.progressText = progressText(JobProgress(done, total, current))
             }
         }
+        val result = withContext(Dispatchers.IO) { planner.apply(plan, output, control) }
         state.lines = reorgResultLines(result) + state.lines
         state.appliedSuffix = "  -- APPLIED (${result.done}), failed ${result.failures.size}"
         state.progress = null

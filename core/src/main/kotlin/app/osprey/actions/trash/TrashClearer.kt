@@ -2,6 +2,9 @@ package app.osprey.actions.trash
 
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 /**
  * Deletes files from the Trash: the only irreversible step in Osprey. It acts on the entries it is
@@ -12,30 +15,25 @@ import app.osprey.filesystem.FileSystemRepository
 class TrashClearer(private val fs: FileSystemRepository) {
 
     /**
-     * Deletes [entries] one by one. [shouldStop] is polled before each file, [progress] told which
-     * one is next. A file that cannot be deleted is listed in the result and the run carries on.
+     * Deletes [entries] one by one. [control] is asked before each file and told which one is next.
+     * A file that cannot be deleted is listed in the result and the run carries on.
      */
     fun clear(
         libraryRoot: FileHandle,
         entries: Collection<TrashEntry>,
-        shouldStop: () -> Boolean = { false },
-        progress: (TrashProgress) -> Unit = {},
+        control: JobControl = NoJobControl,
     ): TrashClearResult {
         val locator = TrashLocator(fs, libraryRoot)
         val failures = mutableListOf<TrashFailure>()
         val touched = linkedSetOf<Pair<String, TrashAction>>()
         var deleted = 0
-        var cancelled = false
-        for ((index, entry) in entries.withIndex()) {
-            cancelled = shouldStop()
-            if (cancelled) break
-            progress(TrashProgress(index, entries.size, entry.label))
+        val finished = control.forEachUntilStopped(entries, TrashEntry::label) { entry ->
             touched += entry.year to entry.action
             val failure = attempt(entry.label) { delete(locator, entry) }
             if (failure == null) deleted++ else failures += failure
         }
         val pruned = touched.sumOf { (year, action) -> locator.prune(year, action) }
-        return TrashClearResult(deleted, failures, pruned, cancelled)
+        return TrashClearResult(deleted, failures, pruned, cancelled = !finished)
     }
 
     private fun delete(locator: TrashLocator, entry: TrashEntry) {
