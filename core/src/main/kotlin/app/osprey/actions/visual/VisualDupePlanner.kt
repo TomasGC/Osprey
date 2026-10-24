@@ -18,6 +18,9 @@ import app.osprey.media.MediaMetadataReader
  */
 const val VISUAL_HAMMING_THRESHOLD = 2
 
+/** Longest side the planner asks the reader for: [phash] samples a 32x32 grid, 128 oversamples it 4x. */
+const val HASH_DECODE_MAX_SIDE = 128
+
 private const val BYTES_PER_KB = 1024
 
 /**
@@ -52,7 +55,8 @@ class VisualDupePlanner(
             .filterNot { it.isDirectory }
             .filter { isImageOrVideo(it.name) }
             .mapNotNull { entry ->
-                val frame = mediaMetadataReader.decodeFrame(entry.handle) ?: return@mapNotNull null
+                val frame = mediaMetadataReader.decodeFrame(entry.handle, HASH_DECODE_MAX_SIDE)
+                    ?: return@mapNotNull null
                 entry to phash(frame)
             }
 

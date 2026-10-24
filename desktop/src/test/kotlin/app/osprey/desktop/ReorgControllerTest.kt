@@ -25,7 +25,7 @@ class ReorgControllerTest {
     private object NameOnlyReader : MediaMetadataReader {
         override fun captureDateTime(entry: FileHandle): MediaDate? = null
 
-        override fun decodeFrame(entry: FileHandle): PixelBuffer? = null
+        override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? = null
     }
 
     private lateinit var tempDir: Path

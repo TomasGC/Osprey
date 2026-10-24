@@ -39,6 +39,7 @@ import app.osprey.actions.splitStemAndSuffix
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.formatSize
+import app.osprey.media.CARD_DECODE_MAX_SIDE
 import app.osprey.media.MediaMetadataReader
 import java.awt.Desktop
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +71,9 @@ fun MediaCard(
     val isImage = splitStemAndSuffix(name).second.lowercase() in imageExtensions
     var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(handle) {
-        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(handle)?.toImageBitmap() }
+        frame = withContext(Dispatchers.IO) {
+            mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE)?.toImageBitmap()
+        }
     }
 
     Column(

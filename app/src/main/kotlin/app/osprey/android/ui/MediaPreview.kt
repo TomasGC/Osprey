@@ -37,6 +37,9 @@ import kotlinx.coroutines.withContext
 private val SCRIM = Color(0xE6000000)
 private const val PREVIEW_WIDTH_FRACTION = 0.95f
 
+/** A phone heap cannot hold a 40 MP photo twice (pixels, then bitmap): the lightbox decodes at screen size (#49). */
+private const val PREVIEW_DECODE_MAX_SIDE = 2048
+
 @Suppress("MagicNumber")
 private val PREVIEW_MAX_HEIGHT = 480.dp
 
@@ -56,7 +59,9 @@ fun MediaPreview(
 ) {
     var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(handle) {
-        frame = withContext(Dispatchers.IO) { mediaMetadataReader.decodeFrame(handle)?.toImageBitmap() }
+        frame = withContext(Dispatchers.IO) {
+            mediaMetadataReader.decodeFrame(handle, PREVIEW_DECODE_MAX_SIDE)?.toImageBitmap()
+        }
     }
 
     Column(
