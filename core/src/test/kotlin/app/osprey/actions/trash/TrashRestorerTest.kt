@@ -1,5 +1,7 @@
 package app.osprey.actions.trash
 
+import app.osprey.filesystem.FaultyFileSystemRepository
+import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -152,5 +154,59 @@ class TrashRestorerTest {
         val failure = restorer.resolve(lib.root, conflict, ConflictChoice.BOTH)
 
         assertEquals("Trash/2019/Dedupe/taken.jpg", failure?.label)
+    }
+
+    @Test
+    fun `keeping the Trash copy of a file that vanished from the Trash reports it and changes nothing`() {
+        val taken = lib.trash("2019", TrashAction.DEDUPE, "taken.jpg")
+        lib.library("2019", "taken.jpg", "library".toByteArray())
+        val conflict = restorer.plan(lib.root, listOf(taken)).conflicts.single()
+        lib.fs.delete(taken.handle)
+
+        val failure = restorer.resolve(lib.root, conflict, ConflictChoice.TRASH_COPY)
+
+        assertEquals("Trash/2019/Dedupe/taken.jpg", failure?.label)
+        assertEquals("not in the Trash any more", failure?.reason)
+        assertEquals("library", textOf("2019", "taken.jpg"))
+    }
+
+    @Test
+    fun `keeping the Trash copy puts the library file back when the swap fails`() {
+        val taken = lib.trash("2019", TrashAction.DEDUPE, "taken.jpg", "trash".toByteArray())
+        lib.library("2019", "taken.jpg", "library".toByteArray())
+        val conflict = restorer.plan(lib.root, listOf(taken)).conflicts.single()
+        val faulty = FaultyFileSystemRepository(lib.fs)
+        faulty.failMove = { entry -> if (entry == taken.handle) FileAlreadyExistsException("taken.jpg appeared") else null }
+
+        val failure = TrashRestorer(faulty).resolve(lib.root, conflict, ConflictChoice.TRASH_COPY)
+
+        assertEquals("taken.jpg appeared", failure?.reason)
+        assertEquals("library", textOf("2019", "taken.jpg"))
+        assertEquals("trash", textOf("Trash", "2019", "Dedupe", "taken.jpg"))
+        assertTrue(lib.namesIn("Trash", "2019", "Replaced").isEmpty())
+    }
+
+    @Test
+    fun `restoring into a year that exists as a file reports the failure and keeps the Trash file`() {
+        val a = lib.trash("2019", TrashAction.DEDUPE, "a.jpg")
+        lib.fs.addFile(lib.root, "2019")
+
+        val result = restoreAll(a)
+
+        assertEquals(0, result.restored)
+        assertEquals(listOf("Trash/2019/Dedupe/a.jpg"), result.failures.map { it.label })
+        assertTrue(lib.exists("Trash", "2019", "Dedupe", "a.jpg"))
+    }
+
+    @Test
+    fun `every choice settles a conflict without a failure`() {
+        for (choice in ConflictChoice.entries) {
+            val library = TrashTestLibrary()
+            val taken = library.trash("2019", TrashAction.DEDUPE, "taken.jpg", "trash".toByteArray())
+            library.library("2019", "taken.jpg", "library".toByteArray())
+            val conflict = TrashRestorer(library.fs).plan(library.root, listOf(taken)).conflicts.single()
+
+            assertNull("$choice", TrashRestorer(library.fs).resolve(library.root, conflict, choice))
+        }
     }
 }

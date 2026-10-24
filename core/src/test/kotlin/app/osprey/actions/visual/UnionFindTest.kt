@@ -38,4 +38,27 @@ class UnionFindTest {
 
         assertEquals(42, uf.find(42))
     }
+
+    @Test
+    fun `uniting two elements that already share a root changes nothing`() {
+        val unionFind = UnionFind<Int>()
+        unionFind.union(1, 2)
+        val root = unionFind.find(1)
+
+        unionFind.union(1, 2)
+        unionFind.union(2, 2)
+
+        assertEquals(root, unionFind.find(1))
+        assertEquals(root, unionFind.find(2))
+    }
+
+    @Test
+    fun `find compresses a long chain to one root`() {
+        val unionFind = UnionFind<Int>()
+        for (i in 1..5) unionFind.union(i, i + 1)
+
+        val roots = (1..6).map { unionFind.find(it) }.toSet()
+
+        assertEquals(1, roots.size)
+    }
 }

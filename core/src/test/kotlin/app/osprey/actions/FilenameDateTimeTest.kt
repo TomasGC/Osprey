@@ -54,4 +54,28 @@ class FilenameDateTimeTest {
         // Real camera/burst/chunk names must never be parsed as dates.
         assertNull(filenameDateTime("DSCPDC_0000_BURST20170101120000"))
     }
+
+    @Test
+    fun `parses a WhatsApp name as midnight of its date`() {
+        assertEquals(LocalDateTime.of(2019, 3, 7, 0, 0, 0), filenameDateTime("IMG-20190307-WA0012"))
+        assertEquals(LocalDateTime.of(2019, 3, 7, 0, 0, 0), filenameDateTime("VID-20190307-WA0012"))
+    }
+
+    @Test
+    fun `returns null when a WhatsApp name encodes an impossible date`() {
+        assertNull(filenameDateTime("IMG-20191301-WA0012"))
+    }
+
+    @Test
+    fun `parses the largest 13-digit epoch-millis timestamp`() {
+        val expected = LocalDateTime.ofInstant(Instant.ofEpochMilli(9_999_999_999_999L), ZoneId.systemDefault())
+
+        assertEquals(expected, filenameDateTime("9999999999999"))
+    }
+
+    @Test
+    fun `does not read a 12-digit or 14-digit number as epoch millis`() {
+        assertNull(filenameDateTime("123456789012"))
+        assertNull(filenameDateTime("12345678901234"))
+    }
 }

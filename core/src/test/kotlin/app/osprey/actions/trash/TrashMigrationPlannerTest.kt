@@ -156,4 +156,33 @@ class TrashMigrationPlannerTest {
         assertEquals(1, count)
         assertEquals("  TRASH 2019/TODELETE/a.jpg -> Trash/2019/Dedupe/a.jpg", logs.single())
     }
+
+    @Test
+    fun `plan ignores a file named like a year and a file named like an old folder`() {
+        fs.addFile(fs.root, "2019")
+        fs.addFile(yearFolder("2020"), "TODELETE")
+        fs.addFolder(yearFolder("2021"), "Photos")
+
+        val plan = planner.plan(fs.root)
+
+        assertTrue(plan.moves.isEmpty())
+        assertTrue(plan.folders.isEmpty())
+        assertFalse(planner.hasLegacy(fs.root))
+    }
+
+    @Test
+    fun `describe marks a renamed move`() {
+        fs.addFile(fs.addFolder(yearFolder("2019"), "TODELETE"), "a.jpg", byteArrayOf(1))
+        planner.apply(planner.plan(fs.root), fs.root) {}
+        fs.addFile(fs.addFolder(child(fs.root, "2019"), "TODELETE"), "a.jpg", byteArrayOf(2))
+        val lines = mutableListOf<String>()
+
+        val count = planner.describe(planner.plan(fs.root), lines::add)
+
+        assertEquals(1, count)
+        assertEquals(
+            "  TRASH 2019/TODELETE/a.jpg -> Trash/2019/Dedupe/a__dup1.jpg  (renamed, name collision)",
+            lines.single(),
+        )
+    }
 }

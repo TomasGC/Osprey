@@ -54,4 +54,27 @@ class TrashScannerTest {
 
         assertTrue(TrashScanner(lib.fs).scan(lib.root).entries.isEmpty())
     }
+
+    @Test
+    fun `a file called Trash is not a Trash folder`() {
+        lib.fs.addFile(lib.root, "Trash")
+
+        assertTrue(TrashScanner(lib.fs).scan(lib.root).entries.isEmpty())
+    }
+
+    @Test
+    fun `a folder with no name is not a year`() {
+        val trash = lib.fs.createFolder(lib.root, "Trash")
+        lib.fs.addFile(lib.fs.addFolder(lib.fs.addFolder(trash, ""), "Dedupe"), "a.jpg")
+
+        assertTrue(TrashScanner(lib.fs).scan(lib.root).entries.isEmpty())
+    }
+
+    @Test
+    fun `a folder whose name only starts with digits is not a year`() {
+        val trash = lib.fs.createFolder(lib.root, "Trash")
+        lib.fs.addFile(lib.fs.addFolder(lib.fs.addFolder(trash, "2019x"), "Dedupe"), "a.jpg")
+
+        assertTrue(TrashScanner(lib.fs).scan(lib.root).entries.isEmpty())
+    }
 }

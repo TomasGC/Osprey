@@ -55,4 +55,12 @@ class TrashConfirmationTest {
             clearConfirmation(entries),
         )
     }
+
+    @Test
+    fun `nothing selected still names the Trash and says it is final`() {
+        assertEquals(
+            "Permanently delete 0 files (0 B) from the Trash? This cannot be undone.",
+            clearConfirmation(emptyList()),
+        )
+    }
 }

@@ -21,4 +21,14 @@ class BurstIdTest {
         assertNull(burstId("DSC_0815.JPG"))
         assertNull(burstId("IMG_20170425_152602.jpg"))
     }
+
+    @Test
+    fun `reads the digits after BURST wherever they sit in the name`() {
+        assertEquals("20170101", burstId("a_BURST20170101_b.jpg"))
+    }
+
+    @Test
+    fun `BURST with no digits after it is not a burst id`() {
+        assertNull(burstId("BURST_cover.jpg"))
+    }
 }

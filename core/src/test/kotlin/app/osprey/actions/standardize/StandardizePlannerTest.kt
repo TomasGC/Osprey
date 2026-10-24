@@ -147,4 +147,44 @@ class StandardizePlannerTest {
         assertEquals(1, count)
         assertTrue(logs.any { it.contains("RENAME") })
     }
+
+    @Test
+    fun `plan gives two files that resolve to one name distinct names`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_20170425_152602.jpg")
+        fs.addFile(fs.root, "download_20170425_152602.jpg")
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+
+        val targets = planner.plan(fs.root).renames.map { it.targetName }
+
+        assertEquals(setOf("IMG_2017-04-25_15-26-02.jpg", "IMG_2017-04-25_15-26-02__dup2.jpg"), targets.toSet())
+        assertEquals(2, targets.size)
+    }
+
+    @Test
+    fun `plan numbers the next duplicate when the first suffix is taken too`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_2017-04-25_15-26-02.jpg", "a".toByteArray())
+        fs.addFile(fs.root, "IMG_2017-04-25_15-26-02__dup2.jpg", "b".toByteArray())
+        fs.addFile(fs.root, "download_20170425_152602.jpg", "c".toByteArray())
+
+        val rename = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root).renames.single()
+
+        assertEquals("IMG_2017-04-25_15-26-02__dup3.jpg", rename.targetName)
+    }
+
+    @Test
+    fun `describe logs an unfixable file before the renames`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "random.jpg")
+        fs.addFile(fs.root, "download_20160828_193034.jpeg")
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+        val logs = mutableListOf<String>()
+
+        val count = planner.describe(planner.plan(fs.root), logs::add)
+
+        assertEquals(1, count)
+        assertEquals("  UNFIXABLE random.jpg", logs.first())
+        assertTrue(logs.last().startsWith("  RENAME download_20160828_193034.jpeg -> IMG_2016-08-28_19-30-34.jpeg"))
+    }
 }
