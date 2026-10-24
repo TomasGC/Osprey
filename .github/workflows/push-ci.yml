@@ -19,6 +19,6 @@ jobs:
       unit-tasks: '[":core:test", ":app:testDebugUnitTest", ":desktop:test"]'
       integration-mock-tasks: '[":core:integrationMock", ":desktop:integrationMock"]'
       integration-real-tasks: '[":core:integrationReal", ":desktop:integrationReal"]'
-      # #1 is scaffolding only, no application logic yet -- raise once :core ports real
-      # behavior (#3+).
-      coverage-threshold: 0
+      # Merged line coverage of :core, :desktop and :app without the Compose screens (#46). :core is held
+      # at 100% line and branch by `:core:koverVerify`, which the coverage report task depends on.
+      coverage-threshold: 65

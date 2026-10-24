@@ -59,6 +59,8 @@ dependencies {
     implementation(libs.exifinterface)
 
     testImplementation(libs.junit)
+    // The JVM unit tests run without the Android framework, whose org.json is only a stub there.
+    testImplementation(libs.json)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.core)
@@ -77,6 +79,13 @@ detekt {
 
 dependencies {
     kover(project(":core"))
+    kover(project(":desktop"))
+}
+
+// The merged report is the number Condor's coverage gate reads. `koverVerify` is not part of the tasks
+// Condor runs, so the :core 100% rule (#46) hangs off the report task it does run.
+tasks.matching { it.name == "koverXmlReportDebug" }.configureEach {
+    dependsOn(":core:koverVerify")
 }
 
 koverReport {
@@ -91,9 +100,11 @@ koverReport {
                     "**.*Test*",
                     "android.*",
                     "androidx.*",
-                    // Compose UI -- manual, see contexts/tests.md convention from Anglerfish/Otter
+                    // Compose UI -- checked by hand on the emulator and the desktop, outside the gate (#46)
                     "**.MainActivity*",
                 )
+                packages("app.osprey.android.ui", "app.osprey.desktop.ui")
+                classes("MainKt*", "**.ComposableSingletons*")
             }
         }
     }

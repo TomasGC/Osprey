@@ -1,3 +1,5 @@
+import kotlinx.kover.gradle.plugin.dsl.MetricType
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kover)
@@ -34,6 +36,25 @@ testing {
                 implementation(project())
                 implementation(libs.junit)
                 implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+    }
+}
+
+// :core is held at 100% line and branch coverage (#46); no exclusions. A new decision in :core needs the
+// test that asserts it, or `koverVerify` fails. Compose screens and the platform modules are outside it.
+koverReport {
+    verify {
+        rule("every line of :core is run by a test") {
+            bound {
+                minValue = 100
+                metric = MetricType.LINE
+            }
+        }
+        rule("every branch of :core is taken both ways by a test") {
+            bound {
+                minValue = 100
+                metric = MetricType.BRANCH
             }
         }
     }
