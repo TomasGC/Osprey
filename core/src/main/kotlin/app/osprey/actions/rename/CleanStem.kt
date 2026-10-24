@@ -14,21 +14,21 @@ private val underscoreRegex = Regex("""^(?<base>.+?)_(?<n>[0-9])$""")
 
 private val suffixPatterns = listOf(copySuffixRegex, copyWordRegex, parenRegex, underscoreRegex)
 
+// The `base` group is the first group of every pattern above.
+private const val BASE_GROUP = 1
+
 private fun stripSuffixOnce(stem: String): String? =
-    suffixPatterns.firstNotNullOfOrNull { it.find(stem)?.groups?.get("base")?.value }
+    suffixPatterns.firstNotNullOfOrNull { pattern -> pattern.find(stem)?.let { it.groupValues[BASE_GROUP] } }
 
 /**
  * Strips sync/OS duplicate-copy suffixes from [stem] — ` (N)`, `_N` (single digit only),
  * ` - Copy`, ` copy N` — up to [maxPasses] times, so stacked suffixes (`photo (1) (2)`) fully
- * resolve. Returns [stem] unchanged if no pattern matches, or once a pass makes no further
- * progress.
+ * resolve. Returns [stem] unchanged if no pattern matches.
  */
 fun cleanStem(stem: String, maxPasses: Int = 3): String {
     var result = stem
     repeat(maxPasses) {
-        val stripped = stripSuffixOnce(result) ?: return result
-        if (stripped == result) return result
-        result = stripped
+        result = stripSuffixOnce(result) ?: return result
     }
     return result
 }

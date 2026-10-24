@@ -82,8 +82,8 @@ private fun resizeGrayscale(
 private fun averageRegion(source: DoubleArray, srcWidth: Int, xRange: IntRange, yRange: IntRange): Double {
     var sum = 0.0
     var count = 0
-    for (y in yRange) {
-        for (x in xRange) {
+    yRange.forEach { y ->
+        xRange.forEach { x ->
             sum += source[y * srcWidth + x]
             count++
         }

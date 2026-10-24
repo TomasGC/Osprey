@@ -1,14 +1,12 @@
 package app.osprey.actions.reorg
 
 import app.osprey.actions.resolveMediaDate
-import app.osprey.filesystem.DirectoryNotEmptyException
-import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.failureReason
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.InputMode
-import java.io.IOException
 
 /**
  * Gathers the images and videos of the input folders, and the misfiled ones of the output, into
@@ -61,7 +59,7 @@ class ReorgPlanner(
     }
 
     private fun yearOf(entry: FileEntry): Int? =
-        resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)?.dateTime?.year
+        resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)?.let { it.dateTime.year }
 
     private fun operationFor(mode: InputMode) =
         if (mode == InputMode.MOVE) ReorgOperation.MOVE else ReorgOperation.COPY
@@ -145,22 +143,8 @@ class ReorgPlanner(
         fs.delete(item.source)
     }
 
-    private fun attempt(item: ReorgItem, action: () -> Unit): ReorgFailure? = try {
-        action()
-        null
-    } catch (e: IOException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    } catch (e: FileAlreadyExistsException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    } catch (e: DirectoryNotEmptyException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    } catch (e: VerificationException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    } catch (e: IllegalStateException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    } catch (e: SecurityException) {
-        ReorgFailure(item.label, e.message.orEmpty())
-    }
+    private fun attempt(item: ReorgItem, action: () -> Unit): ReorgFailure? =
+        failureReason(action)?.let { ReorgFailure(item.label, it) }
 
-    private class VerificationException(message: String) : Exception(message)
+    private class VerificationException(message: String) : IllegalStateException(message)
 }
