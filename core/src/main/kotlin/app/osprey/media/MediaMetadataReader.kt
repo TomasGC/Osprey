@@ -16,9 +16,12 @@ interface MediaMetadataReader {
     fun captureDateTime(entry: FileHandle): MediaDate?
 
     /**
-     * Decodes [entry] into a [PixelBuffer] for perceptual hashing: a full decode for an image,
-     * one representative frame for a video. Returns null if [entry] is neither, or decoding
-     * fails.
+     * Decodes [entry] into a [PixelBuffer]: an image, or one representative frame for a video.
+     * Returns null if [entry] is neither, or decoding fails.
+     *
+     * [maxSide] null decodes at full resolution. Otherwise the longest side of the result is at
+     * least [maxSide] when the source is that large (never upscaled), and at most about twice
+     * it: platforms subsample in whole steps rather than resizing exactly.
      */
-    fun decodeFrame(entry: FileHandle): PixelBuffer?
+    fun decodeFrame(entry: FileHandle, maxSide: Int? = null): PixelBuffer?
 }

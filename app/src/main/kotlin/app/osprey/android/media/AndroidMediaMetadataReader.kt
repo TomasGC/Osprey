@@ -30,7 +30,7 @@ class AndroidMediaMetadataReader(private val context: Context) : MediaMetadataRe
         }
     }
 
-    override fun decodeFrame(entry: FileHandle): PixelBuffer? {
+    override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? {
         val doc = entry.documentFile()
         return when (extensionOf(doc.name)) {
             in imageExtensions -> decodeImagePixelBuffer(context, doc.uri)

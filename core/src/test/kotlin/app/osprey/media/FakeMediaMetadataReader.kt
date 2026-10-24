@@ -12,6 +12,9 @@ class FakeMediaMetadataReader : MediaMetadataReader {
     private val dates = mutableMapOf<FileHandle, MediaDate>()
     private val frames = mutableMapOf<FileHandle, PixelBuffer>()
 
+    /** The `maxSide` of every [decodeFrame] call, in call order. */
+    val requestedMaxSides = mutableListOf<Int?>()
+
     fun setCaptureDateTime(entry: FileHandle, date: MediaDate) {
         dates[entry] = date
     }
@@ -22,5 +25,8 @@ class FakeMediaMetadataReader : MediaMetadataReader {
 
     override fun captureDateTime(entry: FileHandle): MediaDate? = dates[entry]
 
-    override fun decodeFrame(entry: FileHandle): PixelBuffer? = frames[entry]
+    override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? {
+        requestedMaxSides += maxSide
+        return frames[entry]
+    }
 }

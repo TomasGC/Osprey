@@ -9,6 +9,18 @@ import org.junit.Test
 class VisualDupePlannerTest {
 
     @Test
+    fun `plan decodes every file at the hash size, never at full resolution`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        reader.setFrame(fs.addFile(fs.root, "a.jpg"), noisePixelBuffer(seed = 1))
+        reader.setFrame(fs.addFile(fs.root, "b.jpg"), noisePixelBuffer(seed = 2))
+
+        VisualDupePlanner(fs, reader).plan(fs.root)
+
+        assertEquals(listOf<Int?>(HASH_DECODE_MAX_SIDE, HASH_DECODE_MAX_SIDE), reader.requestedMaxSides)
+    }
+
+    @Test
     fun `plan groups near-identical images together`() {
         val fs = FakeFileSystemRepository()
         val reader = FakeMediaMetadataReader()

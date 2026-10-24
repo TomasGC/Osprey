@@ -28,11 +28,11 @@ class DesktopMediaMetadataReader : MediaMetadataReader {
         }
     }
 
-    override fun decodeFrame(entry: FileHandle): PixelBuffer? {
+    override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? {
         val path = entry.path()
         return when (extensionOf(path)) {
-            in imageExtensions -> decodeImagePixelBuffer(path)
-            in videoExtensions -> extractVideoFramePng(path)?.let { decodePngPixelBuffer(it) }
+            in imageExtensions -> decodeImagePixelBuffer(path, maxSide)
+            in videoExtensions -> extractVideoFramePng(path)?.let { decodePngPixelBuffer(it, maxSide) }
             else -> null
         }
     }
