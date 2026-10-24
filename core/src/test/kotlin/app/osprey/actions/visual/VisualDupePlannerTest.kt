@@ -160,4 +160,57 @@ class VisualDupePlannerTest {
         assertTrue(logs.any { it.contains("KEEP (burst frame)") })
         assertTrue(logs.any { it.contains("matches the burst") })
     }
+
+    @Test
+    fun `plan skips a file that cannot be decoded and still groups the others`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        reader.setFrame(fs.addFile(fs.root, "a.jpg"), noisePixelBuffer(seed = 1))
+        reader.setFrame(fs.addFile(fs.root, "b.jpg"), noisePixelBuffer(seed = 1))
+        fs.addFile(fs.root, "broken.jpg")
+
+        val plan = VisualDupePlanner(fs, reader).plan(fs.root)
+
+        assertEquals(3, reader.requestedMaxSides.size)
+        assertEquals(setOf("a.jpg", "b.jpg"), plan.groups.single().map { it.name }.toSet())
+    }
+
+    @Test
+    fun `plan groups look-alike frames of two different bursts`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val buffer = noisePixelBuffer(seed = 1)
+        reader.setFrame(fs.addFile(fs.root, "shot_BURST1.jpg"), buffer)
+        reader.setFrame(fs.addFile(fs.root, "shot_BURST2.jpg"), buffer)
+
+        val plan = VisualDupePlanner(fs, reader).plan(fs.root)
+
+        assertEquals(1, plan.groups.size)
+    }
+
+    @Test
+    fun `plan groups look-alike frames of a burst with a frame outside any burst`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val buffer = noisePixelBuffer(seed = 1)
+        reader.setFrame(fs.addFile(fs.root, "shot_BURST1.jpg"), buffer)
+        reader.setFrame(fs.addFile(fs.root, "plain.jpg"), buffer)
+
+        assertEquals(1, VisualDupePlanner(fs, reader).plan(fs.root).groups.size)
+    }
+
+    @Test
+    fun `plan reads videos in any letter case and ignores other files`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val buffer = noisePixelBuffer(seed = 1)
+        reader.setFrame(fs.addFile(fs.root, "clip.MP4"), buffer)
+        reader.setFrame(fs.addFile(fs.root, "clip2.mp4"), buffer)
+        reader.setFrame(fs.addFile(fs.root, "notes.txt"), buffer)
+
+        val plan = VisualDupePlanner(fs, reader).plan(fs.root)
+
+        assertEquals(2, reader.requestedMaxSides.size)
+        assertEquals(setOf("clip.MP4", "clip2.mp4"), plan.groups.single().map { it.name }.toSet())
+    }
 }

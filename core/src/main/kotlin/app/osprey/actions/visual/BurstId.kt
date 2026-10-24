@@ -11,4 +11,4 @@ private val burstIdPattern = Regex("""BURST(\d+)""")
  * POC's `burst_id` unchanged — broadening this heuristic beyond the `BURST`-substring
  * convention is a separate, deliberate decision, not part of this port.
  */
-fun burstId(name: String): String? = burstIdPattern.find(name)?.groupValues?.get(1)
+fun burstId(name: String): String? = burstIdPattern.find(name)?.let { it.groupValues[1] }

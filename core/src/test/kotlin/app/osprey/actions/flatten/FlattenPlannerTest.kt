@@ -131,4 +131,64 @@ class FlattenPlannerTest {
         assertEquals(1, logs.size)
         assertTrue(logs.single().contains("a.jpg"))
     }
+
+    @Test
+    fun `plan renames the second of two files with one name when the root has none`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.addFolder(fs.root, "07"), "a.jpg", byteArrayOf(2))
+
+        val plan = FlattenPlanner(fs).plan(fs.root)
+
+        assertEquals(listOf("a.jpg", "a__flat1.jpg"), plan.moves.map { it.destName }.sorted())
+        assertEquals(1, plan.moves.count { it.note.isNotEmpty() })
+    }
+
+    @Test
+    fun `plan skips a suffixed name that the root already holds`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.root, "a__flat1.jpg", byteArrayOf(2))
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg", byteArrayOf(3))
+
+        val plan = FlattenPlanner(fs).plan(fs.root)
+
+        assertEquals("a__flat2.jpg", plan.moves.single().destName)
+    }
+
+    @Test
+    fun `plan gives a third file with one name the next free suffix`() {
+        val fs = FakeFileSystemRepository()
+        for (folder in listOf("06", "07", "08")) fs.addFile(fs.addFolder(fs.root, folder), "a.jpg", byteArrayOf(1))
+
+        val plan = FlattenPlanner(fs).plan(fs.root)
+
+        assertEquals(listOf("a.jpg", "a__flat1.jpg", "a__flat2.jpg"), plan.moves.map { it.destName }.sorted())
+    }
+
+    @Test
+    fun `plan leaves a nested TODELETE alone and lists only the folders it flattens`() {
+        val fs = FakeFileSystemRepository()
+        val month = fs.addFolder(fs.root, "06")
+        fs.addFile(month, "b.jpg")
+        fs.addFile(fs.addFolder(month, "TODELETE"), "dup.jpg")
+
+        val plan = FlattenPlanner(fs).plan(fs.root)
+
+        assertEquals(listOf("06"), plan.folders.map { it.relativePath })
+        assertEquals(listOf("b.jpg"), plan.moves.map { it.destName })
+    }
+
+    @Test
+    fun `describe shows the note of a renamed move`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg", byteArrayOf(2))
+        val planner = FlattenPlanner(fs)
+        val logs = mutableListOf<String>()
+
+        planner.describe(planner.plan(fs.root), logs::add)
+
+        assertEquals(listOf("  FLATTEN 06/a.jpg -> a__flat1.jpg  (renamed, name collision)"), logs)
+    }
 }

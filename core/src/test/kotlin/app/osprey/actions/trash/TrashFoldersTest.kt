@@ -60,4 +60,29 @@ class TrashFoldersTest {
         assertTrue(trash.existingNames(location, TrashAction.VISUAL_DUPES).isEmpty())
         assertTrue(trash.existingNames(TrashLocation(fs.root, "2020"), TrashAction.DEDUPE).isEmpty())
     }
+
+    @Test
+    fun `existingNames ignores a file that has the name of a folder on the way`() {
+        fs.addFile(fs.root, "Trash")
+
+        assertEquals(emptySet<String>(), trash.existingNames(location, TrashAction.DEDUPE))
+    }
+
+    @Test
+    fun `existingNames ignores a file named like the year or the action folder`() {
+        val trashFolder = fs.addFolder(fs.root, "Trash")
+        fs.addFile(trashFolder, "2019")
+        assertEquals(emptySet<String>(), trash.existingNames(location, TrashAction.DEDUPE))
+
+        val other = TrashLocation(fs.root, "2020")
+        val year = fs.addFolder(trashFolder, "2020")
+        fs.addFile(year, TrashAction.DEDUPE.folderName)
+        assertEquals(emptySet<String>(), trash.existingNames(other, TrashAction.DEDUPE))
+    }
+
+    @Test
+    fun `freeTrashName keeps the extension when it suffixes a taken name`() {
+        assertEquals("a__dup2.jpg", freeTrashName("a.jpg", setOf("a.jpg", "a__dup1.jpg")))
+        assertEquals("a.jpg", freeTrashName("a.jpg", setOf("b.jpg")))
+    }
 }

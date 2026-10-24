@@ -157,4 +157,52 @@ class DesktopSettingsStoreTest {
 
         assertTrue(store.hasSavedSettings())
     }
+
+    @Test
+    fun `an input entry whose path cannot be parsed or that is not an object is skipped`() {
+        store.save(settingsOf(dir("library")))
+        val json = JSONObject(configFile().readText())
+        val camera = dir("camera").toAbsolutePath().normalize().toString()
+        json.put(
+            "input_folders",
+            org.json.JSONArray()
+                .put(JSONObject().put("path", "bad\u0000path").put("mode", "MOVE"))
+                .put("not an object")
+                .put(JSONObject().put("path", camera).put("mode", "MOVE")),
+        )
+        configFile().writeText(json.toString())
+
+        val loaded = store.load()
+
+        assertEquals(listOf(camera), loaded.inputs.map { it.folder.reference })
+        assertEquals(listOf(InputMode.MOVE), loaded.inputs.map { it.mode })
+    }
+
+    @Test
+    fun `a saved output whose path cannot be parsed loads as no output`() {
+        store.save(settingsOf(dir("library")))
+        val json = JSONObject(configFile().readText())
+        json.put("output_path", "bad\u0000path")
+        configFile().writeText(json.toString())
+
+        assertNull(store.load().output)
+    }
+
+    @Test
+    fun `a volume root is named by its own path`() {
+        val root = tempDir.toAbsolutePath().root
+
+        val folder = folderSetting(root)
+
+        assertEquals(root.toString(), folder.displayName)
+        assertEquals(root.toString(), folder.reference)
+    }
+
+    @Test
+    fun `a folder is named by its last segment and keeps its absolute path as reference`() {
+        val folder = folderSetting(dir("library").resolve("..").resolve("library"))
+
+        assertEquals("library", folder.displayName)
+        assertEquals(dir("library").toAbsolutePath().normalize().toString(), folder.reference)
+    }
 }

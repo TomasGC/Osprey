@@ -52,4 +52,20 @@ class CleanStemTest {
     fun `leaves a name with no suffix unchanged`() {
         assertEquals("photo", cleanStem("photo"))
     }
+
+    @Test
+    fun `tries the patterns in priority order, so a copy word wins over a trailing paren`() {
+        assertEquals("photo", cleanStem("photo - Copy (2)", maxPasses = 1))
+    }
+
+    @Test
+    fun `a stem that is only a suffix is left alone`() {
+        assertEquals("(1)", cleanStem("(1)"))
+        assertEquals("_1", cleanStem("_1"))
+    }
+
+    @Test
+    fun `zero passes change nothing`() {
+        assertEquals("photo (1)", cleanStem("photo (1)", maxPasses = 0))
+    }
 }

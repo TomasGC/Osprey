@@ -47,4 +47,12 @@ class UtcConversionTest {
             utcToLocal(LocalDateTime.of(2020, 1, 1, 0, 30, 0), ZoneId.of("America/New_York")),
         )
     }
+
+    @Test
+    fun `utcToLocal uses the system zone when none is given`() {
+        val utc = LocalDateTime.of(2020, 7, 1, 12, 0, 0)
+        val offset = ZoneId.systemDefault().rules.getOffset(utc.toInstant(java.time.ZoneOffset.UTC))
+
+        assertEquals(utc.plusSeconds(offset.totalSeconds.toLong()), utcToLocal(utc))
+    }
 }

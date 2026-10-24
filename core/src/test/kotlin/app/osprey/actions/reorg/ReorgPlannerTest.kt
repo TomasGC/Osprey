@@ -1,13 +1,17 @@
 package app.osprey.actions.reorg
 
+import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.filesystem.FaultyFileSystemRepository
 import app.osprey.filesystem.FileAlreadyExistsException
+import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
 import app.osprey.settings.InputMode
+import java.io.IOException
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -357,6 +361,101 @@ class ReorgPlannerTest {
         assertTrue(lines.any { it.contains("UNREACHABLE SD card") })
     }
 
+    private fun failureOf(error: Exception): ReorgFailure {
+        file(camera, "a.jpg", 2018)
+        val faulty = FaultyFileSystemRepository(fs).also { it.failCopy = { error } }
+        val failing = ReorgPlanner(faulty, reader)
+
+        val result = failing.apply(failing.plan(output, listOf(copyFrom(camera))), output)
+
+        assertEquals(0, result.copied)
+        assertEquals(setOf("a.jpg"), names(camera))
+        return result.failures.single()
+    }
+
+    @Test
+    fun `apply reports an I-O error and leaves the source`() {
+        assertEquals(ReorgFailure("Camera/a.jpg", "disk full"), failureOf(IOException("disk full")))
+    }
+
+    @Test
+    fun `apply reports a name that is already taken`() {
+        assertEquals(ReorgFailure("Camera/a.jpg", "taken"), failureOf(FileAlreadyExistsException("taken")))
+    }
+
+    @Test
+    fun `apply reports a folder that is not empty`() {
+        assertEquals(ReorgFailure("Camera/a.jpg", "not empty"), failureOf(DirectoryNotEmptyException("not empty")))
+    }
+
+    @Test
+    fun `apply reports a state error`() {
+        assertEquals(ReorgFailure("Camera/a.jpg", "gone"), failureOf(IllegalStateException("gone")))
+    }
+
+    @Test
+    fun `apply reports a refused permission`() {
+        assertEquals(ReorgFailure("Camera/a.jpg", "denied"), failureOf(SecurityException("denied")))
+    }
+
+    @Test
+    fun `apply discards a copy that cannot be found in the destination`() {
+        file(camera, "a.jpg", 2018)
+        val misplacing = ReorgPlanner(MisnamingCopyFs(fs), reader)
+
+        val result = misplacing.apply(misplacing.plan(output, listOf(moveFrom(camera))), output)
+
+        assertEquals(0, result.moved)
+        assertEquals("the copy differs from the source", result.failures.single().reason)
+        assertEquals(setOf("a.jpg"), names(camera))
+        assertEquals(emptySet<String>(), yearNames(2018))
+    }
+
+    @Test
+    fun `apply discards a copy whose size differs from the source`() {
+        file(camera, "a.jpg", 2018)
+        val lying = ReorgPlanner(SizeLyingFs(fs), reader)
+
+        val result = lying.apply(lying.plan(output, listOf(moveFrom(camera))), output)
+
+        assertEquals(0, result.moved)
+        assertEquals("the copy differs from the source", result.failures.single().reason)
+        assertEquals(setOf("a.jpg"), names(camera))
+        assertEquals(emptySet<String>(), yearNames(2018))
+    }
+
+    @Test
+    fun `describe marks a renamed item with its note`() {
+        file(fs.addFolder(output, "2018"), "a.jpg", 2018, content = "old")
+        file(camera, "a.jpg", 2018, content = "new")
+        val lines = mutableListOf<String>()
+
+        planner.describe(planner.plan(output, listOf(copyFrom(camera))), lines::add)
+
+        assertEquals(listOf("  COPY Camera/a.jpg -> 2018/a__year1.jpg  (renamed, name collision)"), lines)
+    }
+
+    @Test
+    fun `describe logs a skipped file as already in the output`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", 2018, content = "same")
+        val lines = mutableListOf<String>()
+
+        planner.describe(planner.plan(output, listOf(copyFrom(camera))), lines::add)
+
+        assertEquals(listOf("  SKIP Camera/y.jpg  (content already in the output)"), lines)
+    }
+
+    @Test
+    fun `an undated output file is listed and left where it is`() {
+        file(fs.addFolder(output, "2019"), "mystery.jpg", null)
+
+        val plan = planner.plan(output, emptyList())
+
+        assertEquals(listOf("2019/mystery.jpg"), plan.undated)
+        assertEquals(emptyList<ReorgItem>(), plan.items)
+    }
+
     /** A filesystem whose copies hash differently from their source. */
     private class CorruptingFs(private val inner: FileSystemRepository) : FileSystemRepository by inner {
         private val copies = mutableSetOf<FileHandle>()
@@ -371,5 +470,22 @@ class ReorgPlannerTest {
     /** A filesystem that refuses every delete, so a verified source cannot be removed. */
     private class StuckDeleteFs(private val inner: FileSystemRepository) : FileSystemRepository by inner {
         override fun delete(entry: FileHandle) = throw FileAlreadyExistsException("locked")
+    }
+
+    /** A filesystem whose copies land under another name, so the destination does not list them by their name. */
+    private class MisnamingCopyFs(private val inner: FileSystemRepository) : FileSystemRepository by inner {
+        override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle =
+            inner.copyTo(entry, destFolder, "${newName ?: "copy"}.part")
+    }
+
+    /** A filesystem that lists every copy one byte larger than it is. */
+    private class SizeLyingFs(private val inner: FileSystemRepository) : FileSystemRepository by inner {
+        private val copies = mutableSetOf<FileHandle>()
+
+        override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle =
+            inner.copyTo(entry, destFolder, newName).also { copies += it }
+
+        override fun list(folder: FileHandle): List<FileEntry> =
+            inner.list(folder).map { if (it.handle in copies) it.copy(sizeBytes = it.sizeBytes + 1) else it }
     }
 }

@@ -1,0 +1,27 @@
+package app.osprey.filesystem
+
+/**
+ * A [FileSystemRepository] over [inner] that throws what a hook returns, so a test can make one
+ * operation fail while everything else behaves. A hook returning null lets the call through.
+ */
+class FaultyFileSystemRepository(private val inner: FileSystemRepository) : FileSystemRepository by inner {
+
+    var failCopy: (entry: FileHandle) -> Throwable? = { null }
+    var failMove: (entry: FileHandle) -> Throwable? = { null }
+    var failDeleteEmptyFolder: (folder: FileHandle) -> Throwable? = { null }
+
+    override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
+        failCopy(entry)?.let { throw it }
+        return inner.copyTo(entry, destFolder, newName)
+    }
+
+    override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
+        failMove(entry)?.let { throw it }
+        return inner.move(entry, destFolder, newName)
+    }
+
+    override fun deleteEmptyFolder(folder: FileHandle) {
+        failDeleteEmptyFolder(folder)?.let { throw it }
+        inner.deleteEmptyFolder(folder)
+    }
+}

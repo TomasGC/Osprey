@@ -44,7 +44,7 @@ class StandardizePlanner(
                     renames += outcome.rename
                 }
                 EntryOutcome.Unfixable -> unfixable += entry
-                EntryOutcome.Skip -> Unit
+                else -> Unit // EntryOutcome.Skip: nothing to do
             }
         }
         return StandardizePlan(renames, unfixable)

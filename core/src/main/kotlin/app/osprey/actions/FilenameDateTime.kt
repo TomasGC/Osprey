@@ -43,7 +43,7 @@ fun filenameDateTime(stem: String): LocalDateTime? {
         return dateOnlyFromGroups(match.groupValues)
     }
     if (epochMillisPattern.matches(stem)) {
-        return epochMillisDateTimeOrNull(stem)
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(stem.toLong()), ZoneId.systemDefault())
     }
     return null
 }
@@ -62,13 +62,6 @@ private fun dateTimeFromGroups(groups: List<String>): LocalDateTime? = try {
 @Suppress("MagicNumber", "SwallowedException")
 private fun dateOnlyFromGroups(groups: List<String>): LocalDateTime? = try {
     LocalDateTime.of(groups[1].toInt(), groups[2].toInt(), groups[3].toInt(), 0, 0, 0)
-} catch (e: DateTimeException) {
-    null
-}
-
-@Suppress("SwallowedException")
-private fun epochMillisDateTimeOrNull(digits: String): LocalDateTime? = try {
-    LocalDateTime.ofInstant(Instant.ofEpochMilli(digits.toLong()), ZoneId.systemDefault())
 } catch (e: DateTimeException) {
     null
 }
