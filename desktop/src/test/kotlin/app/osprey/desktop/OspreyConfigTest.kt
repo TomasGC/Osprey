@@ -5,6 +5,7 @@ import java.nio.file.Path
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -92,5 +93,23 @@ class OspreyConfigTest {
         OspreyConfig.saveLibraryPath(lib)
 
         assertEquals(lib.toAbsolutePath().normalize(), OspreyConfig.resolveLibraryPath("  "))
+    }
+
+    @Test
+    fun `without an override the config lives in the osprey folder of the user home`() {
+        val home = Files.createDirectory(tempDir.resolve("home"))
+        val previousHome = System.getProperty("user.home")
+        System.clearProperty("osprey.config.path")
+        System.setProperty("user.home", home.toString())
+        try {
+            val library = Files.createDirectory(tempDir.resolve("library"))
+
+            OspreyConfig.saveLibraryPath(library)
+
+            assertTrue(Files.isRegularFile(home.resolve(".osprey").resolve("config.json")))
+            assertEquals(library.toAbsolutePath().normalize(), OspreyConfig.loadLibraryPath())
+        } finally {
+            System.setProperty("user.home", previousHome)
+        }
     }
 }
