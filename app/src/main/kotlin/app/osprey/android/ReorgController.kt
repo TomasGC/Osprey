@@ -6,69 +6,68 @@ import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.reorg.reorgResultLines
 import app.osprey.actions.reorg.reorgSummary
 import app.osprey.filesystem.FileHandle
-import app.osprey.jobs.JobControl
-import app.osprey.jobs.JobProgress
-import app.osprey.jobs.progressText
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import app.osprey.jobs.JobOutcome
+import app.osprey.jobs.JobQueue
 
 /**
- * Scan-then-apply for Reorg (#40). Unlike the simple actions it runs on the folders saved in
- * Settings, reports progress file by file, and can be asked to stop between two files; a file that
- * fails is listed and the others carry on.
+ * Scan-then-apply for Reorg (#40), as two jobs of [jobs]. Unlike the simple actions it runs on the folders saved
+ * in Settings, reports progress file by file and can be stopped between two files; a file that fails is listed and
+ * the others carry on. [onApplied] is called once an apply is over, so the year list can be read again.
  */
 class ReorgController(
     private val planner: ReorgPlanner,
+    private val jobs: JobQueue,
     private val sources: () -> List<ReorgSource>,
+    private val onApplied: () -> Unit = {},
 ) {
     val state = ActionUiState()
     private var cachedPlan: ReorgPlan? = null
 
-    @Volatile
-    private var stopRequested = false
-
-    suspend fun onScan(output: FileHandle) {
-        state.busy = true
+    fun onScan(output: FileHandle) {
+        if (!claim()) return
         state.appliedSuffix = ""
-        state.progress = null
-        state.progressText = "Scanning..."
-        val plan = withContext(Dispatchers.IO) { planner.plan(output, sources()) }
-        val lines = mutableListOf<String>()
-        val count = planner.describe(plan, lines::add)
-        cachedPlan = plan
-        state.lines = lines
-        state.summary = reorgSummary(plan)
-        state.applyEnabled = count > 0
-        state.progressText = ""
-        state.busy = false
-    }
-
-    suspend fun onApply(output: FileHandle) {
-        val plan = cachedPlan ?: return
-        cachedPlan = null
-        stopRequested = false
-        state.applyEnabled = false
-        state.busy = true
-        state.canCancel = true
-        val control = object : JobControl {
-            override fun shouldStop(): Boolean = stopRequested
-
-            override fun report(done: Int, total: Int, current: String) {
-                state.progress = done.toFloat() / total
-                state.progressText = progressText(JobProgress(done, total, current))
+        jobs.enqueue("Reorg scan", onDone = { state.busy = false }) { control ->
+            val plan = planner.plan(output, sources(), control)
+            if (control.shouldStop()) {
+                cachedPlan = null
+                state.summary = "Scan stopped"
+                state.lines = emptyList()
+                state.applyEnabled = false
+                JobOutcome("Reorg scan: stopped", stopped = true)
+            } else {
+                val lines = mutableListOf<String>()
+                val count = planner.describe(plan, lines::add)
+                cachedPlan = plan
+                state.lines = lines
+                state.summary = reorgSummary(plan)
+                state.applyEnabled = count > 0
+                JobOutcome("Reorg scan: ${state.summary.trim()}", lines = lines)
             }
         }
-        val result = withContext(Dispatchers.IO) { planner.apply(plan, output, control) }
-        state.lines = reorgResultLines(result) + state.lines
-        state.appliedSuffix = "  -- APPLIED (${result.done}), failed ${result.failures.size}"
-        state.progress = null
-        state.progressText = ""
-        state.canCancel = false
-        state.busy = false
     }
 
-    /** Asks a running apply to stop before its next file; the file in progress is finished first. */
-    fun onCancel() {
-        stopRequested = true
+    fun onApply(output: FileHandle) {
+        val plan = cachedPlan ?: return
+        if (!claim()) return
+        cachedPlan = null
+        state.applyEnabled = false
+        jobs.enqueue("Reorg apply", onDone = { state.busy = false; onApplied() }) { control ->
+            val result = planner.apply(plan, output, control)
+            val resultLines = reorgResultLines(result)
+            state.lines = resultLines + state.lines
+            state.appliedSuffix = "  -- APPLIED (${result.done}), failed ${result.failures.size}"
+            JobOutcome(
+                summary = "Reorg: ${result.done} done, ${result.failures.size} failed",
+                lines = resultLines,
+                failures = result.failures.size,
+                stopped = result.cancelled,
+            )
+        }
+    }
+
+    private fun claim(): Boolean {
+        if (state.busy) return false
+        state.busy = true
+        return true
     }
 }

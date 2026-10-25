@@ -15,48 +15,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.actions.visual.VisualDupePlanner
 import app.osprey.android.AndroidAppState
 import app.osprey.android.VisualDupeGroupUi
-import app.osprey.android.toUiGroups
 import app.osprey.filesystem.FileHandle
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
- * Scan (can take a minute or two), stats chips, a card grid per group, and a fullscreen preview
- * -- same screen as desktop's (#12), single-column phone layout. The one action that stays
- * review-before-apply, never auto-applied, since perceptual similarity can still be wrong.
+ * The POC's Visual Dupes tab: scan (can take a minute or two), stats chips, a card grid per
+ * group, and a fullscreen preview -- the one action that stays review-before-apply, never
+ * auto-applied, since perceptual similarity can still be wrong.
  */
 @Composable
 fun VisualDupesScreen(state: AndroidAppState, yearDir: FileHandle) {
-    val scope = rememberCoroutineScope()
-    var scanning by remember { mutableStateOf(false) }
-    var groups by remember { mutableStateOf<List<VisualDupeGroupUi>>(emptyList()) }
+    val controller = state.visual
+    val groups = controller.groupsIn(yearDir)
     var preview by remember { mutableStateOf<Pair<VisualDupeGroupUi, VisualDupeMember>?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row {
-            Button(
-                onClick = {
-                    scanning = true
-                    scope.launch {
-                        val plan = withContext(Dispatchers.IO) {
-                            VisualDupePlanner(state.fs, state.mediaMetadataReader).plan(yearDir)
-                        }
-                        groups = toUiGroups(plan.groups)
-                        scanning = false
-                    }
-                },
-                enabled = !scanning,
-            ) {
-                Text(if (scanning) "Scanning..." else "Scan (can take a minute or two)")
+            Button(onClick = { controller.onScan(yearDir) }, enabled = !controller.scanning) {
+                Text(if (controller.scanning) "Scanning..." else "Scan (can take a minute or two)")
             }
         }
         Spacer(Modifier.height(12.dp))

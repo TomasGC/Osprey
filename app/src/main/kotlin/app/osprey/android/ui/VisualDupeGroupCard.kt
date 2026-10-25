@@ -21,11 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -35,13 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.osprey.actions.visual.VisualDupeMember
-import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.android.AndroidAppState
 import app.osprey.android.VisualDupeGroupUi
 import app.osprey.filesystem.FileHandle
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Suppress("MagicNumber") // Hex color literals, not measurements.
 private val BURST_BORDER = Color(0xFF5A4A12)
@@ -98,9 +89,6 @@ fun VisualDupeGroupCard(
 
 @Composable
 private fun GroupHeader(state: AndroidAppState, yearDir: FileHandle, group: VisualDupeGroupUi) {
-    val scope = rememberCoroutineScope()
-    var moving by remember { mutableStateOf(false) }
-
     Column {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             IndexBadge(group.index)
@@ -110,17 +98,11 @@ private fun GroupHeader(state: AndroidAppState, yearDir: FileHandle, group: Visu
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(group.status, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(
-                onClick = {
-                    moving = true
-                    scope.launch {
-                        moveUnchecked(state, yearDir, group)
-                        moving = false
-                    }
-                },
-                enabled = !moving && !group.done,
+                onClick = { state.visual.moveUnchecked(yearDir, group) },
+                enabled = !group.moving && !group.done,
                 colors = ButtonDefaults.buttonColors(containerColor = DANGER),
             ) {
-                Text(if (moving) "Working..." else "Move unchecked")
+                Text(if (group.moving) "Working..." else "Move unchecked")
             }
         }
     }
@@ -145,27 +127,6 @@ private fun GroupBadge(group: VisualDupeGroupUi) {
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/** Moves every unchecked member, or just updates [group]'s status if there's nothing valid to move. */
-private suspend fun moveUnchecked(state: AndroidAppState, yearDir: FileHandle, group: VisualDupeGroupUi) {
-    val keptNames = group.members.filter { group.keep[it.name] == true }.map { it.name }.toSet()
-    when {
-        keptNames.isEmpty() -> group.status = "Keep at least one image."
-        keptNames.size == group.members.size -> group.status = "Nothing unchecked -- nothing to move."
-        else -> {
-            val result = withContext(Dispatchers.IO) {
-                moveUncheckedToTrash(state.fs, state.trashLocation(), yearDir, group.members, keptNames)
-            }
-            group.done = true
-            val skippedNote = if (result.skipped.isNotEmpty()) {
-                " (skipped: ${result.skipped.joinToString(", ")})"
-            } else {
-                ""
-            }
-            group.status = "Moved ${result.moved.size}$skippedNote"
-        }
     }
 }
 
