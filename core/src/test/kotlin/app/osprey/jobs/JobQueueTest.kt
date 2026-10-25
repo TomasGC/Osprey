@@ -38,6 +38,12 @@ class JobQueueTest {
 
     private fun release(latch: CountDownLatch) = latch.countDown()
 
+    private fun waitUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (!condition() && System.currentTimeMillis() < deadline) Thread.sleep(SPIN_MS)
+        assertTrue(condition())
+    }
+
     private fun hold(latch: CountDownLatch) = assertTrue(latch.await(WAIT_MS, TimeUnit.MILLISECONDS))
 
     @Test
@@ -90,8 +96,8 @@ class JobQueueTest {
             running.decrementAndGet()
             JobOutcome(name)
         }
-        val first = queue.enqueue("A", work("A", wait = true))
-        val second = queue.enqueue("B", work("B", wait = false))
+        val first = queue.enqueue("A", work = work("A", wait = true))
+        val second = queue.enqueue("B", work = work("B", wait = false))
 
         entriesWhere { it.size == 2 && it[0].state is JobState.Running }
         assertEquals(JobState.Queued, queue.entries.value[1].state)
@@ -219,6 +225,66 @@ class JobQueueTest {
         val kept = entriesWhere { entries -> entries.all { it.state is JobState.Finished } }
 
         assertEquals((3L..7L).toList(), kept.map { it.id })
+    }
+
+    @Test
+    fun `the completion callback gets the outcome once the job is finished`() {
+        val seen = mutableListOf<Pair<JobOutcome, JobState?>>()
+        val handle = queue.enqueue("A", onDone = { outcome ->
+            seen += outcome to queue.entries.value.singleOrNull()?.state
+        }) { JobOutcome("A done") }
+
+        waitFor { handle.await() }
+        waitUntil { seen.isNotEmpty() }
+
+        assertEquals(JobOutcome("A done"), seen.single().first)
+        assertEquals(JobState.Finished(JobOutcome("A done")), seen.single().second)
+    }
+
+    @Test
+    fun `the completion callback also runs for a job removed while it was waiting`() {
+        val gate = CountDownLatch(1)
+        val seen = mutableListOf<JobOutcome>()
+        val first = queue.enqueue("A") {
+            hold(gate)
+            JobOutcome("A")
+        }
+        val second = queue.enqueue("B", onDone = { seen += it }) { JobOutcome("B") }
+        entriesWhere { it.size == 2 }
+
+        second.stop()
+
+        assertEquals(listOf(JobOutcome("B: stopped before it started", stopped = true)), seen)
+        release(gate)
+        waitFor { first.await() }
+    }
+
+    @Test
+    fun `a completion callback that throws does not end the queue`() {
+        val broken = queue.enqueue("A", onDone = { error("watcher broke") }) { JobOutcome("A") }
+        val next = queue.enqueue("B") { JobOutcome("B") }
+
+        waitFor { broken.await() }
+
+        assertEquals("B", waitFor { next.await() }.summary)
+    }
+
+    @Test
+    fun `a job can be stopped by its id`() {
+        val gate = CountDownLatch(1)
+        val handle = queue.enqueue("A") { control ->
+            while (!control.shouldStop()) Thread.sleep(SPIN_MS)
+            hold(gate)
+            JobOutcome("A stopped", stopped = true)
+        }
+        entriesWhere { it.singleOrNull()?.state is JobState.Running }
+
+        queue.stop(handle.id)
+        queue.stop(999L)
+
+        entriesWhere { (it.singleOrNull()?.state as? JobState.Running)?.stopping == true }
+        release(gate)
+        assertTrue(waitFor { handle.await() }.stopped)
     }
 
     @Test

@@ -23,10 +23,12 @@ class JobQueue(scope: CoroutineScope) {
         val id: Long,
         val name: String,
         val work: (JobControl) -> JobOutcome,
-        val outcome: CompletableDeferred<JobOutcome> = CompletableDeferred(),
-        val stopRequested: AtomicBoolean = AtomicBoolean(false),
-        var removed: Boolean = false,
-    )
+        val onDone: (JobOutcome) -> Unit,
+    ) {
+        val outcome = CompletableDeferred<JobOutcome>()
+        val stopRequested = AtomicBoolean(false)
+        var removed = false
+    }
 
     private val lock = Any()
     private val ids = AtomicLong(1L)
@@ -42,15 +44,18 @@ class JobQueue(scope: CoroutineScope) {
         scope.launch { while (true) run(waiting.receive()) }
     }
 
-    /** Queues [work] under [name]; it starts once the jobs before it are over. */
-    fun enqueue(name: String, work: (JobControl) -> JobOutcome): JobHandle {
-        val job = Pending(ids.getAndIncrement(), name, work)
+    /**
+     * Queues [work] under [name]; it starts once the jobs before it are over. [onDone] is told the outcome
+     * as soon as the job is over, also when it was removed before it started, whatever screen is showing.
+     */
+    fun enqueue(name: String, onDone: (JobOutcome) -> Unit = {}, work: (JobControl) -> JobOutcome): JobHandle {
+        val job = Pending(ids.getAndIncrement(), name, work, onDone)
         synchronized(lock) {
             active[job.id] = job
             mutableEntries.value = mutableEntries.value + JobEntry(job.id, name, JobState.Queued)
         }
         waiting.trySend(job)
-        return JobHandle(job.id, job.outcome) { stop(job) }
+        return JobHandle(job.id, job.outcome) { stop(job.id) }
     }
 
     /** Forgets a finished job; a job that is waiting or running stays. */
@@ -73,6 +78,7 @@ class JobQueue(scope: CoroutineScope) {
             keepLastFinished()
         }
         job.outcome.complete(outcome)
+        notifyDone(job, outcome)
     }
 
     @Suppress("TooGenericExceptionCaught") // A job is arbitrary planner code: whatever it throws ends that job only.
@@ -82,14 +88,25 @@ class JobQueue(scope: CoroutineScope) {
         JobOutcome(summary = "${job.name} failed: ${e.message ?: e::class.simpleName}", failures = 1)
     }
 
-    private fun stop(job: Pending) {
-        val dropped = synchronized(lock) { stopLocked(job) }
-        if (dropped) job.outcome.complete(JobOutcome("${job.name}: stopped before it started", stopped = true))
+    /** Removes the job if it is still waiting; otherwise asks it to stop after the file it is on. */
+    fun stop(id: Long) {
+        val removed = synchronized(lock) { active[id]?.takeIf { stopLocked(it) } } ?: return
+        val outcome = JobOutcome("${removed.name}: stopped before it started", stopped = true)
+        removed.outcome.complete(outcome)
+        notifyDone(removed, outcome)
+    }
+
+    @Suppress("TooGenericExceptionCaught", "SwallowedException") // A watcher that fails must not end the queue.
+    private fun notifyDone(job: Pending, outcome: JobOutcome) {
+        try {
+            job.onDone(outcome)
+        } catch (ignored: Exception) {
+            // The job is over and its outcome delivered; there is nothing left to undo.
+        }
     }
 
     /** Marks [job] as asked to stop; true when it was still waiting and is gone from the queue. */
     private fun stopLocked(job: Pending): Boolean {
-        if (job.id !in active) return false
         job.stopRequested.set(true)
         val state = mutableEntries.value.first { it.id == job.id }.state
         if (state == JobState.Queued) {
