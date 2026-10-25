@@ -17,19 +17,21 @@ import app.osprey.actions.trash.clearResultLines
 import app.osprey.actions.trash.restoreResultLines
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
-import app.osprey.jobs.JobControl
-import app.osprey.jobs.JobProgress
-import app.osprey.jobs.progressText
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import app.osprey.jobs.JobOutcome
+import app.osprey.jobs.JobQueue
 
 /**
  * The Trash screen (#41): what the Trash holds by year and action, the files ticked across its tabs, and
  * the two things that can be done with them. Delete is the only irreversible step in Osprey, so it
  * waits for [confirmation] to be accepted; Restore moves files back and hands the name clashes to
- * [conflicts] for the user to settle. Both report progress per file and can be stopped between two.
+ * [conflicts] for the user to settle. Both run as jobs of [jobs]: they report progress per file and can be
+ * stopped between two. [onChanged] is called once one is over, so the year list can be read again.
  */
-class TrashController(private val fs: FileSystemRepository) {
+class TrashController(
+    private val fs: FileSystemRepository,
+    private val jobs: JobQueue,
+    private val onChanged: () -> Unit = {},
+) {
 
     val state = ActionUiState()
 
@@ -51,9 +53,6 @@ class TrashController(private val fs: FileSystemRepository) {
         private set
     var report by mutableStateOf(emptyList<String>())
         private set
-
-    @Volatile
-    private var stopRequested = false
 
     /** The files of the open year and action tab. */
     val currentTab: List<TrashEntry>
@@ -95,30 +94,46 @@ class TrashController(private val fs: FileSystemRepository) {
         confirmation = if (selected.isEmpty()) null else clearConfirmation(selected)
     }
 
-    suspend fun confirmDelete(root: FileHandle) {
+    fun confirmDelete(root: FileHandle) {
         confirmation = null
         val selected = selection.entriesIn(contents)
-        if (selected.isEmpty()) return
-        stopRequested = false
-        val result = runWithProgress(state, { stopRequested }) { control ->
-            TrashClearer(fs).clear(root, selected, control)
+        if (selected.isEmpty() || !claim()) return
+        jobs.enqueue("Trash delete", onDone = { state.busy = false; onChanged() }) { control ->
+            val result = TrashClearer(fs).clear(root, selected, control)
+            report = clearResultLines(result)
+            refresh(root)
+            JobOutcome(
+                summary = "Trash: ${result.deleted} deleted, ${result.failures.size} failed",
+                lines = report,
+                failures = result.failures.size,
+                stopped = result.cancelled,
+            )
         }
-        report = clearResultLines(result)
-        refresh(root)
     }
 
-    suspend fun restore(root: FileHandle) {
+    fun restore(root: FileHandle) {
         val selected = selection.entriesIn(contents)
-        if (selected.isEmpty()) return
-        val restorer = TrashRestorer(fs)
-        val plan = restorer.plan(root, selected)
-        stopRequested = false
-        val result = runWithProgress(state, { stopRequested }) { control ->
-            restorer.restore(root, plan, control)
+        if (selected.isEmpty() || !claim()) return
+        jobs.enqueue("Trash restore", onDone = { state.busy = false; onChanged() }) { control ->
+            val restorer = TrashRestorer(fs)
+            val plan = restorer.plan(root, selected)
+            val result = restorer.restore(root, plan, control)
+            conflicts = plan.conflicts
+            report = restoreResultLines(result, plan.conflicts.size)
+            refresh(root)
+            JobOutcome(
+                summary = "Trash: ${result.restored} restored, ${result.failures.size} failed",
+                lines = report,
+                failures = result.failures.size,
+                stopped = result.cancelled,
+            )
         }
-        conflicts = plan.conflicts
-        report = restoreResultLines(result, plan.conflicts.size)
-        refresh(root)
+    }
+
+    private fun claim(): Boolean {
+        if (state.busy) return false
+        state.busy = true
+        return true
     }
 
     /** Settles [conflict] as [choice], then forgets it. A failure is added to the report. */
@@ -133,33 +148,4 @@ class TrashController(private val fs: FileSystemRepository) {
     fun resolveAll(root: FileHandle, choice: ConflictChoice) {
         conflicts.forEach { resolve(root, it, choice) }
     }
-
-    /** Asks a running delete or restore to stop before its next file; the file in progress is finished first. */
-    fun onCancel() {
-        stopRequested = true
-    }
-}
-
-/** Runs [work] off the UI thread with [state] showing a progress bar and a Stop button. */
-private suspend fun <T> runWithProgress(
-    state: ActionUiState,
-    isStopRequested: () -> Boolean,
-    work: (JobControl) -> T,
-): T {
-    state.busy = true
-    state.canCancel = true
-    val control = object : JobControl {
-        override fun shouldStop(): Boolean = isStopRequested()
-
-        override fun report(done: Int, total: Int, current: String) {
-            state.progress = done.toFloat() / total
-            state.progressText = progressText(JobProgress(done, total, current))
-        }
-    }
-    val result = withContext(Dispatchers.IO) { work(control) }
-    state.progress = null
-    state.progressText = ""
-    state.canCancel = false
-    state.busy = false
-    return result
 }

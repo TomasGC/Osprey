@@ -25,7 +25,7 @@ class TrashControllerTest {
     @Before
     fun setUp() {
         library = Files.createTempDirectory("osprey-trash-controller-test")
-        controller = TrashController(DesktopFileSystemRepository())
+        controller = TrashController(DesktopFileSystemRepository(), immediateJobQueue())
     }
 
     @After
