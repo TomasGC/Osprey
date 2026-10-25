@@ -1,3 +1,4 @@
+import androidx.compose.runtime.remember
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import app.osprey.desktop.AppState
@@ -14,9 +15,13 @@ private fun parseLibraryArg(args: Array<String>): String? {
 }
 
 fun main(args: Array<String>) = application {
-    val state = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), DesktopSettingsStore())
-    OspreyConfig.resolveLibraryPath(parseLibraryArg(args))
-    state.start()
+    // Once: a state made again would also make a new job queue, and orphan the jobs running in the old one.
+    val state = remember {
+        AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), DesktopSettingsStore()).also {
+            OspreyConfig.resolveLibraryPath(parseLibraryArg(args))
+            it.start()
+        }
+    }
 
     Window(onCloseRequest = ::exitApplication, title = "Osprey") {
         OspreyApp(state)
