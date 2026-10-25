@@ -8,6 +8,7 @@ import app.osprey.actions.reorg.reorgSummary
 import app.osprey.filesystem.FileHandle
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
+import app.osprey.jobs.withStoppedNote
 
 /**
  * Scan-then-apply for Reorg (#40), as two jobs of [jobs]. Unlike the simple actions it runs on the folders saved
@@ -56,10 +57,11 @@ class ReorgController(
             val resultLines = reorgResultLines(result)
             state.lines = resultLines + state.lines
             state.appliedSuffix = "  -- APPLIED (${result.done}), failed ${result.failures.size}"
+            val failed = result.failures.size
             JobOutcome(
-                summary = "Reorg: ${result.done} done, ${result.failures.size} failed",
+                summary = withStoppedNote("Reorg: ${result.done} done, $failed failed", result.cancelled),
                 lines = resultLines,
-                failures = result.failures.size,
+                failures = failed,
                 stopped = result.cancelled,
             )
         }

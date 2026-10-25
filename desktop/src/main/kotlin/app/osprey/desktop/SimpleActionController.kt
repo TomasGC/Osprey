@@ -4,6 +4,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
+import app.osprey.jobs.withStoppedNote
 
 /**
  * Scan-then-apply bookkeeping shared by the simple action tabs: queue [scan] as a job, cache its plan, and
@@ -54,7 +55,7 @@ class SimpleActionController<Plan>(
             val applied = apply(yearDir, plan, control)
             val stopped = control.shouldStop()
             state.appliedSuffix = "  -- APPLIED ($applied)" + if (stopped) " -- STOPPED" else ""
-            JobOutcome("$name apply: $applied done", stopped = stopped)
+            JobOutcome(withStoppedNote("$name apply: $applied done", stopped), stopped = stopped)
         }
     }
 

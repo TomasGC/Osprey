@@ -19,3 +19,5 @@ private fun runningBody(state: JobState.Running): String = when {
     state.progress == null -> "Working..."
     else -> progressText(state.progress)
 }
+/** [summary] as it should read once the job is over: a job that was asked to stop says so. */
+fun withStoppedNote(summary: String, stopped: Boolean): String = if (stopped) "$summary (stopped)" else summary

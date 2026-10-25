@@ -19,6 +19,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
+import app.osprey.jobs.withStoppedNote
 
 /**
  * The Trash screen (#41): what the Trash holds by year and action, the files ticked across its tabs, and
@@ -102,10 +103,11 @@ class TrashController(
             val result = TrashClearer(fs).clear(root, selected, control)
             report = clearResultLines(result)
             refresh(root)
+            val failed = result.failures.size
             JobOutcome(
-                summary = "Trash: ${result.deleted} deleted, ${result.failures.size} failed",
+                summary = withStoppedNote("Trash: ${result.deleted} deleted, $failed failed", result.cancelled),
                 lines = report,
-                failures = result.failures.size,
+                failures = failed,
                 stopped = result.cancelled,
             )
         }
@@ -121,10 +123,11 @@ class TrashController(
             conflicts = plan.conflicts
             report = restoreResultLines(result, plan.conflicts.size)
             refresh(root)
+            val failed = result.failures.size
             JobOutcome(
-                summary = "Trash: ${result.restored} restored, ${result.failures.size} failed",
+                summary = withStoppedNote("Trash: ${result.restored} restored, $failed failed", result.cancelled),
                 lines = report,
-                failures = result.failures.size,
+                failures = failed,
                 stopped = result.cancelled,
             )
         }

@@ -11,6 +11,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
+import app.osprey.jobs.withStoppedNote
 import app.osprey.media.MediaMetadataReader
 
 /**
@@ -63,7 +64,8 @@ class VisualDupesController(
                     val stopped = control.shouldStop()
                     group.done = !stopped
                     group.status = moveStatus(result, stopped)
-                    JobOutcome("Visual Dupes group #${group.index}: moved ${result.moved.size}", stopped = stopped)
+                    val summary = "Visual Dupes group #${group.index}: moved ${result.moved.size}"
+                    JobOutcome(withStoppedNote(summary, stopped), stopped = stopped)
                 }
             }
         }

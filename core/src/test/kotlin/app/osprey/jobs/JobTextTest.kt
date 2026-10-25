@@ -46,4 +46,14 @@ class JobTextTest {
     fun `a finished job shows its summary`() {
         assertEquals("Reorg: 5 done", jobBody(JobState.Finished(JobOutcome("Reorg: 5 done"))))
     }
+
+    @Test
+    fun `a summary of a stopped job says it was stopped`() {
+        assertEquals("Reorg: 5 done, 0 failed (stopped)", withStoppedNote("Reorg: 5 done, 0 failed", stopped = true))
+    }
+
+    @Test
+    fun `a summary of a job that ran to the end is left as it is`() {
+        assertEquals("Reorg: 5 done, 0 failed", withStoppedNote("Reorg: 5 done, 0 failed", stopped = false))
+    }
 }

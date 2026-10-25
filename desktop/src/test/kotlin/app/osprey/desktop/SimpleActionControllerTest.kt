@@ -124,6 +124,8 @@ class SimpleActionControllerTest {
         controller.onApply(FakeHandle)
 
         assertEquals("  -- APPLIED (2) -- STOPPED", controller.state.appliedSuffix)
+        val applyJob = jobs.entries.value.last().state as JobState.Finished
+        assertEquals("Test apply: 2 done (stopped)", applyJob.outcome.summary)
     }
 
     @Test
