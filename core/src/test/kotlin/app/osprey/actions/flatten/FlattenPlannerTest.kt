@@ -1,5 +1,6 @@
 package app.osprey.actions.flatten
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -93,7 +94,7 @@ class FlattenPlannerTest {
         val plan = planner.plan(fs.root)
         val logs = mutableListOf<String>()
 
-        planner.apply(plan, fs.root, logs::add)
+        planner.apply(plan, fs.root, log = logs::add)
 
         assertEquals(listOf("a.jpg"), fs.list(fs.root).map { it.name })
         assertTrue(logs.isEmpty())
@@ -110,7 +111,7 @@ class FlattenPlannerTest {
         fs.addFile(month, "leftover.tmp")
         val logs = mutableListOf<String>()
 
-        planner.apply(plan, fs.root, logs::add)
+        planner.apply(plan, fs.root, log = logs::add)
 
         assertEquals(1, logs.size)
         assertFalse(fs.list(fs.root).none { it.name == "06" })
@@ -190,5 +191,58 @@ class FlattenPlannerTest {
         planner.describe(planner.plan(fs.root), logs::add)
 
         assertEquals(listOf("  FLATTEN 06/a.jpg -> a__flat1.jpg  (renamed, name collision)"), logs)
+    }
+
+    @Test
+    fun `plan reports each folder it reads`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        fs.addFile(fs.addFolder(fs.root, "07"), "b.jpg")
+        val control = RecordingJobControl()
+
+        FlattenPlanner(fs).plan(fs.root, control)
+
+        assertEquals(setOf("06", "07"), control.reports.map { it.current }.toSet())
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `plan stops reading folders when asked and keeps what it had`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        fs.addFile(fs.addFolder(fs.root, "07"), "b.jpg")
+
+        val plan = FlattenPlanner(fs).plan(fs.root, RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, plan.moves.size)
+    }
+
+    @Test
+    fun `apply reports each move and returns how many it made`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        fs.addFile(fs.addFolder(fs.root, "07"), "b.jpg")
+        val planner = FlattenPlanner(fs)
+        val control = RecordingJobControl()
+
+        val moved = planner.apply(planner.plan(fs.root), fs.root, control) {}
+
+        assertEquals(2, moved)
+        assertEquals(setOf("06/a.jpg", "07/b.jpg"), control.reports.map { it.current }.toSet())
+    }
+
+    @Test
+    fun `a stopped apply leaves the other files and the folders, and a new scan finds them`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        fs.addFile(fs.addFolder(fs.root, "07"), "b.jpg")
+        val planner = FlattenPlanner(fs)
+        val logs = mutableListOf<String>()
+
+        val moved = planner.apply(planner.plan(fs.root), fs.root, RecordingJobControl(stopAfterReports = 1), logs::add)
+
+        assertEquals(1, moved)
+        assertEquals(emptyList<String>(), logs)
+        assertEquals(1, planner.plan(fs.root).moves.size)
     }
 }

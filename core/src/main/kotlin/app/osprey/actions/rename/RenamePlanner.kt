@@ -1,8 +1,12 @@
 package app.osprey.actions.rename
 
 import app.osprey.actions.splitStemAndSuffix
+import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 /**
  * Strips sync/OS duplicate-copy suffixes ("photo (2).jpg", "photo - Copy.jpg", "photo_1.jpg")
@@ -18,20 +22,22 @@ class RenamePlanner(private val fs: FileSystemRepository) {
      * this same plan, is skipped rather than silently overwritten or crashing. Directories are
      * never considered. Nothing on disk changes — call [apply] to act on the result.
      */
-    fun plan(root: FileHandle): RenamePlan {
+    fun plan(root: FileHandle, control: JobControl = NoJobControl): RenamePlan {
         val entries = fs.list(root).sortedBy { it.name }
         val existingNames = entries.map { it.name }.toSet()
         val claimed = mutableSetOf<String>()
         val renames = mutableListOf<RenameAction>()
         val skips = mutableListOf<RenameAction>()
 
-        for (entry in entries) {
-            val action = entry.takeIf { !it.isDirectory }?.let { candidateRename(it.handle, it.name) } ?: continue
-            if (action.targetName in existingNames || action.targetName in claimed) {
-                skips += action
-            } else {
-                claimed += action.targetName
-                renames += action
+        control.forEachUntilStopped(entries.filterNot { it.isDirectory }, FileEntry::name) { entry ->
+            val action = candidateRename(entry.handle, entry.name)
+            when {
+                action == null -> Unit
+                action.targetName in existingNames || action.targetName in claimed -> skips += action
+                else -> {
+                    claimed += action.targetName
+                    renames += action
+                }
             }
         }
         return RenamePlan(renames, skips)
@@ -55,10 +61,13 @@ class RenamePlanner(private val fs: FileSystemRepository) {
         return plan.renames.size
     }
 
-    /** Renames every file in [plan]. */
-    fun apply(plan: RenamePlan) {
-        for (rename in plan.renames) {
+    /** Renames every file in [plan], stopping between two files when [control] says so; returns how many. */
+    fun apply(plan: RenamePlan, control: JobControl = NoJobControl): Int {
+        var renamed = 0
+        control.forEachUntilStopped(plan.renames, RenameAction::sourceName) { rename ->
             fs.rename(rename.source, rename.targetName)
+            renamed++
         }
+        return renamed
     }
 }

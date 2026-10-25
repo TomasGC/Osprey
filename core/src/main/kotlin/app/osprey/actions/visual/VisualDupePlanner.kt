@@ -3,8 +3,12 @@ package app.osprey.actions.visual
 import app.osprey.actions.imageExtensions
 import app.osprey.actions.splitStemAndSuffix
 import app.osprey.actions.videoExtensions
+import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaMetadataReader
 
 /**
@@ -50,15 +54,17 @@ class VisualDupePlanner(
      * excluded (same as the POC's `None`-hash skip). Clusters of fewer than two files are
      * excluded entirely; the remaining groups are sorted largest-group-first.
      */
-    fun plan(root: FileHandle, threshold: Int = VISUAL_HAMMING_THRESHOLD): VisualDupePlan {
-        val items = fs.list(root)
-            .filterNot { it.isDirectory }
-            .filter { isImageOrVideo(it.name) }
-            .mapNotNull { entry ->
-                val frame = mediaMetadataReader.decodeFrame(entry.handle, HASH_DECODE_MAX_SIDE)
-                    ?: return@mapNotNull null
-                entry to phash(frame)
-            }
+    fun plan(
+        root: FileHandle,
+        threshold: Int = VISUAL_HAMMING_THRESHOLD,
+        control: JobControl = NoJobControl,
+    ): VisualDupePlan {
+        val files = fs.list(root).filterNot { it.isDirectory }.filter { isImageOrVideo(it.name) }
+        val items = mutableListOf<Pair<FileEntry, Long>>()
+        val decoded = control.forEachUntilStopped(files, FileEntry::name) { entry ->
+            mediaMetadataReader.decodeFrame(entry.handle, HASH_DECODE_MAX_SIDE)?.let { items += entry to phash(it) }
+        }
+        if (!decoded) return VisualDupePlan(emptyList())
 
         val burstIds = items.map { (entry, _) -> burstId(entry.name) }
         val unionFind = UnionFind<Int>()

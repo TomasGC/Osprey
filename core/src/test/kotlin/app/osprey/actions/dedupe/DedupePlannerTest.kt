@@ -1,5 +1,7 @@
 package app.osprey.actions.dedupe
 
+import app.osprey.jobs.JobProgress
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
@@ -131,5 +133,62 @@ class DedupePlannerTest {
 
         assertEquals(1, count)
         assertEquals("  TRASH b.jpg  (dup of a.jpg)", logs.single())
+    }
+
+    private fun twoDuplicatePairs() {
+        fs.addFile(year, "a.jpg", byteArrayOf(1, 2, 3))
+        fs.addFile(year, "bb.jpg", byteArrayOf(1, 2, 3))
+        fs.addFile(year, "c.jpg", byteArrayOf(9, 9))
+        fs.addFile(year, "dd.jpg", byteArrayOf(9, 9))
+        fs.addFile(year, "solo.jpg", byteArrayOf(7))
+    }
+
+    @Test
+    fun `plan reports each file it has to read, never one with a size of its own`() {
+        twoDuplicatePairs()
+        val control = RecordingJobControl()
+
+        planner.plan(year, trash, control)
+
+        assertEquals(setOf("a.jpg", "bb.jpg", "c.jpg", "dd.jpg"), control.reports.map { it.current }.toSet())
+        assertEquals(setOf(4), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `a scan stopped before every file was read plans nothing`() {
+        twoDuplicatePairs()
+
+        val plan = planner.plan(year, trash, RecordingJobControl(stopAfterReports = 3))
+
+        assertEquals(emptyList<DedupeMove>(), plan.moves)
+    }
+
+    @Test
+    fun `apply reports each move and returns how many it made`() {
+        twoDuplicatePairs()
+        val control = RecordingJobControl()
+
+        val moved = planner.apply(planner.plan(year, trash), trash, control)
+
+        assertEquals(2, moved)
+        assertEquals(setOf("bb.jpg", "dd.jpg"), control.reports.map { it.current }.toSet())
+    }
+
+    @Test
+    fun `a stopped apply leaves the other duplicate and a new scan finds it`() {
+        twoDuplicatePairs()
+
+        val moved = planner.apply(planner.plan(year, trash), trash, RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, moved)
+        assertEquals(1, planner.plan(year, trash).moves.size)
+    }
+
+    @Test
+    fun `an empty plan moves nothing and reports nothing`() {
+        val control = RecordingJobControl()
+
+        assertEquals(0, planner.apply(DedupePlan(emptyList()), trash, control))
+        assertEquals(emptyList<JobProgress>(), control.reports)
     }
 }

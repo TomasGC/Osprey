@@ -1,5 +1,6 @@
 package app.osprey.actions.visual
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
@@ -76,5 +77,32 @@ class VisualDupeMoveTest {
 
         assertTrue(result.moved.isEmpty())
         assertEquals(listOf("vanished.jpg"), result.skipped)
+    }
+
+    @Test
+    fun `reports each member it moves`() {
+        val keep = write("keep.jpg")
+        val dup1 = write("dup1.jpg")
+        val dup2 = write("dup2.jpg")
+        val control = RecordingJobControl()
+
+        moveUncheckedToTrash(fs, trash, year, listOf(keep, dup1, dup2), setOf("keep.jpg"), control)
+
+        assertEquals(listOf("dup1.jpg", "dup2.jpg"), control.reports.map { it.current })
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `stops between two members when asked and leaves the rest`() {
+        val keep = write("keep.jpg")
+        val dup1 = write("dup1.jpg")
+        val dup2 = write("dup2.jpg")
+
+        val result = moveUncheckedToTrash(
+            fs, trash, year, listOf(keep, dup1, dup2), setOf("keep.jpg"), RecordingJobControl(stopAfterReports = 1),
+        )
+
+        assertEquals(listOf("dup1.jpg"), result.moved)
+        assertTrue(exists(year, "dup2.jpg"))
     }
 }

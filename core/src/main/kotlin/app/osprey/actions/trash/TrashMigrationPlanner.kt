@@ -4,6 +4,9 @@ import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 private val YEAR_FOLDER_NAME = Regex("""\d{4}""")
 
@@ -48,12 +51,12 @@ class TrashMigrationPlanner(private val fs: FileSystemRepository) {
      * Scans every four-digit year folder of [libraryRoot]. Only files directly inside an old folder
      * are queued; a subfolder in one is left alone. Nothing on disk changes: call [apply] to act.
      */
-    fun plan(libraryRoot: FileHandle): TrashMigrationPlan {
+    fun plan(libraryRoot: FileHandle, control: JobControl = NoJobControl): TrashMigrationPlan {
         val reserved = mutableMapOf<Pair<String, TrashAction>, MutableSet<String>>()
         val moves = mutableListOf<TrashMigrationMove>()
         val folders = mutableListOf<TrashMigrationFolder>()
 
-        for (legacy in legacyFolders(libraryRoot)) {
+        control.forEachUntilStopped(legacyFolders(libraryRoot), { "${it.year}/${it.folder.name}" }) { legacy ->
             folders += TrashMigrationFolder(legacy.folder.handle, "${legacy.year}/${legacy.folder.name}")
             val taken = reserved.getOrPut(legacy.year to legacy.action) {
                 trashFolders.existingNames(TrashLocation(libraryRoot, legacy.year), legacy.action).toMutableSet()
@@ -79,17 +82,26 @@ class TrashMigrationPlanner(private val fs: FileSystemRepository) {
     }
 
     /**
-     * Moves every file in [plan] into the Trash, then removes the old folders. An old folder that
-     * still holds something (a subfolder, or a file that appeared after planning) is left and logged.
+     * Moves every file in [plan] into the Trash, then removes the old folders, and returns how many files it
+     * moved. An old folder that still holds something (a subfolder, or a file that appeared after planning) is
+     * left and logged. A run [control] stopped removes no folder, since the files it left would still be in them.
      */
-    fun apply(plan: TrashMigrationPlan, libraryRoot: FileHandle, log: (String) -> Unit) {
+    fun apply(
+        plan: TrashMigrationPlan,
+        libraryRoot: FileHandle,
+        control: JobControl = NoJobControl,
+        log: (String) -> Unit,
+    ): Int {
         val destinations = mutableMapOf<Pair<String, TrashAction>, FileHandle>()
-        for (move in plan.moves) {
+        var moved = 0
+        val finished = control.forEachUntilStopped(plan.moves, TrashMigrationMove::sourcePath) { move ->
             val destination = destinations.getOrPut(move.year to move.action) {
                 trashFolders.ensure(TrashLocation(libraryRoot, move.year), move.action)
             }
             fs.move(move.source, destination, move.destName)
+            moved++
         }
+        if (!finished) return moved
         for (folder in plan.folders) {
             try {
                 fs.deleteEmptyFolder(folder.handle)
@@ -97,6 +109,7 @@ class TrashMigrationPlanner(private val fs: FileSystemRepository) {
                 log("  could not remove ${folder.relativePath} (not empty)")
             }
         }
+        return moved
     }
 
     private data class Legacy(val year: String, val folder: FileEntry, val action: TrashAction)

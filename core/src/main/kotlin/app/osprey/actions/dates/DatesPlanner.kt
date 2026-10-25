@@ -5,8 +5,13 @@ import app.osprey.actions.resolveMediaDate
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.FileTimestamps
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaDateSource
 import app.osprey.media.MediaMetadataReader
+import java.time.ZoneId
 
 /**
  * Resolves the best-known capture datetime for every file directly inside `root`: EXIF/video-
@@ -25,10 +30,10 @@ class DatesPlanner(
      * they simply aren't files. Each file's date is resolved via [resolveMediaDate]; one that
      * resolves neither way ends up in [DatesPlan.unfixable].
      */
-    fun plan(root: FileHandle): DatesPlan {
+    fun plan(root: FileHandle, control: JobControl = NoJobControl): DatesPlan {
         val fixes = mutableListOf<DatesFix>()
         val unfixable = mutableListOf<FileEntry>()
-        for (entry in fs.list(root).filterNot { it.isDirectory }) {
+        control.forEachUntilStopped(fs.list(root).filterNot { it.isDirectory }, FileEntry::name) { entry ->
             val resolved = resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)
             if (resolved == null) {
                 unfixable += entry
@@ -37,6 +42,21 @@ class DatesPlanner(
             }
         }
         return DatesPlan(fixes, unfixable)
+    }
+
+    /**
+     * Sets the created and modified time of every file in [plan] to its resolved date, read as local time in
+     * [zone], and returns how many it set. [control] can stop it between two files. A platform that cannot write
+     * timestamps (Android's file system) ignores the call, so the count is then the files it asked about.
+     */
+    fun apply(plan: DatesPlan, zone: ZoneId = ZoneId.systemDefault(), control: JobControl = NoJobControl): Int {
+        var fixed = 0
+        control.forEachUntilStopped(plan.fixes, DatesFix::name) { fix ->
+            val instant = fix.dateTime.atZone(zone).toInstant()
+            fs.writeTimestamps(fix.entry, FileTimestamps(created = instant, modified = instant))
+            fixed++
+        }
+        return fixed
     }
 
     /**

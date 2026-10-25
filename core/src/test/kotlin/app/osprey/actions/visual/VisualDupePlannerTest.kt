@@ -1,5 +1,6 @@
 package app.osprey.actions.visual
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.media.FakeMediaMetadataReader
 import org.junit.Assert.assertEquals
@@ -212,5 +213,32 @@ class VisualDupePlannerTest {
 
         assertEquals(2, reader.requestedMaxSides.size)
         assertEquals(setOf("clip.MP4", "clip2.mp4"), plan.groups.single().map { it.name }.toSet())
+    }
+
+    @Test
+    fun `plan reports each image it decodes`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        reader.setFrame(fs.addFile(fs.root, "a.jpg"), noisePixelBuffer(seed = 1))
+        reader.setFrame(fs.addFile(fs.root, "b.jpg"), noisePixelBuffer(seed = 1))
+        fs.addFile(fs.root, "notes.txt")
+        val control = RecordingJobControl()
+
+        VisualDupePlanner(fs, reader).plan(fs.root, control = control)
+
+        assertEquals(listOf("a.jpg", "b.jpg"), control.reports.map { it.current })
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `a scan stopped before every image was decoded plans nothing`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        reader.setFrame(fs.addFile(fs.root, "a.jpg"), noisePixelBuffer(seed = 1))
+        reader.setFrame(fs.addFile(fs.root, "b.jpg"), noisePixelBuffer(seed = 1))
+
+        val plan = VisualDupePlanner(fs, reader).plan(fs.root, control = RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(emptyList<List<VisualDupeMember>>(), plan.groups)
     }
 }
