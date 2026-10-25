@@ -21,4 +21,4 @@ jobs:
       integration-real-tasks: '[":core:integrationReal", ":desktop:integrationReal"]'
       # Merged line coverage of :core, :desktop and :app without the Compose screens (#46). :core is held
       # at 100% line and branch by `:core:koverVerify`, which the coverage report task depends on.
-      coverage-threshold: 65
+      coverage-threshold: 75
