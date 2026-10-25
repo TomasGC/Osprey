@@ -107,4 +107,17 @@ class JobNotificationTest {
         assertNull(resultNotification(entry(1, JobState.Running())))
         assertNull(resultNotification(entry(1, JobState.Queued)))
     }
+
+    @Test
+    fun `the notice for the time limit says what happened and what to do`() {
+        val notice = backgroundLimitNotification()
+
+        assertEquals("Osprey stopped", notice.title)
+        assertEquals(
+            "Android limits how long a job can run in the background. Open Osprey and scan again to continue.",
+            notice.text,
+        )
+        assertFalse(notice.failed)
+        assertNull(notice.stoppableJobId)
+    }
 }

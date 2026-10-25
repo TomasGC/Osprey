@@ -43,3 +43,8 @@ fun resultNotification(entry: JobEntry): JobNotification? {
     val outcome = finished.outcome
     return JobNotification(title = entry.name, text = outcome.summary, failed = outcome.failures > 0)
 }
+/** What to tell the user when Android ended the background service because of its time limit. */
+fun backgroundLimitNotification(): JobNotification = JobNotification(
+    title = "Osprey stopped",
+    text = "Android limits how long a job can run in the background. Open Osprey and scan again to continue.",
+)

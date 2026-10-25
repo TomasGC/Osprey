@@ -7,6 +7,8 @@ import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import app.osprey.OspreyApplication
 import app.osprey.jobs.JobNotification
+import app.osprey.jobs.JobState
+import app.osprey.jobs.backgroundLimitNotification
 import app.osprey.jobs.newlyFinished
 import app.osprey.jobs.ongoingNotification
 import app.osprey.jobs.resultNotification
@@ -17,6 +19,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 private const val NO_JOB = -1L
+private const val NO_JOB_ID = 0L
 
 /**
  * Keeps the process alive while jobs run, so a run goes on with the app in the background or the screen off.
@@ -46,6 +49,19 @@ class JobService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) app.jobs.stop(intent.getLongExtra(EXTRA_JOB_ID, NO_JOB))
         return START_NOT_STICKY
+    }
+
+    /**
+     * From Android 15 the system ends a data-sync service after about six hours of background work in a day. It
+     * gives the service a few seconds to stop and kills the whole app if it does not (seen on an Android 16 phone
+     * with the limit shortened to a minute). Every job is asked to stop, each ending after the file it is on, the
+     * service ends, and the user is told why.
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        app.jobs.entries.value.filter { it.state !is JobState.Finished }.forEach { app.jobs.stop(it.id) }
+        notifications.showResult(NO_JOB_ID, backgroundLimitNotification())
+        app.jobServiceStopped()
+        stopSelf()
     }
 
     override fun onDestroy() {
