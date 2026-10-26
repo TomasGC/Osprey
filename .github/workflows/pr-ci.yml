@@ -1,23 +1,21 @@
 name: PR-CI
 
 on:
-  workflow_run:
-    workflows: ["Push-CI"]
-    types: [completed]
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
 
 permissions:
   pull-requests: write
   contents: read
 
 concurrency:
-  group: pr-ci-${{ github.event.workflow_run.head_branch }}
+  group: pr-ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   pr-checks:
-    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@main
-    secrets: inherit
+    # Pinned to Condor PR #22 (context-check input) until it merges, then back to @main.
+    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@b51a77fe1c37780a98898f410ff0a76b7a2e4df0
     with:
-      push-ci-conclusion: ${{ github.event.workflow_run.conclusion }}
-      head-branch: ${{ github.event.workflow_run.head_branch }}
-      head-sha: ${{ github.event.workflow_run.head_sha }}
+      # Osprey's context lives in the wiki: there is no contexts/ folder to check.
+      context-check: false
