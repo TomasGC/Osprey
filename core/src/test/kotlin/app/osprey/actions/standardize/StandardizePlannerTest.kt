@@ -1,5 +1,6 @@
 package app.osprey.actions.standardize
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
@@ -186,5 +187,60 @@ class StandardizePlannerTest {
         assertEquals(1, count)
         assertEquals("  UNFIXABLE random.jpg", logs.first())
         assertTrue(logs.last().startsWith("  RENAME download_20160828_193034.jpeg -> IMG_2016-08-28_19-30-34.jpeg"))
+    }
+
+    private fun twoRenames(fs: FakeFileSystemRepository) {
+        fs.addFile(fs.root, "download_20160828_193034.jpeg", "a".toByteArray())
+        fs.addFile(fs.root, "download_20170101_000000.jpeg", "b".toByteArray())
+    }
+
+    @Test
+    fun `plan reports each file`() {
+        val fs = FakeFileSystemRepository()
+        twoRenames(fs)
+        val control = RecordingJobControl()
+
+        StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root, control)
+
+        assertEquals(
+            listOf("download_20160828_193034.jpeg", "download_20170101_000000.jpeg"),
+            control.reports.map { it.current },
+        )
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `plan stops when asked and keeps what it had`() {
+        val fs = FakeFileSystemRepository()
+        twoRenames(fs)
+
+        val plan = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root, RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, plan.renames.size)
+    }
+
+    @Test
+    fun `apply reports each rename and returns how many it made`() {
+        val fs = FakeFileSystemRepository()
+        twoRenames(fs)
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+        val control = RecordingJobControl()
+
+        val renamed = planner.apply(planner.plan(fs.root), control)
+
+        assertEquals(2, renamed)
+        assertEquals(2, control.reports.size)
+    }
+
+    @Test
+    fun `a stopped apply leaves the other file and a new scan finds it`() {
+        val fs = FakeFileSystemRepository()
+        twoRenames(fs)
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+
+        val renamed = planner.apply(planner.plan(fs.root), RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, renamed)
+        assertEquals(1, planner.plan(fs.root).renames.size)
     }
 }

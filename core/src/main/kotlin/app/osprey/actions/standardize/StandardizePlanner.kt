@@ -8,6 +8,9 @@ import app.osprey.actions.videoExtensions
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
 import java.time.format.DateTimeFormatter
@@ -31,13 +34,13 @@ class StandardizePlanner(
      * (not even considered for [StandardizePlan.unfixable]). An already-standardized name is a
      * silent no-op, never a false [StandardizePlan.unfixable] entry.
      */
-    fun plan(root: FileHandle): StandardizePlan {
+    fun plan(root: FileHandle, control: JobControl = NoJobControl): StandardizePlan {
         val existingNames = fs.list(root).map { it.name }.toSet()
         val claimed = mutableSetOf<String>()
         val renames = mutableListOf<StandardizeRename>()
         val unfixable = mutableListOf<FileEntry>()
 
-        for (entry in fs.list(root).filterNot { it.isDirectory }) {
+        control.forEachUntilStopped(fs.list(root).filterNot { it.isDirectory }, FileEntry::name) { entry ->
             when (val outcome = classify(entry, existingNames, claimed)) {
                 is EntryOutcome.Rename -> {
                     claimed += outcome.rename.targetName
@@ -76,11 +79,14 @@ class StandardizePlanner(
         return plan.renames.size
     }
 
-    /** Renames every file in [plan]. */
-    fun apply(plan: StandardizePlan) {
-        for (rename in plan.renames) {
+    /** Renames every file in [plan], stopping between two files when [control] says so; returns how many. */
+    fun apply(plan: StandardizePlan, control: JobControl = NoJobControl): Int {
+        var renamed = 0
+        control.forEachUntilStopped(plan.renames, StandardizeRename::sourceName) { rename ->
             fs.rename(rename.entry, rename.targetName)
+            renamed++
         }
+        return renamed
     }
 
     private fun prefixFor(name: String): String? {

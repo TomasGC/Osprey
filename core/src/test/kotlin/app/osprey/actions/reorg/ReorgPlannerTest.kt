@@ -7,6 +7,8 @@ import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobProgress
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
@@ -321,12 +323,11 @@ class ReorgPlannerTest {
     fun `apply stops between files when asked`() {
         file(camera, "a.jpg", 2018)
         file(camera, "b.jpg", 2018)
-        var calls = 0
 
         val result = planner.apply(
             planner.plan(output, listOf(moveFrom(camera))),
             output,
-            shouldStop = { calls++ >= 1 },
+            control = RecordingJobControl(stopAfterReports = 1),
         )
 
         assertTrue(result.cancelled)
@@ -338,12 +339,13 @@ class ReorgPlannerTest {
     fun `apply reports progress for every file`() {
         file(camera, "a.jpg", 2018)
         file(camera, "b.jpg", 2019)
-        val seen = mutableListOf<ReorgProgress>()
+        val control = RecordingJobControl()
 
-        planner.apply(planner.plan(output, listOf(copyFrom(camera))), output, progress = { seen += it })
+        planner.apply(planner.plan(output, listOf(copyFrom(camera))), output, control = control)
 
-        assertEquals(listOf(0, 1), seen.map { it.done })
-        assertEquals(setOf(2), seen.map { it.total }.toSet())
+        assertEquals(listOf(0, 1), control.reports.map { it.done })
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+        assertEquals(setOf("Camera/a.jpg", "Camera/b.jpg"), control.reports.map { it.current }.toSet())
     }
 
     @Test
@@ -454,6 +456,48 @@ class ReorgPlannerTest {
 
         assertEquals(listOf("2019/mystery.jpg"), plan.undated)
         assertEquals(emptyList<ReorgItem>(), plan.items)
+    }
+
+    @Test
+    fun `plan reports every file it looks at, the output first and then each input`() {
+        file(fs.addFolder(output, "2019"), "o.jpg", 2016)
+        file(camera, "a.jpg", 2018)
+        file(camera, "b.jpg", 2018)
+        val control = RecordingJobControl()
+
+        planner.plan(output, listOf(copyFrom(camera)), control)
+
+        assertEquals(
+            listOf(
+                JobProgress(0, 3, "2019/o.jpg"),
+                JobProgress(1, 3, "Camera/a.jpg"),
+                JobProgress(2, 3, "Camera/b.jpg"),
+            ),
+            control.reports,
+        )
+    }
+
+    @Test
+    fun `plan stops looking when asked and keeps what it had planned`() {
+        file(camera, "a.jpg", 2018)
+        file(camera, "b.jpg", 2018)
+
+        val plan = planner.plan(output, listOf(copyFrom(camera)), RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(listOf("Camera/a.jpg"), plan.items.map { it.label })
+    }
+
+    @Test
+    fun `a run stopped midway and planned again finds exactly the files left`() {
+        file(camera, "a.jpg", 2018)
+        file(camera, "b.jpg", 2018)
+        val first = planner.plan(output, listOf(moveFrom(camera)))
+        planner.apply(first, output, control = RecordingJobControl(stopAfterReports = 1))
+
+        val second = planner.plan(output, listOf(moveFrom(camera)))
+
+        assertEquals(1, names(camera).size)
+        assertEquals(listOf("Camera/" + names(camera).single()), second.items.map { it.label })
     }
 
     /** A filesystem whose copies hash differently from their source. */

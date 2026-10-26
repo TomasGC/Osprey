@@ -1,9 +1,11 @@
 package app.osprey.desktop.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,11 +23,14 @@ import app.osprey.filesystem.FileHandle
 fun OspreyApp(state: AppState) {
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                Sidebar(state)
-                Box(modifier = Modifier.fillMaxHeight()) {
-                    OspreyContent(state)
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    Sidebar(state)
+                    Box(modifier = Modifier.fillMaxHeight()) {
+                        OspreyContent(state)
+                    }
                 }
+                JobStrip(state.jobs)
             }
         }
     }
@@ -44,7 +49,7 @@ private fun OspreyContent(state: AppState) {
     }
     val rootAction = libraryDir?.let { rootActionFor(state, state.selectedTab, it) }
     if (rootAction != null) {
-        ActionPane(rootAction.ui, rootAction.scan, rootAction.apply, onCancel = rootAction.cancel)
+        ActionPane(rootAction.ui, rootAction.scan, rootAction.apply)
         return
     }
     YearContent(state)
@@ -69,9 +74,8 @@ private fun YearContent(state: AppState) {
 /** A pane that runs on the library root: what it shows, how it scans and applies, and whether it can stop. */
 private class RootAction(
     val ui: ActionUiState,
-    val scan: suspend () -> Unit,
-    val apply: suspend () -> Unit,
-    val cancel: (() -> Unit)? = null,
+    val scan: () -> Unit,
+    val apply: () -> Unit,
 )
 
 /** The tabs that run on the library root instead of the selected year folder. */
@@ -79,20 +83,12 @@ private fun rootActionFor(state: AppState, tab: ActionTab, root: FileHandle): Ro
     ActionTab.REORG -> RootAction(
         state.reorg.state,
         { state.reorg.onScan(root) },
-        {
-            state.reorg.onApply(root)
-            state.refreshYears()
-        },
-        state.reorg::onCancel,
+        { state.reorg.onApply(root) },
     )
     ActionTab.TRASH_MIGRATION -> RootAction(
         state.trashMigration.state,
         { state.trashMigration.onScan(root) },
-        {
-            state.trashMigration.onApply(root)
-            state.refreshYears()
-            state.refreshLegacyTrash()
-        },
+        { state.trashMigration.onApply(root) },
     )
     else -> null
 }

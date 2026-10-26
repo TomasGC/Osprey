@@ -1,41 +1,50 @@
 package app.osprey
 
-import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
-import androidx.documentfile.provider.DocumentFile
-import app.osprey.android.AndroidAppState
-import app.osprey.android.AndroidSettingsStore
-import app.osprey.android.filesystem.AndroidFileHandle
-import app.osprey.android.filesystem.AndroidFileSystemRepository
-import app.osprey.android.media.AndroidMediaMetadataReader
-import app.osprey.android.releaseGrant
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import app.osprey.android.ui.OspreyApp
+import app.osprey.jobs.JobState
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private val askForNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private var askedForNotifications = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val app = application as OspreyApplication
+        val state = app.appState
         setContent {
-            val context = LocalContext.current
-            val state = remember {
-                AndroidAppState(
-                    fs = AndroidFileSystemRepository(context),
-                    mediaMetadataReader = AndroidMediaMetadataReader(context),
-                    settingsStore = AndroidSettingsStore(context),
-                    resolveFolder = { folder ->
-                        DocumentFile.fromTreeUri(context, Uri.parse(folder.reference))
-                            ?.takeIf { it.isDirectory }
-                            ?.let(::AndroidFileHandle)
-                    },
-                    releaseGrant = { releaseGrant(context, it) },
-                )
-            }
             LaunchedEffect(Unit) { state.start() }
             OspreyApp(state)
         }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                app.jobs.entries.collect { entries ->
+                    if (entries.any { it.state !is JobState.Finished }) askForNotificationsOnce()
+                }
+            }
+        }
+    }
+
+    /**
+     * Android 13 and later show a job's notification only once the user allowed it. The first job asks, once per
+     * run of the app; a refusal does not stop the job, it just runs without a notification.
+     */
+    private fun askForNotificationsOnce() {
+        if (askedForNotifications || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+        askedForNotifications = true
+        askForNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

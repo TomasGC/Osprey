@@ -1,9 +1,9 @@
 package app.osprey.desktop
 
-import app.osprey.actions.dedupe.DedupePlan
-import app.osprey.actions.dedupe.DedupePlanner
 import app.osprey.actions.dates.DatesPlan
 import app.osprey.actions.dates.DatesPlanner
+import app.osprey.actions.dedupe.DedupePlan
+import app.osprey.actions.dedupe.DedupePlanner
 import app.osprey.actions.flatten.FlattenPlan
 import app.osprey.actions.flatten.FlattenPlanner
 import app.osprey.actions.rename.RenamePlan
@@ -14,110 +14,107 @@ import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.TrashMigrationPlan
 import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.filesystem.FileSystemRepository
-import app.osprey.filesystem.FileTimestamps
+import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
-import java.time.ZoneId
 
-fun flattenController(fs: FileSystemRepository) = SimpleActionController<FlattenPlan>(
-    scan = { yearDir ->
+fun flattenController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionController<FlattenPlan>(
+    name = "Flatten",
+    jobs = jobs,
+    scan = { yearDir, control ->
         val planner = FlattenPlanner(fs)
-        val plan = planner.plan(yearDir)
+        val plan = planner.plan(yearDir, control)
         val lines = mutableListOf<String>()
         val count = planner.describe(plan, lines::add)
         ScanResult(plan, "count=$count", lines, count)
     },
-    apply = { yearDir, plan ->
-        FlattenPlanner(fs).apply(plan, yearDir) {}
-        plan.moves.size
-    },
+    apply = { yearDir, plan, control -> FlattenPlanner(fs).apply(plan, yearDir, control) {} },
 )
 
-fun renameController(fs: FileSystemRepository) = SimpleActionController<RenamePlan>(
-    scan = { yearDir ->
+fun renameController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionController<RenamePlan>(
+    name = "Rename",
+    jobs = jobs,
+    scan = { yearDir, control ->
         val planner = RenamePlanner(fs)
-        val plan = planner.plan(yearDir)
+        val plan = planner.plan(yearDir, control)
         val lines = mutableListOf<String>()
         val count = planner.describe(plan, lines::add)
         ScanResult(plan, "count=$count  skipped=${plan.skips.size}", lines, count)
     },
-    apply = { _, plan ->
-        RenamePlanner(fs).apply(plan)
-        plan.renames.size
-    },
+    apply = { _, plan, control -> RenamePlanner(fs).apply(plan, control) },
 )
 
 fun dedupeController(
     fs: FileSystemRepository,
+    jobs: JobQueue,
     trashLocation: () -> TrashLocation,
 ) = SimpleActionController<DedupePlan>(
-    scan = { yearDir ->
+    name = "Dedupe",
+    jobs = jobs,
+    scan = { yearDir, control ->
         val planner = DedupePlanner(fs)
-        val plan = planner.plan(yearDir, trashLocation())
+        val plan = planner.plan(yearDir, trashLocation(), control)
         val lines = mutableListOf<String>()
         val count = planner.describe(plan, lines::add)
         ScanResult(plan, "count=$count", lines, count)
     },
-    apply = { yearDir, plan ->
-        DedupePlanner(fs).apply(plan, trashLocation())
-        plan.moves.size
-    },
+    apply = { _, plan, control -> DedupePlanner(fs).apply(plan, trashLocation(), control = control) },
 )
 
 /**
- * Applying a resolved date is deliberately this tab's own job, not `:core`'s (#6): `DatesPlanner`
- * only decides *what* a file's timestamp should be. Both created and modified are set, matching
- * the POC's `apply_dates` (portable `os.utime` for both, plus Windows Created-time).
+ * Deciding what a file's timestamp should be is [DatesPlanner]'s job and so is applying it: both created and
+ * modified are set, matching the POC's `apply_dates` (portable `os.utime` for both, plus Windows Created-time).
  */
 fun datesController(
     fs: FileSystemRepository,
     mediaMetadataReader: MediaMetadataReader,
+    jobs: JobQueue,
 ) = SimpleActionController<DatesPlan>(
-    scan = { yearDir ->
+    name = "Dates",
+    jobs = jobs,
+    scan = { yearDir, control ->
         val planner = DatesPlanner(fs, mediaMetadataReader)
-        val plan = planner.plan(yearDir)
+        val plan = planner.plan(yearDir, control)
         val lines = mutableListOf<String>()
         val (fixedMeta, fixedFilename) = planner.describe(plan, lines::add)
         val summary = "count=${plan.fixes.size}  fixed_meta=$fixedMeta  " +
             "fixed_filename=$fixedFilename  unfixable=${plan.unfixable.size}"
         ScanResult(plan, summary, lines, plan.fixes.size)
     },
-    apply = { _, plan ->
-        for (fix in plan.fixes) {
-            val instant = fix.dateTime.atZone(ZoneId.systemDefault()).toInstant()
-            fs.writeTimestamps(fix.entry, FileTimestamps(created = instant, modified = instant))
-        }
-        plan.fixes.size
-    },
+    apply = { _, plan, control -> DatesPlanner(fs, mediaMetadataReader).apply(plan, control = control) },
 )
 
 /** Runs on the library root: moves the old `<year>/TODELETE*` folders into `Trash` (#38). */
-fun trashMigrationController(fs: FileSystemRepository) = SimpleActionController<TrashMigrationPlan>(
-    scan = { root ->
+fun trashMigrationController(
+    fs: FileSystemRepository,
+    jobs: JobQueue,
+    onApplied: () -> Unit = {},
+) = SimpleActionController<TrashMigrationPlan>(
+    name = "Trash migration",
+    jobs = jobs,
+    scan = { root, control ->
         val planner = TrashMigrationPlanner(fs)
-        val plan = planner.plan(root)
+        val plan = planner.plan(root, control)
         val lines = mutableListOf<String>()
         val count = planner.describe(plan, lines::add)
         ScanResult(plan, "count=$count  old_folders=${plan.folders.size}", lines, count + plan.folders.size)
     },
-    apply = { root, plan ->
-        TrashMigrationPlanner(fs).apply(plan, root) {}
-        plan.moves.size
-    },
+    apply = { root, plan, control -> TrashMigrationPlanner(fs).apply(plan, root, control) {} },
+    onApplied = onApplied,
 )
 
 fun standardizeController(
     fs: FileSystemRepository,
     mediaMetadataReader: MediaMetadataReader,
+    jobs: JobQueue,
 ) = SimpleActionController<StandardizePlan>(
-    scan = { yearDir ->
+    name = "Standardize",
+    jobs = jobs,
+    scan = { yearDir, control ->
         val planner = StandardizePlanner(fs, mediaMetadataReader)
-        val plan = planner.plan(yearDir)
+        val plan = planner.plan(yearDir, control)
         val lines = mutableListOf<String>()
         val count = planner.describe(plan, lines::add)
         ScanResult(plan, "count=$count  unfixable=${plan.unfixable.size}", lines, count)
     },
-    apply = { _, plan ->
-        StandardizePlanner(fs, mediaMetadataReader).apply(plan)
-        plan.renames.size
-    },
+    apply = { _, plan, control -> StandardizePlanner(fs, mediaMetadataReader).apply(plan, control) },
 )

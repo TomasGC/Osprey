@@ -24,6 +24,9 @@ class VisualDupeGroupUi(
         members.forEach { put(it.name, it.name in initialKeep) }
     }
     var done by mutableStateOf(false)
+
+    /** True while this group's files are being moved to the Trash by a job. */
+    var moving by mutableStateOf(false)
     var status by mutableStateOf("")
 }
 

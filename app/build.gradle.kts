@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.exifinterface)
 
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":core")))
     // The JVM unit tests run without the Android framework, whose org.json is only a stub there.
     testImplementation(libs.json)
 

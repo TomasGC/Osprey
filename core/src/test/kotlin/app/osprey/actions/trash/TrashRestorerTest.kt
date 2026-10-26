@@ -3,6 +3,7 @@ package app.osprey.actions.trash
 import app.osprey.filesystem.FaultyFileSystemRepository
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
+import app.osprey.jobs.RecordingJobControl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -80,10 +81,9 @@ class TrashRestorerTest {
     fun `a stop leaves the remaining files in the Trash`() {
         val a = lib.trash("2019", TrashAction.DEDUPE, "a.jpg")
         val b = lib.trash("2019", TrashAction.DEDUPE, "b.jpg")
-        var calls = 0
 
         val plan = restorer.plan(lib.root, listOf(a, b))
-        val result = restorer.restore(lib.root, plan, shouldStop = { calls++ >= 1 })
+        val result = restorer.restore(lib.root, plan, control = RecordingJobControl(stopAfterReports = 1))
 
         assertTrue(result.cancelled)
         assertEquals(1, result.restored)

@@ -4,6 +4,9 @@ import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 private const val NOT_IN_TRASH = "not in the Trash any more"
 
@@ -27,30 +30,25 @@ class TrashRestorer(private val fs: FileSystemRepository) {
     }
 
     /**
-     * Restores the [RestorePlan.direct] files; the conflicts are left for [resolve]. [shouldStop] is polled
+     * Restores the [RestorePlan.direct] files; the conflicts are left for [resolve]. [control] is asked
      * before each file. A file that cannot be moved stays in the Trash and is listed in the result.
      */
     fun restore(
         libraryRoot: FileHandle,
         plan: RestorePlan,
-        shouldStop: () -> Boolean = { false },
-        progress: (TrashProgress) -> Unit = {},
+        control: JobControl = NoJobControl,
     ): TrashRestoreResult {
         val locator = TrashLocator(fs, libraryRoot)
         val failures = mutableListOf<TrashFailure>()
         val touched = linkedSetOf<Pair<String, TrashAction>>()
         var restored = 0
-        var cancelled = false
-        for ((index, entry) in plan.direct.withIndex()) {
-            cancelled = shouldStop()
-            if (cancelled) break
-            progress(TrashProgress(index, plan.direct.size, entry.label))
+        val finished = control.forEachUntilStopped(plan.direct, TrashEntry::label) { entry ->
             touched += entry.year to entry.action
             val failure = attempt(entry.label) { moveBack(locator, libraryRoot, entry, entry.name) }
             if (failure == null) restored++ else failures += failure
         }
         val pruned = touched.sumOf { (year, action) -> locator.prune(year, action) }
-        return TrashRestoreResult(restored, failures, pruned, cancelled)
+        return TrashRestoreResult(restored, failures, pruned, cancelled = !finished)
     }
 
     /** Settles one conflict as [choice]; returns the failure, or null when it worked. */

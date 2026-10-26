@@ -1,5 +1,6 @@
 package app.osprey.actions.trash
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
 import org.junit.Assert.assertEquals
@@ -116,7 +117,7 @@ class TrashMigrationPlannerTest {
         fs.addFolder(old, "nested")
         val logs = mutableListOf<String>()
 
-        planner.apply(planner.plan(fs.root), fs.root, logs::add)
+        planner.apply(planner.plan(fs.root), fs.root, log = logs::add)
 
         assertEquals(setOf("nested"), names(old))
         assertTrue(logs.single().contains("2019/TODELETE"))
@@ -184,5 +185,56 @@ class TrashMigrationPlannerTest {
             "  TRASH 2019/TODELETE/a.jpg -> Trash/2019/Dedupe/a__dup1.jpg  (renamed, name collision)",
             lines.single(),
         )
+    }
+
+    private fun threeOldFiles() {
+        val year = yearFolder("2019")
+        val todelete = fs.addFolder(year, "TODELETE")
+        fs.addFile(todelete, "a.jpg")
+        fs.addFile(todelete, "b.jpg")
+        fs.addFile(fs.addFolder(year, "TODELETEDUPS"), "c.jpg")
+    }
+
+    @Test
+    fun `plan reports each old folder it reads`() {
+        threeOldFiles()
+        val control = RecordingJobControl()
+
+        planner.plan(fs.root, control)
+
+        assertEquals(setOf("2019/TODELETE", "2019/TODELETEDUPS"), control.reports.map { it.current }.toSet())
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `plan stops reading folders when asked and keeps what it had`() {
+        threeOldFiles()
+
+        val plan = planner.plan(fs.root, RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, plan.folders.size)
+    }
+
+    @Test
+    fun `apply reports each move and returns how many it made`() {
+        threeOldFiles()
+        val control = RecordingJobControl()
+
+        val moved = planner.apply(planner.plan(fs.root), fs.root, control) {}
+
+        assertEquals(3, moved)
+        assertEquals(3, control.reports.size)
+    }
+
+    @Test
+    fun `a stopped apply keeps the old folders and a new scan finds the rest`() {
+        threeOldFiles()
+        val logs = mutableListOf<String>()
+
+        val moved = planner.apply(planner.plan(fs.root), fs.root, RecordingJobControl(stopAfterReports = 1), logs::add)
+
+        assertEquals(1, moved)
+        assertEquals(emptyList<String>(), logs)
+        assertEquals(2, planner.plan(fs.root).moves.size)
     }
 }

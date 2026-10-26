@@ -91,8 +91,11 @@ fun OspreyApp(state: AndroidAppState) {
                     )
                 },
             ) { padding ->
-                Box(modifier = Modifier.padding(padding)) {
-                    OspreyContent(state)
+                Column(modifier = Modifier.padding(padding)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        OspreyContent(state)
+                    }
+                    JobStrip(state.jobs)
                 }
             }
         }
@@ -112,7 +115,7 @@ private fun OspreyContent(state: AndroidAppState) {
     }
     val rootAction = rootActionFor(state, state.selectedTab, libraryRoot)
     if (rootAction != null) {
-        ActionPane(rootAction.ui, rootAction.scan, rootAction.apply, onCancel = rootAction.cancel)
+        ActionPane(rootAction.ui, rootAction.scan, rootAction.apply)
         return
     }
     YearContent(state)
@@ -144,9 +147,8 @@ private fun YearContent(state: AndroidAppState) {
 /** A pane that runs on the library root: what it shows, how it scans and applies, and whether it can stop. */
 private class RootAction(
     val ui: ActionUiState,
-    val scan: suspend () -> Unit,
-    val apply: suspend () -> Unit,
-    val cancel: (() -> Unit)? = null,
+    val scan: () -> Unit,
+    val apply: () -> Unit,
 )
 
 /** The tabs that run on the library root instead of the selected year folder. */
@@ -154,20 +156,12 @@ private fun rootActionFor(state: AndroidAppState, tab: ActionTab, root: FileHand
     ActionTab.REORG -> RootAction(
         state.reorg.state,
         { state.reorg.onScan(root) },
-        {
-            state.reorg.onApply(root)
-            state.refreshYears()
-        },
-        state.reorg::onCancel,
+        { state.reorg.onApply(root) },
     )
     ActionTab.TRASH_MIGRATION -> RootAction(
         state.trashMigration.state,
         { state.trashMigration.onScan(root) },
-        {
-            state.trashMigration.onApply(root)
-            state.refreshYears()
-            state.refreshLegacyTrash()
-        },
+        { state.trashMigration.onApply(root) },
     )
     else -> null
 }

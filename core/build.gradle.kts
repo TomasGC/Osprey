@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
+    // The in-memory file system and metadata reader are shared with the :app tests (#50).
+    `java-test-fixtures`
 }
 
 kotlin {
@@ -38,6 +40,13 @@ testing {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
+    }
+}
+
+// The test doubles shared with the other modules are not :core's code; the coverage rule is about what ships.
+kover {
+    excludeSourceSets {
+        names("testFixtures")
     }
 }
 

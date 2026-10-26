@@ -1,5 +1,6 @@
 package app.osprey.actions.rename
 
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -102,5 +103,57 @@ class RenamePlannerTest {
         assertEquals(1, count)
         assertTrue(logs.any { it.contains("SKIP") })
         assertTrue(logs.any { it.contains("RENAME") })
+    }
+
+    @Test
+    fun `plan reports each file and no folder`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a (1).jpg")
+        fs.addFile(fs.root, "b (1).jpg")
+        fs.addFolder(fs.root, "sub")
+        val control = RecordingJobControl()
+
+        RenamePlanner(fs).plan(fs.root, control)
+
+        assertEquals(listOf("a (1).jpg", "b (1).jpg"), control.reports.map { it.current })
+        assertEquals(setOf(2), control.reports.map { it.total }.toSet())
+    }
+
+    @Test
+    fun `plan stops when asked and keeps what it had`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a (1).jpg")
+        fs.addFile(fs.root, "b (1).jpg")
+
+        val plan = RenamePlanner(fs).plan(fs.root, RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(listOf("a (1).jpg"), plan.renames.map { it.sourceName })
+    }
+
+    @Test
+    fun `apply reports each rename and returns how many it made`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a (1).jpg")
+        fs.addFile(fs.root, "b (1).jpg")
+        val planner = RenamePlanner(fs)
+        val control = RecordingJobControl()
+
+        val renamed = planner.apply(planner.plan(fs.root), control)
+
+        assertEquals(2, renamed)
+        assertEquals(listOf("a (1).jpg", "b (1).jpg"), control.reports.map { it.current })
+    }
+
+    @Test
+    fun `a stopped apply leaves the other files and a new scan finds them`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a (1).jpg")
+        fs.addFile(fs.root, "b (1).jpg")
+        val planner = RenamePlanner(fs)
+
+        val renamed = planner.apply(planner.plan(fs.root), RecordingJobControl(stopAfterReports = 1))
+
+        assertEquals(1, renamed)
+        assertEquals(listOf("b (1).jpg"), planner.plan(fs.root).renames.map { it.sourceName })
     }
 }

@@ -4,6 +4,9 @@ import app.osprey.actions.splitStemAndSuffix
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 private const val TODELETE = "TODELETE"
 
@@ -22,13 +25,13 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
      * files nor its own nested subfolders are touched), matching every other action's rule of
      * never touching anything already parked there.
      */
-    fun plan(root: FileHandle): FlattenPlan {
+    fun plan(root: FileHandle, control: JobControl = NoJobControl): FlattenPlan {
         val folders = collectNestedFolders(root)
         val existingNames = fs.list(root).map { it.name }.toMutableSet()
         val reserved = mutableSetOf<String>()
         val moves = mutableListOf<FlattenMove>()
 
-        for (folder in folders) {
+        control.forEachUntilStopped(folders, FlattenFolder::relativePath) { folder ->
             for (entry in fs.list(folder.handle)) {
                 if (entry.isDirectory) continue
                 val (destName, note) = resolveDestination(entry.name, existingNames, reserved)
@@ -64,14 +67,18 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
     }
 
     /**
-     * Moves every file in [plan] into `root`, then removes [plan]'s subfolders deepest first.
-     * A subfolder that gained an untracked file after [plan] was computed is left in place and
-     * logged, exactly like the POC's `rmdir()`-then-log-and-continue.
+     * Moves every file in [plan] into `root`, then removes [plan]'s subfolders deepest first, and returns
+     * how many files it moved. A subfolder that gained an untracked file after [plan] was computed is left
+     * in place and logged, exactly like the POC's `rmdir()`-then-log-and-continue. A run [control] stopped
+     * removes no folder: the files it left would only make them fail.
      */
-    fun apply(plan: FlattenPlan, root: FileHandle, log: (String) -> Unit) {
-        for (move in plan.moves) {
+    fun apply(plan: FlattenPlan, root: FileHandle, control: JobControl = NoJobControl, log: (String) -> Unit): Int {
+        var moved = 0
+        val finished = control.forEachUntilStopped(plan.moves, FlattenMove::sourcePath) { move ->
             fs.move(move.source, root, move.destName)
+            moved++
         }
+        if (!finished) return moved
         for (folder in plan.folders) {
             try {
                 fs.deleteEmptyFolder(folder.handle)
@@ -79,6 +86,7 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
                 log("  could not remove ${folder.relativePath} (not empty)")
             }
         }
+        return moved
     }
 
     private fun collectNestedFolders(root: FileHandle): List<FlattenFolder> {

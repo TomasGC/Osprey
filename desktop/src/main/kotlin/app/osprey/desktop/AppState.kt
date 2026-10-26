@@ -10,10 +10,14 @@ import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.SettingsStore
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /** Which tab is showing, same order as the POC's nav list. */
 enum class ActionTab(val label: String) {
@@ -32,6 +36,7 @@ class AppState(
     val fs: FileSystemRepository,
     val mediaMetadataReader: MediaMetadataReader,
     private val settingsStore: SettingsStore,
+    val jobs: JobQueue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO)),
 ) {
 
     val settingsState = SettingsState(settingsStore) { openLibrary(it) }
@@ -45,14 +50,18 @@ class AppState(
     /** Whether the Trash screen is showing instead of the selected action. */
     var showsTrash by mutableStateOf(false)
 
-    val flatten = flattenController(fs)
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader)) { reorgSources() }
-    val rename = renameController(fs)
-    val dedupe = dedupeController(fs, ::trashLocation)
-    val trashMigration = trashMigrationController(fs)
-    val dates = datesController(fs, mediaMetadataReader)
-    val standardize = standardizeController(fs, mediaMetadataReader)
-    val trash = TrashController(fs)
+    val flatten = flattenController(fs, jobs)
+    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
+    val rename = renameController(fs, jobs)
+    val dedupe = dedupeController(fs, jobs, ::trashLocation)
+    val trashMigration = trashMigrationController(fs, jobs) {
+        refreshYears()
+        refreshLegacyTrash()
+    }
+    val dates = datesController(fs, mediaMetadataReader, jobs)
+    val standardize = standardizeController(fs, mediaMetadataReader, jobs)
+    val trash = TrashController(fs, jobs) { refreshYears() }
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
 
     /** Loads the saved settings, which open their output folder as the library. */
     fun start() = settingsState.start()

@@ -5,6 +5,9 @@ import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.failureReason
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.InputMode
 
@@ -22,36 +25,36 @@ class ReorgPlanner(
     /**
      * Reads [output] and every reachable input; nothing on disk changes. An input with no folder
      * is listed as unreachable and skipped. An input file whose content is already in the output,
-     * or already planned from an earlier input, is listed and skipped.
+     * or already planned from an earlier input, is listed and skipped. [control] is told which file is
+     * next and asked between two files whether to stop; a stopped scan returns what it had so far.
      */
-    fun plan(output: FileHandle, sources: List<ReorgSource>): ReorgPlan {
+    fun plan(
+        output: FileHandle,
+        sources: List<ReorgSource>,
+        control: JobControl = NoJobControl,
+    ): ReorgPlan {
         val outputFiles = scanMedia(fs, output)
+        val reachable = sources.mapNotNull { s -> s.folder?.let { s to it } }
+        val visits = outputFiles.map { Visit(it, null) } +
+            reachable.flatMap { (source, folder) -> scanMedia(fs, folder).map { Visit(it, source) } }
         val known = ContentIndex(fs).also { index -> outputFiles.forEach { index.add(it.entry) } }
         val names = DestinationNames(fs, output)
         val items = mutableListOf<ReorgItem>()
         val alreadyInOutput = mutableListOf<String>()
         val undated = mutableListOf<String>()
 
-        for (file in outputFiles) {
-            val year = yearOf(file.entry)
+        control.forEachUntilStopped(visits, Visit::label) { visit ->
+            val year = yearOf(visit.file.entry)
+            val source = visit.source
             when {
-                year == null -> undated += file.relativePath
-                file.folders != listOf(year.toString()) ->
-                    items += item(file, file.relativePath, ReorgOperation.REFILE, year, names)
-            }
-        }
-        for ((source, folder) in sources.mapNotNull { s -> s.folder?.let { s to it } }) {
-            for (file in scanMedia(fs, folder)) {
-                val label = "${source.label}/${file.relativePath}"
-                val year = yearOf(file.entry)
-                when {
-                    known.holdsContentOf(file.entry) -> alreadyInOutput += label
-                    year == null -> undated += label
-                    else -> {
-                        known.add(file.entry)
-                        items += item(file, label, operationFor(source.mode), year, names)
-                    }
+                source != null && known.holdsContentOf(visit.file.entry) -> alreadyInOutput += visit.label
+                year == null -> undated += visit.label
+                source != null -> {
+                    known.add(visit.file.entry)
+                    items += item(visit.file, visit.label, operationFor(source.mode), year, names)
                 }
+                visit.file.folders != listOf(year.toString()) ->
+                    items += item(visit.file, visit.label, ReorgOperation.REFILE, year, names)
             }
         }
         val unreachable = sources.filter { it.folder == null }.map { it.label }
@@ -93,22 +96,13 @@ class ReorgPlanner(
 
     /**
      * Performs exactly [plan]. A file that fails is left as it was and reported; the rest carry on.
-     * [shouldStop] is asked before each file, so stopping never interrupts one in the middle.
+     * [control] is asked before each file, so stopping never interrupts one in the middle.
      */
-    fun apply(
-        plan: ReorgPlan,
-        output: FileHandle,
-        shouldStop: () -> Boolean = { false },
-        progress: (ReorgProgress) -> Unit = {},
-    ): ReorgResult {
+    fun apply(plan: ReorgPlan, output: FileHandle, control: JobControl = NoJobControl): ReorgResult {
         val counts = mutableMapOf<ReorgOperation, Int>()
         val failures = mutableListOf<ReorgFailure>()
         val yearFolders = mutableMapOf<Int, FileHandle>()
-        var cancelled = false
-        for ((index, item) in plan.items.withIndex()) {
-            cancelled = shouldStop()
-            if (cancelled) break
-            progress(ReorgProgress(index, plan.items.size, item.label))
+        val finished = control.forEachUntilStopped(plan.items, ReorgItem::label) { item ->
             val failure = attempt(item) {
                 perform(item, yearFolders.getOrPut(item.year) { fs.createFolder(output, item.year.toString()) })
             }
@@ -119,7 +113,7 @@ class ReorgPlanner(
             moved = counts[ReorgOperation.MOVE] ?: 0,
             refiled = counts[ReorgOperation.REFILE] ?: 0,
             failures = failures,
-            cancelled = cancelled,
+            cancelled = !finished,
         )
     }
 
@@ -145,6 +139,11 @@ class ReorgPlanner(
 
     private fun attempt(item: ReorgItem, action: () -> Unit): ReorgFailure? =
         failureReason(action)?.let { ReorgFailure(item.label, it) }
+
+    /** A file found while planning: [source] is the input it came from, or null for a file of the output. */
+    private class Visit(val file: ScannedFile, val source: ReorgSource?) {
+        val label: String get() = if (source == null) file.relativePath else "${source.label}/${file.relativePath}"
+    }
 
     private class VerificationException(message: String) : IllegalStateException(message)
 }

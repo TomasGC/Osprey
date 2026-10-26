@@ -17,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,12 +27,10 @@ import app.osprey.actions.trash.RestoreConflict
 import app.osprey.desktop.AppState
 import app.osprey.desktop.TrashController
 import app.osprey.filesystem.FileHandle
-import kotlinx.coroutines.launch
 
 /** The two questions the Trash can ask: delete for good, and which copy to keep when a restore finds a clash. */
 @Composable
 fun TrashDialogs(state: AppState, root: FileHandle, controller: TrashController) {
-    val scope = rememberCoroutineScope()
     controller.confirmation?.let { question ->
         AlertDialog(
             onDismissRequest = { controller.confirmation = null },
@@ -41,12 +38,7 @@ fun TrashDialogs(state: AppState, root: FileHandle, controller: TrashController)
             text = { Text(question) },
             confirmButton = {
                 Button(
-                    onClick = {
-                        scope.launch {
-                            controller.confirmDelete(root)
-                            state.refreshYears()
-                        }
-                    },
+                    onClick = { controller.confirmDelete(root) },
                     colors = ButtonDefaults.buttonColors(containerColor = DANGER),
                 ) {
                     Text("Delete")

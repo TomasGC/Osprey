@@ -9,6 +9,7 @@ import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.FolderSetting
 import app.osprey.settings.SettingsStore
@@ -30,6 +31,7 @@ class AndroidAppState(
     val fs: FileSystemRepository,
     val mediaMetadataReader: MediaMetadataReader,
     settingsStore: SettingsStore,
+    val jobs: JobQueue,
     private val resolveFolder: (FolderSetting) -> FileHandle?,
     releaseGrant: (String) -> Unit,
 ) {
@@ -52,17 +54,30 @@ class AndroidAppState(
     /** True while the Settings screen is up, which is also the only screen until an output folder is set. */
     val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
-    val flatten = flattenController(fs)
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader)) { reorgSources() }
-    val rename = renameController(fs)
-    val dedupe = dedupeController(fs, ::trashLocation)
-    val trashMigration = trashMigrationController(fs)
-    val dates = datesController(fs, mediaMetadataReader)
-    val standardize = standardizeController(fs, mediaMetadataReader)
-    val trash = TrashController(fs)
+    val flatten = flattenController(fs, jobs)
+    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
+    val rename = renameController(fs, jobs)
+    val dedupe = dedupeController(fs, jobs, ::trashLocation)
+    val trashMigration = trashMigrationController(fs, jobs) {
+        refreshYears()
+        refreshLegacyTrash()
+    }
+    val dates = datesController(fs, mediaMetadataReader, jobs)
+    val standardize = standardizeController(fs, mediaMetadataReader, jobs)
+    val trash = TrashController(fs, jobs) { refreshYears() }
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
 
-    /** Loads the saved settings, which open their output folder as the library. */
-    fun start() = settingsState.start()
+    private var started = false
+
+    /**
+     * Loads the saved settings, which open their output folder as the library. This state outlives the activity
+     * (a run in progress must), so a second activity over the same state leaves what the first one set up alone.
+     */
+    fun start() {
+        if (started) return
+        started = true
+        settingsState.start()
+    }
 
     fun openLibrary(root: FileHandle) {
         libraryRoot = root

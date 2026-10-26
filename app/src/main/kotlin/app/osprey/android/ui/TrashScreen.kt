@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -23,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,7 +31,6 @@ import app.osprey.actions.trash.TrashEntry
 import app.osprey.android.AndroidAppState
 import app.osprey.android.TrashController
 import app.osprey.filesystem.FileHandle
-import kotlinx.coroutines.launch
 
 /**
  * The Trash (#41): year tabs, action sub-tabs, the files of the open tab as cards to tick, and one
@@ -42,19 +39,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun TrashScreen(state: AndroidAppState, root: FileHandle) {
     val controller = state.trash
-    val scope = rememberCoroutineScope()
     var preview by remember { mutableStateOf<TrashEntry?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        TrashHeader(controller, onDelete = controller::requestDelete) {
-            scope.launch {
-                controller.restore(root)
-                state.refreshYears()
-            }
-        }
-        if (controller.state.busy) {
-            ProgressBlock(controller.state)
-        }
+        TrashHeader(controller, onDelete = controller::requestDelete) { controller.restore(root) }
         Spacer(Modifier.height(12.dp))
         if (controller.contents.entries.isEmpty()) {
             Text("The Trash is empty.")
@@ -100,7 +88,6 @@ private fun TrashHeader(controller: TrashController, onDelete: () -> Unit, onRes
         ) {
             Text("🗑 Delete")
         }
-        if (controller.state.canCancel) OutlinedButton(onClick = controller::onCancel) { Text("Stop") }
     }
 }
 

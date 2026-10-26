@@ -4,8 +4,12 @@ import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.freeTrashName
+import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.JobControl
+import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.forEachUntilStopped
 
 /**
  * Finds byte-identical duplicates among the files directly inside `root` and plans moving all
@@ -25,14 +29,20 @@ class DedupePlanner(private val fs: FileSystemRepository) {
      * [trash]'s Dedupe folder, suffixed with `__dupN` if its name is already taken there. Nothing
      * on disk changes — call [apply] to act on the result.
      */
-    fun plan(root: FileHandle, trash: TrashLocation): DedupePlan {
+    fun plan(root: FileHandle, trash: TrashLocation, control: JobControl = NoJobControl): DedupePlan {
         val entries = fs.list(root).filterNot { it.isDirectory }
         val taken = trashFolders.existingNames(trash, TrashAction.DEDUPE).toMutableSet()
         val moves = mutableListOf<DedupeMove>()
 
-        for (sizeGroup in entries.groupBy { it.sizeBytes }.values) {
-            if (sizeGroup.size < 2) continue
-            for (hashGroup in sizeGroup.groupBy { fileHash(fs.readBytes(it.handle)) }.values) {
+        val sizeGroups = entries.groupBy { it.sizeBytes }.values.filter { it.size >= 2 }
+        val hashes = mutableMapOf<FileHandle, String>()
+        val read = control.forEachUntilStopped(sizeGroups.flatten(), FileEntry::name) {
+            hashes[it.handle] = fileHash(fs.readBytes(it.handle))
+        }
+        if (!read) return DedupePlan(emptyList())
+
+        for (sizeGroup in sizeGroups) {
+            for (hashGroup in sizeGroup.groupBy { hashes.getValue(it.handle) }.values) {
                 if (hashGroup.size < 2) continue
                 val sorted = hashGroup.sortedWith(compareBy({ it.name.length }, { it.name.lowercase() }))
                 val keep = sorted.first()
@@ -57,12 +67,16 @@ class DedupePlanner(private val fs: FileSystemRepository) {
     /**
      * Moves every extra file in [plan] into [trash]'s Dedupe folder, creating it only if [plan]
      * actually has moves — a no-op run never creates clutter.
+     * Returns how many files it moved; [control] can stop it between two files.
      */
-    fun apply(plan: DedupePlan, trash: TrashLocation) {
-        if (plan.moves.isEmpty()) return
+    fun apply(plan: DedupePlan, trash: TrashLocation, control: JobControl = NoJobControl): Int {
+        if (plan.moves.isEmpty()) return 0
         val destination = trashFolders.ensure(trash, TrashAction.DEDUPE)
-        for (move in plan.moves) {
+        var moved = 0
+        control.forEachUntilStopped(plan.moves, DedupeMove::sourceName) { move ->
             fs.move(move.source, destination, move.destName)
+            moved++
         }
+        return moved
     }
 }
