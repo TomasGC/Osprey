@@ -12,7 +12,7 @@ import app.osprey.android.AndroidSettingsStore
 import app.osprey.android.filesystem.AndroidFileHandle
 import app.osprey.android.filesystem.AndroidFileSystemRepository
 import app.osprey.android.jobs.JobService
-import app.osprey.android.media.AndroidMediaMetadataReader
+import app.osprey.android.media.uprightAndroidMediaMetadataReader
 import app.osprey.android.releaseGrant
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.JobState
@@ -41,7 +41,7 @@ class OspreyApplication : Application() {
     val appState: AndroidAppState by lazy {
         AndroidAppState(
             fs = AndroidFileSystemRepository(this),
-            mediaMetadataReader = AndroidMediaMetadataReader(this),
+            mediaMetadataReader = uprightAndroidMediaMetadataReader(this),
             settingsStore = AndroidSettingsStore(this),
             jobs = jobs,
             resolveFolder = { folder ->

@@ -26,6 +26,21 @@ class ExifOrientationTest {
     }
 
     @Test
+    fun `clockwise degrees map to the quarter turns`() {
+        assertEquals(ExifOrientation.NORMAL, ExifOrientation.fromClockwiseDegrees(0))
+        assertEquals(ExifOrientation.ROTATE_90, ExifOrientation.fromClockwiseDegrees(90))
+        assertEquals(ExifOrientation.ROTATE_180, ExifOrientation.fromClockwiseDegrees(180))
+        assertEquals(ExifOrientation.ROTATE_270, ExifOrientation.fromClockwiseDegrees(270))
+    }
+
+    @Test
+    fun `a missing or odd rotation is normal`() {
+        assertEquals(ExifOrientation.NORMAL, ExifOrientation.fromClockwiseDegrees(null))
+        assertEquals(ExifOrientation.NORMAL, ExifOrientation.fromClockwiseDegrees(45))
+        assertEquals(ExifOrientation.NORMAL, ExifOrientation.fromClockwiseDegrees(360))
+    }
+
+    @Test
     fun `only the four diagonal and quarter turn values swap width and height`() {
         val swapping = ExifOrientation.entries.filter { it.swapsDimensions }
         assertEquals(
