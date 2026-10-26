@@ -15,9 +15,10 @@ import java.nio.file.Path
  * Real [MediaMetadataReader] for plain Windows/Unix paths: EXIF via `metadata-extractor`
  * ([readExifDateTime]), video-container metadata and frame extraction by shelling to
  * `ffprobe`/`ffmpeg` ([probeVideoCreationTime], [extractVideoFramePng]) — the same two binaries
- * on PATH the POC already required, bundling them is explicitly out of scope (#10).
+ * on PATH the POC already required, bundling them is explicitly out of scope (#10). A HEIC photo is decoded
+ * by `ffmpeg` too ([decodeHeicPixelBuffer]): `ImageIO` has no reader for it.
  */
-class DesktopMediaMetadataReader : MediaMetadataReader {
+class DesktopMediaMetadataReader(private val heicRenderer: HeicRenderer = FfmpegHeicRenderer) : MediaMetadataReader {
 
     override fun captureDateTime(entry: FileHandle): MediaDate? {
         val path = entry.path()
@@ -31,6 +32,7 @@ class DesktopMediaMetadataReader : MediaMetadataReader {
     override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? {
         val path = entry.path()
         return when (extensionOf(path)) {
+            in heicExtensions -> decodeHeicPixelBuffer(path, maxSide, heicRenderer)
             in imageExtensions -> decodeImagePixelBuffer(path, maxSide)
             in videoExtensions -> extractVideoFramePng(path)?.let { decodePngPixelBuffer(it, maxSide) }
             else -> null
