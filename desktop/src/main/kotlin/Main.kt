@@ -19,23 +19,24 @@ private fun parseLibraryArg(args: Array<String>): String? {
     return if (index >= 0 && index + 1 < args.size) args[index + 1] else null
 }
 
-fun main(args: Array<String>) = application {
-    // Once: a state made again would also make a new job queue, and orphan the jobs running in the old one.
-    val state = remember {
-        AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), DesktopSettingsStore()).also {
-            OspreyConfig.resolveLibraryPath(parseLibraryArg(args))
-            it.start()
-        }
+fun main(args: Array<String>) {
+    // Built and started here, outside composition: `start()` reads Compose state, and a read made while composing
+    // subscribes the composing scope to it, so a later write would recompose `application` itself.
+    val state = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), DesktopSettingsStore()).also {
+        OspreyConfig.resolveLibraryPath(parseLibraryArg(args))
+        it.start()
     }
-    var asking by remember { mutableStateOf(false) }
+    application {
+        var asking by remember { mutableStateOf(false) }
 
-    Window(
-        // The entries are read here, in the click, not in this scope: reading them would recompose it on every job.
-        onCloseRequest = { if (closeRisk(state.jobs.entries.value)) asking = true else exitApplication() },
-        title = "Osprey",
-    ) {
-        OspreyApp(state)
-        TaskbarEffect(state.jobs, window)
-        if (asking) CloseGuard(state.jobs, onKeep = { asking = false }, onQuit = ::exitApplication)
+        Window(
+            // The entries are read here, in the click, not in this scope: reading them would recompose it on every job.
+            onCloseRequest = { if (closeRisk(state.jobs.entries.value)) asking = true else exitApplication() },
+            title = "Osprey",
+        ) {
+            OspreyApp(state)
+            TaskbarEffect(state.jobs, window)
+            if (asking) CloseGuard(state.jobs, onKeep = { asking = false }, onQuit = ::exitApplication)
+        }
     }
 }

@@ -3,6 +3,7 @@ package app.osprey.desktop
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import app.osprey.actions.reorg.ReorgPlanner
 import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.trash.TrashLocation
@@ -63,8 +64,12 @@ class AppState(
     val trash = TrashController(fs, jobs) { refreshYears() }
     val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
 
-    /** Loads the saved settings, which open their output folder as the library. */
-    fun start() = settingsState.start()
+    /**
+     * Loads the saved settings, which open their output folder as the library. It reads state it has just
+     * written, and a scope that composed it would be subscribed to that state: when a job ended and wrote
+     * [years], the scope would recompose (#56). Nothing observes these reads.
+     */
+    fun start() = Snapshot.withoutReadObservation { settingsState.start() }
 
     fun openLibrary(path: Path) {
         libraryPath = path
