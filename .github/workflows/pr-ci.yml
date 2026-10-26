@@ -14,8 +14,7 @@ concurrency:
 
 jobs:
   pr-checks:
-    # Pinned to Condor PR #22 (context-check input) until it merges, then back to @main.
-    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@b51a77fe1c37780a98898f410ff0a76b7a2e4df0
+    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@main
     with:
       # Osprey's context lives in the wiki: there is no contexts/ folder to check.
       context-check: false
