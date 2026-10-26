@@ -21,6 +21,12 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(compose.desktop.uiTestJUnit4)
+
+    constraints {
+        // ui-test-junit4 brings Truth, which asks for Guava 28.1-android (two known CVEs, flagged by the dependency
+        // scan); this one is already verified for the build and is only on the test classpath.
+        testImplementation("com.google.guava:guava:32.0.1-jre")
+    }
 }
 
 testing {
