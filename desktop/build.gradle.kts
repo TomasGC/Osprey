@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
 
     testImplementation(libs.junit)
+    testImplementation(compose.desktop.uiTestJUnit4)
 }
 
 testing {
