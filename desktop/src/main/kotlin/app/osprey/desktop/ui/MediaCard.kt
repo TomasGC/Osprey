@@ -19,16 +19,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,8 +36,6 @@ import app.osprey.filesystem.formatSize
 import app.osprey.media.CARD_DECODE_MAX_SIDE
 import app.osprey.media.MediaMetadataReader
 import java.awt.Desktop
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Suppress("MagicNumber") // Hex color literals, not measurements.
 val CHECKED_COLOR = Color(0xFF22AA66)
@@ -69,12 +61,7 @@ fun MediaCard(
     showToggle: Boolean = true,
 ) {
     val isImage = splitStemAndSuffix(name).second.lowercase() in imageExtensions
-    var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(handle) {
-        frame = withContext(Dispatchers.IO) {
-            mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE)?.toImageBitmap()
-        }
-    }
+    val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE) }
 
     Column(
         modifier = Modifier
@@ -90,13 +77,15 @@ fun MediaCard(
                 .clickable(enabled = isImage, onClick = onOpen),
             contentAlignment = Alignment.Center,
         ) {
-            frame?.let {
-                Image(
-                    it,
+            when (frame) {
+                is FrameState.Ready -> Image(
+                    frame.bitmap,
                     contentDescription = name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
+                FrameState.Unavailable -> if (isImage) PreviewUnavailable()
+                FrameState.Loading -> Unit
             }
             if (!isImage) {
                 IconButton(onClick = { openInSystemPlayer(handle) }) {
