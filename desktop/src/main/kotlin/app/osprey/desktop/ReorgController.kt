@@ -27,7 +27,7 @@ class ReorgController(
     fun onScan(output: FileHandle) {
         if (!claim()) return
         state.appliedSuffix = ""
-        jobs.enqueue("Reorg scan", onDone = { state.busy = false }) { control ->
+        jobs.enqueue("Reorg scan", onDone = { state.busy = false }, writes = false) { control ->
             val plan = planner.plan(output, sources(), control)
             if (control.shouldStop()) {
                 cachedPlan = null

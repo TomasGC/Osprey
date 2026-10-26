@@ -47,12 +47,19 @@ class JobQueue(scope: CoroutineScope) {
     /**
      * Queues [work] under [name]; it starts once the jobs before it are over. [onDone] is told the outcome
      * as soon as the job is over, also when it was removed before it started, whatever screen is showing.
+     * A job that [writes] nothing (a scan) is passed as `false`; it is the default because a job wrongly
+     * left as writing only asks once too often when the window closes, never the reverse.
      */
-    fun enqueue(name: String, onDone: (JobOutcome) -> Unit = {}, work: (JobControl) -> JobOutcome): JobHandle {
+    fun enqueue(
+        name: String,
+        onDone: (JobOutcome) -> Unit = {},
+        writes: Boolean = true,
+        work: (JobControl) -> JobOutcome,
+    ): JobHandle {
         val job = Pending(ids.getAndIncrement(), name, work, onDone)
         synchronized(lock) {
             active[job.id] = job
-            mutableEntries.value = mutableEntries.value + JobEntry(job.id, name, JobState.Queued)
+            mutableEntries.value = mutableEntries.value + JobEntry(job.id, name, JobState.Queued, writes)
         }
         waiting.trySend(job)
         return JobHandle(job.id, job.outcome) { stop(job.id) }
