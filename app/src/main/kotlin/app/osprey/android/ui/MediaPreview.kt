@@ -17,21 +17,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.osprey.filesystem.FileHandle
 import app.osprey.media.MediaMetadataReader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Suppress("MagicNumber") // Hex color literal, not a measurement.
 private val SCRIM = Color(0xE6000000)
@@ -57,12 +50,7 @@ fun MediaPreview(
     onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    var frame by remember(handle) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(handle) {
-        frame = withContext(Dispatchers.IO) {
-            mediaMetadataReader.decodeFrame(handle, PREVIEW_DECODE_MAX_SIDE)?.toImageBitmap()
-        }
-    }
+    val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle, PREVIEW_DECODE_MAX_SIDE) }
 
     Column(
         modifier = Modifier
@@ -76,13 +64,15 @@ fun MediaPreview(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        frame?.let {
-            Image(
-                it,
+        when (frame) {
+            is FrameState.Ready -> Image(
+                frame.bitmap,
                 contentDescription = name,
                 modifier = Modifier.fillMaxWidth(PREVIEW_WIDTH_FRACTION).heightIn(max = PREVIEW_MAX_HEIGHT),
                 contentScale = ContentScale.Fit,
             )
+            FrameState.Unavailable -> PreviewUnavailable(Color.White)
+            FrameState.Loading -> Unit
         }
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
