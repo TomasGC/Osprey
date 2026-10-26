@@ -37,7 +37,7 @@ class VisualDupesController(
     fun onScan(yearDir: FileHandle) {
         if (scanning) return
         scanning = true
-        jobs.enqueue("Visual Dupes scan", onDone = { scanning = false }) { control ->
+        jobs.enqueue("Visual Dupes scan", onDone = { scanning = false }, writes = false) { control ->
             val plan = VisualDupePlanner(fs, mediaMetadataReader).plan(yearDir, control = control)
             if (control.shouldStop()) {
                 JobOutcome("Visual Dupes scan: stopped", stopped = true)

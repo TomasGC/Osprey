@@ -288,6 +288,33 @@ class JobQueueTest {
     }
 
     @Test
+    fun `a job is a writer unless it says otherwise`() {
+        val gate = CountDownLatch(1)
+        val handle = queue.enqueue("Reorg apply") {
+            hold(gate)
+            JobOutcome("done")
+        }
+
+        assertTrue(entriesWhere { it.size == 1 }.single().writes)
+        release(gate)
+        waitFor { handle.await() }
+    }
+
+    @Test
+    fun `a job enqueued with writes false keeps that on its entry`() {
+        val gate = CountDownLatch(1)
+        val handle = queue.enqueue("Reorg scan", writes = false) {
+            hold(gate)
+            JobOutcome("done")
+        }
+
+        assertFalse(entriesWhere { it.size == 1 }.single().writes)
+        release(gate)
+        waitFor { handle.await() }
+        assertFalse(entriesWhere { it.singleOrNull()?.state is JobState.Finished }.single().writes)
+    }
+
+    @Test
     fun `dismissing a finished job removes it`() {
         val handle = queue.enqueue("A") { JobOutcome("A") }
         waitFor { handle.await() }

@@ -28,7 +28,7 @@ class SimpleActionController<Plan>(
     fun onScan(yearDir: FileHandle) {
         if (!claim()) return
         state.appliedSuffix = ""
-        jobs.enqueue("$name scan", onDone = { state.busy = false }) { control ->
+        jobs.enqueue("$name scan", onDone = { state.busy = false }, writes = false) { control ->
             val result = scan(yearDir, control)
             if (control.shouldStop()) {
                 cachedPlan = null
