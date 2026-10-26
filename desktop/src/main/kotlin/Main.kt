@@ -8,7 +8,7 @@ import app.osprey.desktop.AppState
 import app.osprey.desktop.DesktopSettingsStore
 import app.osprey.desktop.OspreyConfig
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
-import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
 import app.osprey.desktop.ui.CloseGuard
 import app.osprey.desktop.ui.OspreyApp
 import app.osprey.desktop.ui.TaskbarEffect
@@ -22,7 +22,8 @@ private fun parseLibraryArg(args: Array<String>): String? {
 fun main(args: Array<String>) {
     // Built and started here, outside composition: `start()` reads Compose state, and a read made while composing
     // subscribes the composing scope to it, so a later write would recompose `application` itself.
-    val state = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), DesktopSettingsStore()).also {
+    val files = DesktopFileSystemRepository()
+    val state = AppState(files, uprightDesktopMediaMetadataReader(), DesktopSettingsStore()).also {
         OspreyConfig.resolveLibraryPath(parseLibraryArg(args))
         it.start()
     }
