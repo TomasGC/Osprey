@@ -16,3 +16,4 @@ rootProject.name = "Osprey"
 include(":core")
 include(":desktop")
 include(":app")
+include(":app-instrumented")
