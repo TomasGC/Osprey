@@ -10,6 +10,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
 import app.osprey.media.PixelBuffer
+import app.osprey.viewer.ViewTurns
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Test
@@ -36,7 +37,7 @@ class PreviewUnavailableTest {
     private fun ComposeUiTest.card(name: String, frame: PixelBuffer?) {
         setContent {
             MediaCard(
-                readerReturning(frame), handle(name), name, sizeBytes = 1_000L, checked = false,
+                readerReturning(frame), ViewTurns(), handle(name), name, sizeBytes = 1_000L, checked = false,
                 onToggle = {}, onOpen = {},
             )
         }
@@ -45,7 +46,7 @@ class PreviewUnavailableTest {
     private fun ComposeUiTest.preview(frame: PixelBuffer?) {
         setContent {
             MediaPreview(
-                readerReturning(frame), handle("IMG_0001.heic"), "IMG_0001.heic", checked = false,
+                readerReturning(frame), ViewTurns(), handle("IMG_0001.heic"), "IMG_0001.heic", checked = false,
                 checkLabel = "Keep", onCheckedChange = {}, onClose = {},
             )
         }

@@ -48,9 +48,15 @@ sourceSets {
         compileClasspath += sourceSets.test.get().compileClasspath
         runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
     }
+    // integrationReal and e2e also see `test`'s own classes, for the shared test photos (`app.osprey.desktop.testing`).
     create("integrationReal") {
         kotlin.srcDir("src/integrationReal/kotlin")
-        compileClasspath += sourceSets.test.get().compileClasspath
+        compileClasspath += sourceSets.test.get().compileClasspath + sourceSets.test.get().output
+        runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
+    }
+    create("e2e") {
+        kotlin.srcDir("src/e2e/kotlin")
+        compileClasspath += sourceSets.test.get().compileClasspath + sourceSets.test.get().output
         runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
     }
 }
@@ -65,6 +71,20 @@ tasks.register<Test>("integrationReal") {
     testClassesDirs = sourceSets["integrationReal"].output.classesDirs
     classpath = sourceSets["integrationReal"].runtimeClasspath
     useJUnit()
+}
+
+// The real app, headless, on a temp library (#51). Not part of the coverage figure: it answers "does the app work
+// here", not "is the logic exercised".
+tasks.register<Test>("e2e") {
+    testClassesDirs = sourceSets["e2e"].output.classesDirs
+    classpath = sourceSets["e2e"].runtimeClasspath
+    useJUnit()
+}
+
+kover {
+    excludeTests {
+        tasks("e2e")
+    }
 }
 
 compose.desktop {

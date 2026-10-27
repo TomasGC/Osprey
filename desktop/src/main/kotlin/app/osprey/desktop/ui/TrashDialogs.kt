@@ -109,7 +109,7 @@ private fun SideLabelled(label: String, content: @Composable () -> Unit) {
 @Composable
 private fun ShownCard(state: AppState, handle: FileHandle, name: String, sizeBytes: Long) {
     MediaCard(
-        state.mediaMetadataReader, handle, name, sizeBytes,
+        state.mediaMetadataReader, state.viewTurns, handle, name, sizeBytes,
         checked = false, onToggle = {}, onOpen = {}, showToggle = false,
     )
 }

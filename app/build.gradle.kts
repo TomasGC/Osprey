@@ -16,7 +16,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -63,12 +62,9 @@ dependencies {
     // The JVM unit tests run without the Android framework, whose org.json is only a stub there.
     testImplementation(libs.json)
 
-    androidTestImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.test.core)
-    androidTestImplementation(libs.androidx.test.runner)
-    androidTestImplementation(libs.androidx.test.ext.junit)
-
     debugImplementation(libs.compose.ui.tooling)
+    // The ComponentActivity the Compose test rule of :app-instrumented launches.
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 detekt {

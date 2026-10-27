@@ -60,6 +60,7 @@ fun TrashScreen(state: AppState, root: FileHandle) {
     preview?.let { entry ->
         MediaPreview(
             mediaMetadataReader = state.mediaMetadataReader,
+            viewTurns = state.viewTurns,
             handle = entry.handle,
             name = entry.name,
             checked = entry in controller.selection,
@@ -132,6 +133,7 @@ private fun TrashGrid(state: AppState, controller: TrashController, onOpen: (Tra
         items(controller.currentTab, key = { it.label }) { entry ->
             MediaCard(
                 mediaMetadataReader = state.mediaMetadataReader,
+                viewTurns = state.viewTurns,
                 handle = entry.handle,
                 name = entry.name,
                 sizeBytes = entry.sizeBytes,

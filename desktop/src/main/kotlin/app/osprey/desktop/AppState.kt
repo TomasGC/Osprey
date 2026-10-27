@@ -14,6 +14,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.SettingsStore
+import app.osprey.viewer.ViewTurns
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +40,9 @@ class AppState(
     private val settingsStore: SettingsStore,
     val jobs: JobQueue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO)),
 ) {
+
+    /** The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51). */
+    val viewTurns = ViewTurns()
 
     val settingsState = SettingsState(settingsStore) { openLibrary(it) }
     var libraryPath by mutableStateOf<Path?>(null)
