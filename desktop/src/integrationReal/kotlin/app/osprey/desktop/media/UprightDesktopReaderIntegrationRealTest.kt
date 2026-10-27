@@ -1,13 +1,10 @@
 package app.osprey.desktop.media
 
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.toJpeg
 import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
-import javax.imageio.ImageIO
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -46,14 +43,7 @@ class UprightDesktopReaderIntegrationRealTest {
     private fun jpegWithOrientation(name: String, value: Int): PathHandle {
         val image = BufferedImage(WIDE, HIGH, BufferedImage.TYPE_INT_RGB)
         for (y in 0 until HIGH / 2) for (x in 0 until WIDE / 2) image.setRGB(x, y, RED)
-        val jpeg = ByteArrayOutputStream().also { ImageIO.write(image, "jpg", it) }.toByteArray()
-        val tiff = ByteBuffer.allocate(26).order(ByteOrder.LITTLE_ENDIAN)
-            .put("II".toByteArray()).putShort(42).putInt(8).putShort(1)
-            .putShort(0x0112).putShort(3).putInt(1).putShort(value.toShort()).putShort(0).putInt(0).array()
-        val exif = "Exif\u0000\u0000".toByteArray(Charsets.ISO_8859_1) + tiff
-        val segment = byteArrayOf(0xFF.toByte(), 0xE1.toByte(), 0, (exif.size + 2).toByte()) + exif
-        val bytes = jpeg.copyOfRange(0, 2) + segment + jpeg.copyOfRange(2, jpeg.size)
-        return PathHandle(Files.write(tempDir.resolve(name), bytes))
+        return PathHandle(Files.write(tempDir.resolve(name), image.toJpeg(value)))
     }
 
     @Test
