@@ -135,6 +135,35 @@ class ViewTransformTest {
     }
 
     @Test
+    fun `a point is over the photo when it falls inside the shown photo`() {
+        val tall = ViewTransform(viewWidth = 1000f, viewHeight = 500f, imageWidth = 500f, imageHeight = 1000f)
+
+        assertEquals(true, start.covers(500f, 250f))
+        assertEquals(true, tall.covers(400f, 250f))
+        assertEquals(false, tall.covers(100f, 250f))
+    }
+
+    @Test
+    fun `a point above or below the shown photo is not over it`() {
+        val wide = ViewTransform(viewWidth = 1000f, viewHeight = 500f, imageWidth = 1000f, imageHeight = 100f)
+
+        assertEquals(true, wide.covers(500f, 250f))
+        assertEquals(false, wide.covers(500f, 10f))
+        assertEquals(false, wide.covers(500f, 490f))
+    }
+
+    @Test
+    fun `the shown photo moves with the pan and the turn`() {
+        val corner = start.zoomAt(0f, 0f, 2f)
+        val turned = ViewTransform(viewWidth = 1000f, viewHeight = 500f, imageWidth = 2000f, imageHeight = 1000f)
+            .rotateRight()
+
+        assertEquals(true, corner.covers(10f, 10f))
+        assertEquals(true, turned.covers(500f, 250f))
+        assertEquals(false, turned.covers(100f, 250f))
+    }
+
+    @Test
     fun `resizing the view keeps the pan inside the new limits`() {
         val corner = start.zoomAt(0f, 0f, 2f)
         val smaller = corner.resizedTo(500f, 250f)

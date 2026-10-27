@@ -19,9 +19,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +37,10 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.formatSize
 import app.osprey.media.CARD_DECODE_MAX_SIDE
 import app.osprey.media.MediaMetadataReader
+import app.osprey.viewer.ViewTurns
 import java.awt.Desktop
+
+private const val DEGREES_PER_TURN = 90f
 
 @Suppress("MagicNumber") // Hex color literals, not measurements.
 val CHECKED_COLOR = Color(0xFF22AA66)
@@ -51,6 +56,7 @@ private val UNCHECKED_TOGGLE_BG = Color(0x80141414)
 @Composable
 fun MediaCard(
     mediaMetadataReader: MediaMetadataReader,
+    viewTurns: ViewTurns,
     handle: FileHandle,
     name: String,
     sizeBytes: Long,
@@ -62,6 +68,7 @@ fun MediaCard(
 ) {
     val isImage = splitStemAndSuffix(name).second.lowercase() in imageExtensions
     val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE) }
+    val quarterTurns = viewTurns.turns.collectAsState().value[handle] ?: 0
 
     Column(
         modifier = Modifier
@@ -81,7 +88,7 @@ fun MediaCard(
                 is FrameState.Ready -> Image(
                     frame.bitmap,
                     contentDescription = name,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().rotate(DEGREES_PER_TURN * quarterTurns),
                     contentScale = ContentScale.Crop,
                 )
                 FrameState.Unavailable -> if (isImage) PreviewUnavailable()

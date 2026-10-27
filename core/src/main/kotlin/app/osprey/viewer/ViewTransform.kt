@@ -1,5 +1,6 @@
 package app.osprey.viewer
 
+import kotlin.math.abs
 import kotlin.math.pow
 
 /** Zoom 1 shows the whole photo inside the view. */
@@ -59,9 +60,10 @@ data class ViewTransform(
         ).clamped()
     }
 
-    /** One wheel event: up ([scrollDelta] below zero) zooms in, down zooms out. */
-    fun zoomByWheel(focusX: Float, focusY: Float, scrollDelta: Float): ViewTransform =
-        zoomAt(focusX, focusY, WHEEL_ZOOM_STEP.pow(-scrollDelta))
+    /** Whether the view point ([x], [y]) is over the photo as shown now, not over the empty space around it. */
+    fun covers(x: Float, y: Float): Boolean =
+        abs(x - (viewWidth / HALF + panX)) <= turnedWidth * scale / HALF &&
+            abs(y - (viewHeight / HALF + panY)) <= turnedHeight * scale / HALF
 
     fun panBy(dx: Float, dy: Float): ViewTransform = copy(panX = panX + dx, panY = panY + dy).clamped()
 
@@ -87,3 +89,7 @@ data class ViewTransform(
         return copy(panX = panX.coerceIn(-limitX, limitX), panY = panY.coerceIn(-limitY, limitY))
     }
 }
+
+/** One wheel event: up ([scrollDelta] below zero) zooms in, down zooms out. */
+fun ViewTransform.zoomByWheel(focusX: Float, focusY: Float, scrollDelta: Float): ViewTransform =
+    zoomAt(focusX, focusY, WHEEL_ZOOM_STEP.pow(-scrollDelta))
