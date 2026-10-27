@@ -15,6 +15,9 @@ class FakeMediaMetadataReader : MediaMetadataReader {
     /** The `maxSide` of every [decodeFrame] call, in call order. */
     val requestedMaxSides = mutableListOf<Int?>()
 
+    /** The region and sample size of every [decodeRegion] call, in call order. */
+    val requestedRegions = mutableListOf<Pair<PhotoRegion, Int>>()
+
     fun setCaptureDateTime(entry: FileHandle, date: MediaDate) {
         dates[entry] = date
     }
@@ -28,5 +31,12 @@ class FakeMediaMetadataReader : MediaMetadataReader {
     override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer? {
         requestedMaxSides += maxSide
         return frames[entry]
+    }
+
+    override fun imageSize(entry: FileHandle): PhotoSize? = frames[entry]?.let { PhotoSize(it.width, it.height) }
+
+    override fun decodeRegion(entry: FileHandle, region: PhotoRegion, sampleSize: Int): PixelBuffer? {
+        requestedRegions += region to sampleSize
+        return frames[entry]?.cropped(region)
     }
 }
