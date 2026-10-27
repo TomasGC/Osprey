@@ -47,4 +47,29 @@ class FakeMediaMetadataReaderTest {
 
         assertEquals(frame, reader.decodeFrame(entry))
     }
+
+    @Test
+    fun `imageSize and decodeRegion return null when nothing was registered for the entry`() {
+        val fs = FakeFileSystemRepository()
+        val entry = fs.addFile(fs.root, "photo.jpg")
+        val reader = FakeMediaMetadataReader()
+
+        assertNull(reader.imageSize(entry))
+        assertNull(reader.decodeRegion(entry, PhotoRegion(0, 0, 1, 1), 1))
+    }
+
+    @Test
+    fun `imageSize and decodeRegion answer from the registered frame and record the request`() {
+        val fs = FakeFileSystemRepository()
+        val entry = fs.addFile(fs.root, "photo.jpg")
+        val reader = FakeMediaMetadataReader()
+        reader.setFrame(entry, PixelBuffer(3, 2, intArrayOf(1, 2, 3, 4, 5, 6)))
+
+        assertEquals(PhotoSize(3, 2), reader.imageSize(entry))
+        assertEquals(
+            PixelBuffer(2, 1, intArrayOf(5, 6)),
+            reader.decodeRegion(entry, PhotoRegion(1, 1, 2, 1), 4),
+        )
+        assertEquals(listOf(PhotoRegion(1, 1, 2, 1) to 4), reader.requestedRegions)
+    }
 }
