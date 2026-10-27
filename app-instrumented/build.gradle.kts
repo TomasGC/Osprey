@@ -44,6 +44,8 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.activity.compose)
     implementation(libs.documentfile)
     implementation(libs.exifinterface)
     implementation(libs.junit)

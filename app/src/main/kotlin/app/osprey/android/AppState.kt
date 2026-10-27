@@ -13,6 +13,7 @@ import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.FolderSetting
 import app.osprey.settings.SettingsStore
+import app.osprey.viewer.ViewTurns
 
 /** Which screen is showing, same actions and order as desktop's `ActionTab` (#11). */
 enum class ActionTab(val label: String) {
@@ -35,6 +36,9 @@ class AndroidAppState(
     private val resolveFolder: (FolderSetting) -> FileHandle?,
     releaseGrant: (String) -> Unit,
 ) {
+
+    /** The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51). */
+    val viewTurns = ViewTurns()
 
     val settingsState = SettingsState(
         settingsStore,

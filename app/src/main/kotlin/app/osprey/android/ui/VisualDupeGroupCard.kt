@@ -73,6 +73,7 @@ fun VisualDupeGroupCard(
                 group.members.forEach { member ->
                     MediaCard(
                         mediaMetadataReader = state.mediaMetadataReader,
+                        viewTurns = state.viewTurns,
                         handle = member.handle,
                         name = member.name,
                         sizeBytes = member.sizeBytes,

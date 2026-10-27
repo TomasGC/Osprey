@@ -55,6 +55,7 @@ fun VisualDupesScreen(state: AndroidAppState, yearDir: FileHandle) {
     preview?.let { (group, member) ->
         MediaPreview(
             mediaMetadataReader = state.mediaMetadataReader,
+            viewTurns = state.viewTurns,
             handle = member.handle,
             name = member.name,
             checked = group.keep[member.name] == true,
