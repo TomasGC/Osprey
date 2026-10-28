@@ -1,5 +1,6 @@
 package app.osprey.desktop.filesystem
 
+import app.osprey.filesystem.ChannelRange
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
@@ -7,8 +8,10 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTransfer
 import app.osprey.filesystem.FileTimestamps
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
@@ -32,11 +35,11 @@ class DesktopFileSystemRepository(
     }
 
     override fun rename(entry: FileHandle, newName: String): FileHandle =
-        moveTo(entry.path(), entry.path().resolveSibling(newName))
+        moveWithoutOverwrite(entry.path(), entry.path().resolveSibling(newName))
 
     override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
         val targetName = newName ?: entry.path().fileName.toString()
-        return moveTo(entry.path(), destFolder.path().resolve(targetName))
+        return moveWithoutOverwrite(entry.path(), destFolder.path().resolve(targetName))
     }
 
     override fun createFolder(parent: FileHandle, name: String): FileHandle {
@@ -58,6 +61,19 @@ class DesktopFileSystemRepository(
 
     override fun readBytes(entry: FileHandle): ByteArray = Files.readAllBytes(entry.path())
 
+    override fun readRange(entry: FileHandle, offset: Long, length: Int): ByteArray =
+        FileChannel.open(entry.path(), StandardOpenOption.READ).use { channel ->
+            ChannelRange.read(channel.size(), offset, length) { buffer, at -> channel.read(buffer, at) }
+        }
+
+    // WRITE only: no truncate and no create. ChannelRange refuses a range past the end, so the file never grows.
+    override fun overwriteAt(entry: FileHandle, offset: Long, bytes: ByteArray) {
+        FileChannel.open(entry.path(), StandardOpenOption.WRITE).use { channel ->
+            ChannelRange.write(channel.size(), offset, bytes) { buffer, at -> channel.write(buffer, at) }
+            channel.force(true)
+        }
+    }
+
     override fun readTimestamps(entry: FileHandle): FileTimestamps {
         val attributes = Files.readAttributes(entry.path(), BasicFileAttributes::class.java)
         return FileTimestamps(
@@ -74,12 +90,12 @@ class DesktopFileSystemRepository(
             timestamps.created?.let { FileTime.from(it) },
         )
     }
+}
 
-    private fun moveTo(source: Path, target: Path): FileHandle = try {
-        PathHandle(Files.move(source, target))
-    } catch (e: NioFileAlreadyExistsException) {
-        throw FileAlreadyExistsException("$target already exists: ${e.message}", e)
-    }
+private fun moveWithoutOverwrite(source: Path, target: Path): FileHandle = try {
+    PathHandle(Files.move(source, target))
+} catch (e: NioFileAlreadyExistsException) {
+    throw FileAlreadyExistsException("$target already exists: ${e.message}", e)
 }
 
 private fun Path.toEntry(): FileEntry {

@@ -1,18 +1,32 @@
 package app.osprey.android.filesystem
 
+import android.graphics.Bitmap
 import androidx.documentfile.provider.DocumentFile
+import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.osprey.android.media.AndroidOrientationSource
+import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileTimestamps
+import app.osprey.media.ExifOrientation
+import app.osprey.viewer.TurnSaveResult
+import app.osprey.viewer.TurnSaver
+import java.io.IOException
 import java.time.Instant
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+
+private const val WIDE = 64
+private const val HIGH = 32
+private const val QUALITY = 90
 
 /**
  * Runs [AndroidFileSystemRepository] against a real Storage Access Framework tree on a real
@@ -53,6 +67,65 @@ class AndroidFileSystemRepositoryInstrumentedTest {
         val doc = parent.createFile("application/octet-stream", name) ?: error("could not create $name")
         context.contentResolver.openOutputStream(doc.uri)?.use { it.write(content) } ?: error("could not open $name for write")
         return doc
+    }
+
+    private fun binary(name: String, vararg bytes: Byte): FileHandle =
+        AndroidFileHandle(seedFile(testRoot!!, name, bytes))
+
+    private fun jpegWithOrientation(name: String, orientation: Int): DocumentFile {
+        val doc = testRoot!!.createFile("image/jpeg", name) ?: error("could not create $name")
+        val bitmap = Bitmap.createBitmap(WIDE, HIGH, Bitmap.Config.ARGB_8888)
+        context.contentResolver.openOutputStream(doc.uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }
+            ?: error("could not open $name for write")
+        context.contentResolver.openFileDescriptor(doc.uri, "rw")?.use { pfd ->
+            ExifInterface(pfd.fileDescriptor).apply {
+                setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
+                saveAttributes()
+            }
+        } ?: error("could not open $name for write")
+        return doc
+    }
+
+    @Test
+    fun readRangeReturnsTheBytesFromTheOffsetShorterAtTheEndAndEmptyPastIt() {
+        val handle = binary("range.bin", 1, 2, 3, 4, 5, 6)
+
+        assertArrayEquals(byteArrayOf(3, 4, 5), fs.readRange(handle, 2L, 3))
+        assertArrayEquals(byteArrayOf(5, 6), fs.readRange(handle, 4L, 100))
+        assertArrayEquals(byteArrayOf(), fs.readRange(handle, 10L, 5))
+    }
+
+    @Test
+    fun overwriteAtReplacesOnlyItsRangeAndKeepsTheSize() {
+        val handle = binary("over.bin", 1, 2, 3, 4, 5)
+
+        fs.overwriteAt(handle, 1L, byteArrayOf(9, 8))
+
+        assertArrayEquals(byteArrayOf(1, 9, 8, 4, 5), fs.readBytes(handle))
+        assertEquals(5L, fs.list(AndroidFileHandle(testRoot!!)).single { it.name == "over.bin" }.sizeBytes)
+    }
+
+    @Test
+    fun overwriteAtOutsideTheFileThrowsAndLeavesTheFile() {
+        val handle = binary("outside.bin", 1, 2, 3)
+
+        assertThrows(IOException::class.java) { fs.overwriteAt(handle, 2L, byteArrayOf(9, 9)) }
+
+        assertArrayEquals(byteArrayOf(1, 2, 3), fs.readBytes(handle))
+    }
+
+    @Test
+    fun aSavedTurnIsReadBackAndChangesOneByteInPlace() {
+        val handle = AndroidFileHandle(jpegWithOrientation("turn.jpg", ExifInterface.ORIENTATION_NORMAL))
+        val before = fs.readBytes(handle)
+
+        assertEquals(TurnSaveResult.Saved, TurnSaver(fs).save(handle, "turn.jpg", 1))
+
+        val after = fs.readBytes(handle)
+        assertEquals(before.size, after.size)
+        assertEquals(1, before.indices.count { before[it] != after[it] })
+        assertEquals(ExifOrientation.ROTATE_90, AndroidOrientationSource(context).orientationOf(handle))
+        assertEquals(listOf("turn.jpg"), fs.list(AndroidFileHandle(testRoot!!)).map { it.name })
     }
 
     @Test

@@ -10,6 +10,19 @@ class FaultyFileSystemRepository(private val inner: FileSystemRepository) : File
     var failMove: (entry: FileHandle) -> Throwable? = { null }
     var failDeleteEmptyFolder: (folder: FileHandle) -> Throwable? = { null }
 
+    var failOverwrite: (entry: FileHandle) -> Throwable? = { null }
+    var failWriteTimestamps: (entry: FileHandle) -> Throwable? = { null }
+
+    override fun overwriteAt(entry: FileHandle, offset: Long, bytes: ByteArray) {
+        failOverwrite(entry)?.let { throw it }
+        inner.overwriteAt(entry, offset, bytes)
+    }
+
+    override fun writeTimestamps(entry: FileHandle, timestamps: FileTimestamps) {
+        failWriteTimestamps(entry)?.let { throw it }
+        inner.writeTimestamps(entry, timestamps)
+    }
+
     override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
         failCopy(entry)?.let { throw it }
         return inner.copyTo(entry, destFolder, newName)
