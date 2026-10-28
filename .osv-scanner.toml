@@ -5,6 +5,13 @@
 # dependencies (same AGP/Gradle version family) — same overrides apply here.
 
 [[PackageOverrides]]
+name = "com.google.guava:guava"
+version = "32.0.1-jre"
+ecosystem = "Maven"
+ignore = true
+reason = "AGP build tool dependency (and the desktop test-classpath pin), not shipped in the APK or the desktop app. GHSA-xxph-c9ww-hj94 (High, published 2026-10-27) is a memory exhaustion when deserializing attacker-controlled streams, which neither the build nor the tests do. Fixed in 33.7.2: revisit when AGP ships a Guava of that version, then raise the pin in desktop/build.gradle.kts."
+
+[[PackageOverrides]]
 name = "com.google.protobuf:protobuf-java"
 ecosystem = "Maven"
 ignore = true
