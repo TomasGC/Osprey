@@ -1,6 +1,8 @@
 package app.osprey.filesystem
 
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.time.Instant
 
 /**
  * In-memory [FileSystemRepository], backing every `:core` planner's unit tests from here on.
@@ -27,7 +29,7 @@ class FakeFileSystemRepository : FileSystemRepository {
 
     /** Test scaffolding: creates [name] as a file directly inside [parent]. */
     fun addFile(parent: FileHandle, name: String, bytes: ByteArray = ByteArray(0)): FileHandle =
-        newNode(parent, name, isDirectory = false, bytes = bytes)
+        newNode(parent, name, isDirectory = false, bytes = bytes.copyOf())
 
     /** Test scaffolding: creates [name] as a subfolder directly inside [parent]. */
     fun addFolder(parent: FileHandle, name: String): FileHandle =
@@ -92,7 +94,7 @@ class FakeFileSystemRepository : FileSystemRepository {
     override fun contentHash(entry: FileHandle): String =
         sha256Hex(ByteArrayInputStream(nodes.getValue(entry.id()).bytes))
 
-    override fun readBytes(entry: FileHandle): ByteArray = nodes.getValue(entry.id()).bytes
+    override fun readBytes(entry: FileHandle): ByteArray = nodes.getValue(entry.id()).bytes.copyOf()
 
     override fun readTimestamps(entry: FileHandle): FileTimestamps = nodes.getValue(entry.id()).timestamps
 
@@ -102,6 +104,20 @@ class FakeFileSystemRepository : FileSystemRepository {
             created = timestamps.created ?: node.timestamps.created,
             modified = timestamps.modified ?: node.timestamps.modified,
         )
+    }
+
+    override fun readRange(entry: FileHandle, offset: Long, length: Int): ByteArray {
+        val bytes = (nodes[entry.id()] ?: throw IOException("no such file")).bytes
+        val from = offset.toInt().coerceAtMost(bytes.size)
+        return bytes.copyOfRange(from, (from + length).coerceAtMost(bytes.size))
+    }
+
+    /** Like a real file system, a write in place touches the modified time. */
+    override fun overwriteAt(entry: FileHandle, offset: Long, bytes: ByteArray) {
+        val node = nodes.getValue(entry.id())
+        if (offset + bytes.size > node.bytes.size) throw IOException("range is outside the file")
+        bytes.copyInto(node.bytes, offset.toInt())
+        node.timestamps = node.timestamps.copy(modified = Instant.now())
     }
 
     private fun newNode(parent: FileHandle, name: String, isDirectory: Boolean, bytes: ByteArray = ByteArray(0)): FileHandle {

@@ -54,4 +54,14 @@ interface FileSystemRepository : FileTransfer {
      * timestamp untouched.
      */
     fun writeTimestamps(entry: FileHandle, timestamps: FileTimestamps)
+
+    /** Up to [length] bytes of [entry] from [offset]: fewer at the end of the file, none past it. */
+    fun readRange(entry: FileHandle, offset: Long, length: Int): ByteArray
+
+    /**
+     * Overwrites the bytes of [entry] from [offset] with [bytes], inside the file as it is: the size never changes,
+     * nothing else is rewritten (#61). Throws when the range is not inside the file or the provider refuses a write
+     * in place.
+     */
+    fun overwriteAt(entry: FileHandle, offset: Long, bytes: ByteArray)
 }

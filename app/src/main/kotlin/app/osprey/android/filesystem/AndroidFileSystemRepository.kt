@@ -1,8 +1,11 @@
 package app.osprey.android.filesystem
 
+import android.content.ContentResolver
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
+import app.osprey.filesystem.ChannelRange
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
@@ -10,6 +13,8 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTransfer
 import app.osprey.filesystem.FileTimestamps
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.time.Instant
 
 /**
@@ -102,8 +107,31 @@ class AndroidFileSystemRepository(
     @Suppress("UnusedParameter")
     override fun writeTimestamps(entry: FileHandle, timestamps: FileTimestamps) = Unit
 
-    private fun DocumentFile.toEntry(): FileEntry =
-        FileEntry(AndroidFileHandle(this), name.orEmpty(), isDirectory, if (isDirectory) 0 else length())
+    override fun readRange(entry: FileHandle, offset: Long, length: Int): ByteArray =
+        context.contentResolver.openDescriptor(entry, "r").use { pfd ->
+            FileInputStream(pfd.fileDescriptor).channel.use { channel ->
+                ChannelRange.read(channel.size(), offset, length) { buffer, at -> channel.read(buffer, at) }
+            }
+        }
 
-    private fun FileHandle.documentFile(): DocumentFile = (this as AndroidFileHandle).documentFile
+    // "rw", never "rwt": the file is not truncated. A provider that cannot seek (a cloud one) throws here, and the
+    // save fails with its message.
+    override fun overwriteAt(entry: FileHandle, offset: Long, bytes: ByteArray) {
+        context.contentResolver.openDescriptor(entry, "rw").use { pfd ->
+            FileOutputStream(pfd.fileDescriptor).channel.use { channel ->
+                ChannelRange.write(channel.size(), offset, bytes) { buffer, at -> channel.write(buffer, at) }
+                channel.force(true)
+            }
+        }
+    }
+}
+
+private fun DocumentFile.toEntry(): FileEntry =
+    FileEntry(AndroidFileHandle(this), name.orEmpty(), isDirectory, if (isDirectory) 0 else length())
+
+private fun FileHandle.documentFile(): DocumentFile = (this as AndroidFileHandle).documentFile
+
+private fun ContentResolver.openDescriptor(entry: FileHandle, mode: String): ParcelFileDescriptor {
+    val uri = entry.documentFile().uri
+    return openFileDescriptor(uri, mode) ?: error("cannot open $uri")
 }

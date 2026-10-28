@@ -2,12 +2,15 @@ package app.osprey.desktop.filesystem
 
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
+import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileTimestamps
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -136,6 +139,49 @@ class DesktopFileSystemRepositoryTest {
         val entry = repo.list(root()).single()
 
         assertTrue(byteArrayOf(9, 8, 7).contentEquals(repo.readBytes(entry.handle)))
+    }
+
+    private fun fileOf(vararg bytes: Byte): FileHandle =
+        PathHandle(Files.write(tempDir.resolve("range.bin"), bytes))
+
+    @Test
+    fun `readRange returns the bytes from the offset`() {
+        assertArrayEquals(byteArrayOf(3, 4, 5), repo.readRange(fileOf(1, 2, 3, 4, 5, 6), 2L, 3))
+    }
+
+    @Test
+    fun `readRange is shorter at the end of the file and empty past it`() {
+        val entry = fileOf(1, 2, 3, 4)
+
+        assertArrayEquals(byteArrayOf(3, 4), repo.readRange(entry, 2L, 100))
+        assertArrayEquals(byteArrayOf(), repo.readRange(entry, 10L, 5))
+    }
+
+    @Test
+    fun `overwriteAt replaces only its range and keeps the size`() {
+        val entry = fileOf(1, 2, 3, 4, 5)
+
+        repo.overwriteAt(entry, 1L, byteArrayOf(9, 8))
+
+        assertArrayEquals(byteArrayOf(1, 9, 8, 4, 5), repo.readBytes(entry))
+    }
+
+    @Test
+    fun `overwriteAt outside the file throws and leaves the file`() {
+        val entry = fileOf(1, 2, 3)
+
+        assertThrows(IOException::class.java) { repo.overwriteAt(entry, 2L, byteArrayOf(9, 9)) }
+
+        assertArrayEquals(byteArrayOf(1, 2, 3), repo.readBytes(entry))
+    }
+
+    @Test
+    fun `overwriteAt on a missing file throws and creates nothing`() {
+        val missing = tempDir.resolve("missing.bin")
+
+        assertThrows(IOException::class.java) { repo.overwriteAt(PathHandle(missing), 0L, byteArrayOf(1)) }
+
+        assertFalse(Files.exists(missing))
     }
 
     @Test

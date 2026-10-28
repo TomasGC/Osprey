@@ -27,11 +27,14 @@ sealed interface FrameState {
 
 const val PREVIEW_UNAVAILABLE = "Preview unavailable"
 
-/** Decodes with [decode] off the UI thread whenever [handle] changes: Loading, then the picture or Unavailable. */
+/**
+ * Decodes with [decode] off the UI thread whenever [handle] or its [revision] (a saved turn, #61) changes: Loading,
+ * then the picture or Unavailable.
+ */
 @Composable
-fun rememberFrameState(handle: FileHandle, decode: () -> PixelBuffer?): FrameState {
-    var state by remember(handle) { mutableStateOf<FrameState>(FrameState.Loading) }
-    LaunchedEffect(handle) {
+fun rememberFrameState(handle: FileHandle, revision: Int, decode: () -> PixelBuffer?): FrameState {
+    var state by remember(handle, revision) { mutableStateOf<FrameState>(FrameState.Loading) }
+    LaunchedEffect(handle, revision) {
         state = withContext(Dispatchers.IO) { decode()?.toImageBitmap() }
             ?.let { FrameState.Ready(it) } ?: FrameState.Unavailable
     }

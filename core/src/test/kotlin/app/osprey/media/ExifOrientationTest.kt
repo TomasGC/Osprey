@@ -53,4 +53,25 @@ class ExifOrientationTest {
         assertFalse(ExifOrientation.NORMAL.swapsDimensions)
         assertTrue(ExifOrientation.ROTATE_90.swapsDimensions)
     }
+
+    @Test
+    fun `one clockwise turn follows the exif table`() {
+        val expected = listOf(6, 7, 8, 5, 2, 3, 4, 1).map { ExifOrientation.fromExif(it) }
+        assertEquals(expected, ExifOrientation.entries.map { it.turnedBy(1) })
+    }
+
+    /** Turning the stored orientation must give the pixels that turning the shown photo gives, for all 8 and 4 turns. */
+    @Test
+    fun `turning the tag turns the shown photo`() {
+        val source = PixelBuffer(2, 3, intArrayOf(1, 2, 3, 4, 5, 6))
+        val rotations = listOf(
+            ExifOrientation.NORMAL, ExifOrientation.ROTATE_90, ExifOrientation.ROTATE_180, ExifOrientation.ROTATE_270,
+        )
+        for (orientation in ExifOrientation.entries) {
+            for (turns in -5..5) {
+                val shownThenTurned = source.oriented(orientation).oriented(rotations[turns.mod(4)])
+                assertEquals("$orientation x $turns", shownThenTurned, source.oriented(orientation.turnedBy(turns)))
+            }
+        }
+    }
 }
