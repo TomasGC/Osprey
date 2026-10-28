@@ -5,8 +5,12 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.center
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.isNotEnabled
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -17,6 +21,8 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.ui.OspreyApp
+import app.osprey.media.ExifOrientation
+import app.osprey.media.JpegOrientation
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
@@ -135,5 +141,46 @@ class ViewerEndToEndTest {
         val pixels = card(TAG_6)
         assertTrue("after turning right, the red left side is on top", pixels.at(0.5, 0.25).isRed())
         assertTrue("after turning right, the blue right side is at the bottom", pixels.at(0.5, 0.75).isBlue())
+    }
+
+    private fun ComposeUiTest.saveButton() = onNodeWithContentDescription("Save turn")
+
+    private fun storedOrientation(name: String) =
+        JpegOrientation.read(Files.readAllBytes(dedupeFolder().resolve(name)))
+
+    private fun dedupeFolder() = root.resolve("Library").resolve("Trash").resolve("2026").resolve("Dedupe")
+
+    @Test
+    fun `Save turn is off until the photo is turned`() = runComposeUiTest {
+        openTrash()
+
+        onNodeWithContentDescription(TAG_6).performClick()
+        waitForText("100%")
+        saveButton().assertIsNotEnabled()
+
+        onNodeWithContentDescription("Rotate right").performClick()
+
+        saveButton().assertIsEnabled()
+    }
+
+    @Test
+    fun `saving a turn writes it into the file and the card looks the same afterwards`() = runComposeUiTest {
+        openTrash()
+
+        onNodeWithContentDescription(TAG_6).performClick()
+        waitForText("100%")
+        onNodeWithContentDescription("Rotate right").performClick()
+        saveButton().performClick()
+
+        waitUntil(timeoutMillis = WAIT_MS) { storedOrientation(TAG_6) == ExifOrientation.ROTATE_180 }
+        waitUntil(timeoutMillis = WAIT_MS) {
+            onAllNodes(hasContentDescription("Save turn") and isNotEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Close").performClick()
+        waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(TAG_6).fetchSemanticsNodes().size == 1 }
+
+        val pixels = card(TAG_6)
+        assertTrue("after the save, the red left side is on top", pixels.at(0.5, 0.25).isRed())
+        assertTrue("after the save, the blue right side is at the bottom", pixels.at(0.5, 0.75).isBlue())
     }
 }

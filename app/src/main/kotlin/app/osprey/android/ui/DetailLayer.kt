@@ -44,11 +44,12 @@ private const val HALF = 2f
 fun rememberDetailTiles(
     mediaMetadataReader: MediaMetadataReader,
     handle: FileHandle,
+    revision: Int,
     transform: ViewTransform?,
     baseMaxSide: Int,
 ): Map<DetailTile, ImageBitmap> {
-    var held by remember(handle) { mutableStateOf<Map<DetailTile, ImageBitmap>>(emptyMap()) }
-    LaunchedEffect(handle, transform) {
+    var held by remember(handle, revision) { mutableStateOf<Map<DetailTile, ImageBitmap>>(emptyMap()) }
+    LaunchedEffect(handle, revision, transform) {
         if (transform == null) return@LaunchedEffect
         delay(DETAIL_SETTLE_MS)
         val plan = transform.detailTiles(baseMaxSide)

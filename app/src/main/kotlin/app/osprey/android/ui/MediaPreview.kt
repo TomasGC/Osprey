@@ -18,6 +18,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +68,8 @@ private class PhotoDimensions(val size: PhotoSize?)
 
 /**
  * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. The photo can be pinched,
- * dragged, double-tapped and turned (#51); a turn is only in memory ([viewTurns]) and nothing is written to the file.
+ * dragged, double-tapped and turned (#51); a turn is only in memory ([viewTurns]) until Save turn writes it into a
+ * JPEG's file (#61).
  * The whole photo is decoded at [PREVIEW_DECODE_MAX_SIDE]; zoomed in, the part in view is decoded again at its real
  * pixels, tile by tile, over that base (#60). A tap beside the photo closes it: there is no Escape key on a phone.
  */
@@ -82,20 +84,25 @@ fun MediaPreview(
     onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle, PREVIEW_DECODE_MAX_SIDE) }
-    var dimensions by remember(handle) { mutableStateOf<PhotoDimensions?>(null) }
-    LaunchedEffect(handle) {
+    val revision = viewTurns.revisions.collectAsState().value[handle] ?: 0
+    val pending = viewTurns.turns.collectAsState().value[handle] ?: 0
+    val frame = rememberFrameState(handle, revision) {
+        mediaMetadataReader.decodeFrame(handle, PREVIEW_DECODE_MAX_SIDE)
+    }
+    var dimensions by remember(handle, revision) { mutableStateOf<PhotoDimensions?>(null) }
+    LaunchedEffect(handle, revision) {
         dimensions = PhotoDimensions(withContext(Dispatchers.IO) { mediaMetadataReader.imageSize(handle) })
     }
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var stored by remember(handle) { mutableStateOf<ViewTransform?>(null) }
+    var stored by remember(handle, revision) { mutableStateOf<ViewTransform?>(null) }
     val bitmap = (frame as? FrameState.Ready)?.bitmap
     // The photo's own size, not the base picture's: zoom and tiles are measured on the full photo. A reader that
     // cannot tell it leaves the base picture's size, and no detail.
     val photo = bitmap?.let { base -> dimensions?.let { it.size ?: PhotoSize(base.width, base.height) } }
-    val transform = photo?.let { transformFor(it, viewSize, stored, viewTurns.turnsOf(handle)) }
+    val transform = photo?.let { transformFor(it, viewSize, stored, pending) }
     val latest by rememberUpdatedState(transform)
-    val tiles = rememberDetailTiles(mediaMetadataReader, handle, transform, PREVIEW_DECODE_MAX_SIDE)
+    val tiles = rememberDetailTiles(mediaMetadataReader, handle, revision, transform, PREVIEW_DECODE_MAX_SIDE)
+    val save = rememberTurnSaveControls(viewTurns, handle, name, pending)
 
     Column(
         modifier = Modifier.fillMaxSize().background(SCRIM),
@@ -123,6 +130,7 @@ fun MediaPreview(
                 viewTurns.turn(handle, quarters)
                 stored = if (quarters > 0) latest?.rotateRight() else latest?.rotateLeft()
             },
+            save = save,
             checked = checked,
             checkLabel = checkLabel,
             onCheckedChange = onCheckedChange,
@@ -154,6 +162,7 @@ private fun Modifier.viewerGestures(
 private fun ViewerControls(
     zoom: Float,
     onTurn: (Int) -> Unit,
+    save: TurnSaveControls,
     checked: Boolean,
     checkLabel: String,
     onCheckedChange: (Boolean) -> Unit,
@@ -181,9 +190,17 @@ private fun ViewerControls(
             Spacer(Modifier.weight(1f))
             Button(onClick = onClose) { Text("Close") }
         }
+        save.note?.let { Text(it, color = Color.White) }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = checked, onCheckedChange = onCheckedChange)
             Text(checkLabel, color = Color.White)
+            Spacer(Modifier.weight(1f))
+            Button(
+                onClick = save.onSave,
+                enabled = save.canSave,
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                modifier = Modifier.semantics { contentDescription = "Save turn" },
+            ) { Text("Save turn") }
         }
         Text(name, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

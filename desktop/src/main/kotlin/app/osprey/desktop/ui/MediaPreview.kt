@@ -19,6 +19,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +68,8 @@ private const val PERCENT = 100
 /**
  * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. The photo is shown at
  * full resolution and can be zoomed (mouse wheel at the cursor, double click), dragged and turned (#51); a turn is
- * only in memory ([viewTurns]) and nothing is written to the file. Escape, Close and a click beside the photo close it.
+ * only in memory ([viewTurns]) until Save turn writes it into a JPEG's file (#61). Escape, Close and a click beside
+ * the photo close it.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -81,14 +83,17 @@ fun MediaPreview(
     onCheckedChange: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle) }
+    val revision = viewTurns.revisions.collectAsState().value[handle] ?: 0
+    val pending = viewTurns.turns.collectAsState().value[handle] ?: 0
+    val frame = rememberFrameState(handle, revision) { mediaMetadataReader.decodeFrame(handle) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    var stored by remember(handle) { mutableStateOf<ViewTransform?>(null) }
+    var stored by remember(handle, revision) { mutableStateOf<ViewTransform?>(null) }
     val bitmap = (frame as? FrameState.Ready)?.bitmap
-    val transform = bitmap?.let { transformFor(it, viewSize, stored, viewTurns.turnsOf(handle)) }
+    val transform = bitmap?.let { transformFor(it, viewSize, stored, pending) }
     val latest by rememberUpdatedState(transform)
+    val save = rememberTurnSaveControls(viewTurns, handle, name, pending)
 
     Column(
         modifier = Modifier
@@ -125,6 +130,7 @@ fun MediaPreview(
                 viewTurns.turn(handle, quarters)
                 stored = if (quarters > 0) latest?.rotateRight() else latest?.rotateLeft()
             },
+            save = save,
             checked = checked,
             checkLabel = checkLabel,
             onCheckedChange = onCheckedChange,
@@ -162,41 +168,54 @@ private fun Modifier.viewerGestures(
 private fun ViewerControls(
     zoom: Float,
     onTurn: (Int) -> Unit,
+    save: TurnSaveControls,
     checked: Boolean,
     checkLabel: String,
     onCheckedChange: (Boolean) -> Unit,
     name: String,
     onClose: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth().padding(14.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Button(
-            onClick = { onTurn(-1) },
-            modifier = Modifier.semantics { contentDescription = "Rotate left" },
-        ) { Text("↺") }
-        Spacer(Modifier.width(8.dp))
-        Button(
-            onClick = { onTurn(1) },
-            modifier = Modifier.semantics { contentDescription = "Rotate right" },
-        ) { Text("↻") }
-        Spacer(Modifier.width(14.dp))
-        Text("${(zoom * PERCENT).roundToInt()}%", color = Color.White)
-        Spacer(Modifier.width(14.dp))
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Text(checkLabel, color = Color.White)
-        Spacer(Modifier.width(14.dp))
-        Text(
-            name,
-            color = Color.Gray,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(Modifier.width(14.dp))
-        Button(onClick = onClose) { Text("Close") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(
+                onClick = { onTurn(-1) },
+                modifier = Modifier.semantics { contentDescription = "Rotate left" },
+            ) { Text("↺") }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = { onTurn(1) },
+                modifier = Modifier.semantics { contentDescription = "Rotate right" },
+            ) { Text("↻") }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = save.onSave,
+                enabled = save.canSave,
+                modifier = Modifier.semantics { contentDescription = "Save turn" },
+            ) { Text("Save turn") }
+            Spacer(Modifier.width(14.dp))
+            Text("${(zoom * PERCENT).roundToInt()}%", color = Color.White)
+            Spacer(Modifier.width(14.dp))
+            Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+            Text(checkLabel, color = Color.White)
+            Spacer(Modifier.width(14.dp))
+            Text(
+                name,
+                color = Color.Gray,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(14.dp))
+            Button(onClick = onClose) { Text("Close") }
+        }
+        save.note?.let { Text(it, color = Color.Gray) }
     }
 }
 

@@ -67,7 +67,8 @@ fun MediaCard(
     showToggle: Boolean = true,
 ) {
     val isImage = splitStemAndSuffix(name).second.lowercase() in imageExtensions
-    val frame = rememberFrameState(handle) { mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE) }
+    val revision = viewTurns.revisions.collectAsState().value[handle] ?: 0
+    val frame = rememberFrameState(handle, revision) { mediaMetadataReader.decodeFrame(handle, CARD_DECODE_MAX_SIDE) }
     val quarterTurns = viewTurns.turns.collectAsState().value[handle] ?: 0
 
     Column(

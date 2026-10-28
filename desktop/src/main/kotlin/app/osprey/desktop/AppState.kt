@@ -14,6 +14,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.SettingsStore
+import app.osprey.viewer.TurnSaver
 import app.osprey.viewer.ViewTurns
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,8 +42,11 @@ class AppState(
     val jobs: JobQueue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO)),
 ) {
 
-    /** The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51). */
-    val viewTurns = ViewTurns()
+    /**
+     * The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51), and the
+     * viewer can write a turn into a JPEG's file (#61).
+     */
+    val viewTurns = ViewTurns(TurnSaver(fs)::save)
 
     val settingsState = SettingsState(settingsStore) { openLibrary(it) }
     var libraryPath by mutableStateOf<Path?>(null)
