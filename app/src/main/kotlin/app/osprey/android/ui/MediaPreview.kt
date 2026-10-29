@@ -69,7 +69,7 @@ private class PhotoDimensions(val size: PhotoSize?)
 /**
  * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. The photo can be pinched,
  * dragged, double-tapped and turned (#51); a turn is only in memory ([viewTurns]) until Save turn writes it into a
- * JPEG's file (#61).
+ * JPEG or PNG file (#61, #70).
  * The whole photo is decoded at [PREVIEW_DECODE_MAX_SIDE]; zoomed in, the part in view is decoded again at its real
  * pixels, tile by tile, over that base (#60). A tap beside the photo closes it: there is no Escape key on a phone.
  */

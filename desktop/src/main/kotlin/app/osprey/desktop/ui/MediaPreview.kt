@@ -68,8 +68,8 @@ private const val PERCENT = 100
 /**
  * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. The photo is shown at
  * full resolution and can be zoomed (mouse wheel at the cursor, double click), dragged and turned (#51); a turn is
- * only in memory ([viewTurns]) until Save turn writes it into a JPEG's file (#61). Escape, Close and a click beside
- * the photo close it.
+ * only in memory ([viewTurns]) until Save turn writes it into a JPEG or PNG file (#61, #70). Escape, Close and a
+ * click beside the photo close it.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

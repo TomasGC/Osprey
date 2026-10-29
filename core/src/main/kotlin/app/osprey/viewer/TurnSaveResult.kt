@@ -20,6 +20,6 @@ val TurnSaveResult.userMessage: String?
         is TurnSaveResult.Failed -> "Could not save the turn: $reason"
     }
 
-/** Why a pending turn cannot be saved, or null when it can: a turned PNG or HEIC says so before the user presses. */
+/** Why a pending turn cannot be saved, or null when it can: a turned HEIC says so before the user presses. */
 fun saveTurnHint(name: String, pendingTurns: Int): String? =
-    if (pendingTurns != 0 && !TurnSaver.isJpeg(name)) TurnSaver.NOT_A_JPEG else null
+    if (pendingTurns != 0 && !TurnSaver.canSave(name)) TurnSaver.UNSUPPORTED_FORMAT else null

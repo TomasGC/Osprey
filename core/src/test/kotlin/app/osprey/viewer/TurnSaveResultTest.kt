@@ -21,14 +21,18 @@ class TurnSaveResultTest {
     fun `a turned jpeg has no hint`() = assertNull(saveTurnHint("a.jpg", 1))
 
     @Test
-    fun `a turned png or heic says only jpeg can be saved`() {
-        assertEquals(TurnSaver.NOT_A_JPEG, saveTurnHint("a.png", 1))
-        assertEquals(TurnSaver.NOT_A_JPEG, saveTurnHint("a.heic", 3))
+    fun `a turned png has no hint`() = assertNull(saveTurnHint("a.png", 1))
+
+    @Test
+    fun `a turned heic says only jpeg and png can be saved`() {
+        assertEquals(TurnSaver.UNSUPPORTED_FORMAT, saveTurnHint("a.heic", 3))
+        assertEquals(TurnSaver.UNSUPPORTED_FORMAT, saveTurnHint("a", 1))
     }
 
     @Test
     fun `a photo that is not turned has no hint whatever its format`() {
         assertNull(saveTurnHint("a.png", 0))
+        assertNull(saveTurnHint("a.heic", 0))
         assertNull(saveTurnHint("a.jpg", 0))
     }
 }
