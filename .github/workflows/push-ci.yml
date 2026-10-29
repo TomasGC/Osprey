@@ -18,8 +18,10 @@ jobs:
       app-name: osprey
       unit-tasks: '[":core:test", ":app:testDebugUnitTest", ":desktop:test"]'
       integration-mock-tasks: '[":core:integrationMock", ":desktop:integrationMock"]'
-      integration-real-tasks: '[":core:integrationReal", ":desktop:integrationReal", ":desktop:e2e"]'
-      instrumented-task: ":app-instrumented:connectedDebugAndroidTest"
+      integration-real-tasks: '[":core:integrationReal", ":desktop:integrationReal"]'
+      # The end-to-end checks of the real app, one per environment (Condor#23): :app-instrumented on the emulator,
+      # :desktop:e2e on Windows and on Linux.
+      app-environments: '["android", "windows", "linux"]'
       # Merged line coverage of :core, :desktop and :app without the Compose screens (#46). :core is held
       # at 100% line and branch by `:core:koverVerify`, which the coverage report task depends on.
       coverage-threshold: 75
