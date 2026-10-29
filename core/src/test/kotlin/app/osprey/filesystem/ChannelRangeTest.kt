@@ -84,4 +84,40 @@ class ChannelRangeTest {
         assertThrows(IOException::class.java) { ChannelRange.write(size, 0L, byteArrayOf(9), stuck) }
         assertEquals(1, disk[0].toInt())
     }
+    /** A file that starts empty and grows as it is written, behind the positional write a channel offers. */
+    private fun growingWriteAt(into: ByteArray, positions: MutableList<Long>, perCall: Int = Int.MAX_VALUE) =
+        { buffer: ByteBuffer, at: Long ->
+            val count = minOf(buffer.remaining(), perCall)
+            positions += at
+            buffer.get(into, at.toInt(), count)
+            count
+        }
+
+    @Test
+    fun `writeAll writes every byte from the start whatever the size of the file`() {
+        val into = ByteArray(5)
+        ChannelRange.writeAll(byteArrayOf(1, 2, 3, 4, 5), growingWriteAt(into, mutableListOf()))
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5), into)
+    }
+
+    @Test
+    fun `writeAll goes on from where the channel stopped`() {
+        val into = ByteArray(4)
+        val positions = mutableListOf<Long>()
+        ChannelRange.writeAll(byteArrayOf(1, 2, 3, 4), growingWriteAt(into, positions, perCall = 1))
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), into)
+        assertEquals(listOf(0L, 1L, 2L, 3L), positions)
+    }
+
+    @Test
+    fun `writeAll of nothing asks the channel for nothing`() {
+        val positions = mutableListOf<Long>()
+        ChannelRange.writeAll(byteArrayOf(), growingWriteAt(ByteArray(1), positions))
+        assertEquals(emptyList<Long>(), positions)
+    }
+
+    @Test
+    fun `writeAll fails when the channel makes no progress`() {
+        assertThrows(IOException::class.java) { ChannelRange.writeAll(byteArrayOf(9)) { _, _ -> 0 } }
+    }
 }

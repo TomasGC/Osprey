@@ -120,6 +120,12 @@ class FakeFileSystemRepository : FileSystemRepository {
         node.timestamps = node.timestamps.copy(modified = Instant.now())
     }
 
+    override fun replaceContent(entry: FileHandle, bytes: ByteArray) {
+        val node = nodes[entry.id()] ?: throw IOException("no such file")
+        node.bytes = bytes.copyOf()
+        node.timestamps = node.timestamps.copy(modified = Instant.now())
+    }
+
     private fun newNode(parent: FileHandle, name: String, isDirectory: Boolean, bytes: ByteArray = ByteArray(0)): FileHandle {
         val id = nextId++
         nodes[id] = Node(name, parent.id(), isDirectory, bytes)

@@ -27,4 +27,11 @@ object ChannelRange {
             if (writeAt(buffer, offset + buffer.position()) <= 0) throw IOException("the file took no bytes")
         }
     }
+    /** Writes all of [bytes] from the start of a file, which may grow while it is written. */
+    fun writeAll(bytes: ByteArray, writeAt: (ByteBuffer, Long) -> Int) {
+        val buffer = ByteBuffer.wrap(bytes)
+        while (buffer.hasRemaining()) {
+            if (writeAt(buffer, buffer.position().toLong()) <= 0) throw IOException("the file took no bytes")
+        }
+    }
 }

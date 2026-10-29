@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import app.osprey.filesystem.ChannelRange
+import app.osprey.filesystem.ContentReplacer
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
@@ -35,7 +36,8 @@ import java.time.Instant
 class AndroidFileSystemRepository(
     private val context: Context,
     transfer: FileTransfer = AndroidFileTransfer(context),
-) : FileSystemRepository, FileTransfer by transfer {
+    replacer: ContentReplacer = AndroidContentReplacer(context, transfer),
+) : FileSystemRepository, FileTransfer by transfer, ContentReplacer by replacer {
 
     override fun list(folder: FileHandle): List<FileEntry> {
         val doc = folder.documentFile()
@@ -93,10 +95,7 @@ class AndroidFileSystemRepository(
         check(doc.delete()) { "delete failed: ${doc.name}" }
     }
 
-    override fun readBytes(entry: FileHandle): ByteArray {
-        val uri = entry.documentFile().uri
-        return context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("cannot open $uri")
-    }
+    override fun readBytes(entry: FileHandle): ByteArray = context.readAllBytes(entry)
 
     override fun readTimestamps(entry: FileHandle): FileTimestamps {
         val modified = entry.documentFile().lastModified().takeIf { it > 0 }?.let { Instant.ofEpochMilli(it) }
@@ -129,9 +128,14 @@ class AndroidFileSystemRepository(
 private fun DocumentFile.toEntry(): FileEntry =
     FileEntry(AndroidFileHandle(this), name.orEmpty(), isDirectory, if (isDirectory) 0 else length())
 
-private fun FileHandle.documentFile(): DocumentFile = (this as AndroidFileHandle).documentFile
+internal fun FileHandle.documentFile(): DocumentFile = (this as AndroidFileHandle).documentFile
 
-private fun ContentResolver.openDescriptor(entry: FileHandle, mode: String): ParcelFileDescriptor {
+internal fun ContentResolver.openDescriptor(entry: FileHandle, mode: String): ParcelFileDescriptor {
     val uri = entry.documentFile().uri
     return openFileDescriptor(uri, mode) ?: error("cannot open $uri")
+}
+
+internal fun Context.readAllBytes(entry: FileHandle): ByteArray {
+    val uri = entry.documentFile().uri
+    return contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("cannot open $uri")
 }

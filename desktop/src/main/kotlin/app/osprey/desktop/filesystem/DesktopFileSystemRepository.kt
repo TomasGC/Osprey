@@ -1,6 +1,7 @@
 package app.osprey.desktop.filesystem
 
 import app.osprey.filesystem.ChannelRange
+import app.osprey.filesystem.ContentReplacer
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
@@ -26,7 +27,8 @@ import java.nio.file.FileAlreadyExistsException as NioFileAlreadyExistsException
  */
 class DesktopFileSystemRepository(
     transfer: FileTransfer = DesktopFileTransfer(),
-) : FileSystemRepository, FileTransfer by transfer {
+    replacer: ContentReplacer = DesktopContentReplacer(),
+) : FileSystemRepository, FileTransfer by transfer, ContentReplacer by replacer {
 
     override fun list(folder: FileHandle): List<FileEntry> {
         val path = folder.path()
