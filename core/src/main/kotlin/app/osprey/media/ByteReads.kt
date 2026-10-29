@@ -4,6 +4,7 @@ private const val BYTE_MASK = 0xFF
 private const val BITS_PER_BYTE = 8
 private const val BITS_PER_SHORT = 16
 private const val SHORT_SIZE = 2
+private const val INT_SIZE = 4
 
 internal fun ByteArray.u8(at: Int): Int = this[at].toInt() and BYTE_MASK
 
@@ -14,4 +15,8 @@ internal fun ByteArray.u32(at: Int, bigEndian: Boolean): Int {
     val first = u16(at, bigEndian)
     val second = u16(at + SHORT_SIZE, bigEndian)
     return if (bigEndian) (first shl BITS_PER_SHORT) or second else first or (second shl BITS_PER_SHORT)
+}
+
+internal fun ByteArray.putU32(at: Int, value: Int) {
+    for (i in 0 until INT_SIZE) this[at + i] = (value ushr (BITS_PER_BYTE * (INT_SIZE - 1 - i))).toByte()
 }
