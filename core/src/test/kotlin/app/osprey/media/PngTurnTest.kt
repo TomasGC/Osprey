@@ -24,12 +24,14 @@ class PngTurnTest {
 
     private fun turned(png: ByteArray, quarterTurns: Int): ByteArray = when (val result = PngTurn.turn(png, quarterTurns)) {
         is PngTurnResult.Turned -> result.bytes
+        PngTurnResult.Unchanged -> png
         is PngTurnResult.Refused -> throw AssertionError("refused: ${result.reason}")
     }
 
     private fun refusal(png: ByteArray, quarterTurns: Int = 1, limit: Int = PngTurn.MAX_RAW_BYTES): String =
         when (val result = PngTurn.turn(png, quarterTurns, limit)) {
             is PngTurnResult.Turned -> throw AssertionError("turned")
+            PngTurnResult.Unchanged -> throw AssertionError("unchanged")
             is PngTurnResult.Refused -> result.reason
         }
 
@@ -94,7 +96,7 @@ class PngTurnTest {
     @Test
     fun `whole turns leave the file as it is`() {
         val png = pngOf(image(), before = listOf(physChunk(PHYS_X, PHYS_Y)))
-        for (turns in listOf(0, 4, -4, 8)) assertArrayEquals(png, turned(png, turns))
+        for (turns in listOf(0, 4, -4, 8)) assertEquals(PngTurnResult.Unchanged, PngTurn.turn(png, turns))
     }
 
     @Test
@@ -352,5 +354,23 @@ class PngTurnTest {
     fun `the paeth filter takes the left byte when it ties with the upper left one`() {
         val source = Samples(2, 2, 8, GRAY, intArrayOf(2, 1, 4, 9))
         assertSame(source.oriented(ExifOrientation.ROTATE_90), decode(turned(pngOf(source, filters = { 4 }), 1)))
+    }
+
+    @Test
+    fun `rows of a byte or more per pixel are filtered Up`() {
+        val formats = listOf(GRAY to 8, GRAY to 16, RGB to 8, RGB to 16, GRAY_ALPHA to 8, GRAY_ALPHA to 16, RGBA to 8, RGBA to 16)
+        for ((colorType, depth) in formats) {
+            val types = filterTypesOf(turned(pngOf(image(colorType, depth)), 1))
+            assertEquals("colour $colorType depth $depth", List(types.size) { 2 }, types)
+        }
+    }
+
+    @Test
+    fun `palette images and pixels under a byte are not filtered`() {
+        val formats = listOf(PALETTE to 1, PALETTE to 2, PALETTE to 4, PALETTE to 8, GRAY to 1, GRAY to 2, GRAY to 4)
+        for ((colorType, depth) in formats) {
+            val types = filterTypesOf(turned(pngOf(image(colorType, depth)), 1))
+            assertEquals("colour $colorType depth $depth", List(types.size) { 0 }, types)
+        }
     }
 }

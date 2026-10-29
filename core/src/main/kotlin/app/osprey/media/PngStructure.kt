@@ -1,6 +1,5 @@
 package app.osprey.media
 
-private const val PALETTE_TYPE = 3
 private const val LAST_LETTER = 3
 
 private val CRITICAL = setOf("IHDR", "PLTE", "IDAT", "IEND")
@@ -18,13 +17,13 @@ internal object PngStructure {
     fun check(chunks: List<PngChunk>): PngHeader {
         val types = chunks.map { it.type }
         if (types.any { it in ANIMATION }) refuse(PngTurn.ANIMATED)
-        if (types.first() != "IHDR" || types.count { it == "IHDR" } != 1 || chunks.last().data.isNotEmpty()) {
+        if (types.first() != "IHDR" || types.count { it == "IHDR" } != 1 || chunks.last().size > 0) {
             refuse(PngTurn.DAMAGED)
         }
         if (!types.all { carries(it) }) refuse(PngTurn.UNKNOWN_CHUNK)
         val header = PngHeader.parse(chunks.first().data)
         if (!isOneRun(types, "IDAT")) refuse(PngTurn.DAMAGED)
-        if (header.colorType == PALETTE_TYPE && "PLTE" !in types) refuse(PngTurn.DAMAGED)
+        if (header.isPalette && "PLTE" !in types) refuse(PngTurn.DAMAGED)
         return header
     }
 

@@ -29,23 +29,25 @@ object PngTurn {
      * it cannot be. A picture needing more than [maxRawBytes] bytes of scanlines is refused before it is read.
      */
     fun turn(png: ByteArray, quarterTurns: Int, maxRawBytes: Int = MAX_RAW_BYTES): PngTurnResult = try {
-        PngTurnResult.Turned(turned(png, quarterTurns, maxRawBytes))
+        turned(png, quarterTurns, maxRawBytes)
     } catch (refusal: PngRefusal) {
         PngTurnResult.Refused(refusal.reason)
     } catch (ignored: DataFormatException) {
         PngTurnResult.Refused(DAMAGED)
     }
 
-    private fun turned(png: ByteArray, quarterTurns: Int, maxRawBytes: Int): ByteArray {
+    private fun turned(png: ByteArray, quarterTurns: Int, maxRawBytes: Int): PngTurnResult {
         val chunks = PngChunks.read(png)
         val header = PngStructure.check(chunks)
-        val orientation = storedOrientation(chunks).turnedBy(quarterTurns)
+        val stored = storedOrientation(chunks)
+        val orientation = stored.turnedBy(quarterTurns)
+        if (stored == ExifOrientation.NORMAL && orientation == ExifOrientation.NORMAL) return PngTurnResult.Unchanged
         val image = if (orientation == ExifOrientation.NORMAL) {
             null
         } else {
             turnedImage(chunks, header, orientation, maxRawBytes)
         }
-        return PngChunks.write(rebuilt(chunks, header, orientation, image))
+        return PngTurnResult.Turned(PngChunks.write(rebuilt(chunks, header, orientation, image)))
     }
 
     private fun storedOrientation(chunks: List<PngChunk>): ExifOrientation {
@@ -75,7 +77,7 @@ object PngTurn {
         target: PngHeader,
         orientation: ExifOrientation,
     ): ByteArray {
-        val raw = PngZlib.inflate(chunks.filter { it.type == "IDAT" }.map { it.data }, header.rawSize.toInt())
+        val raw = PngZlib.inflate(chunks.filter { it.type == "IDAT" }, header.rawSize.toInt())
         PngScanlines.unfilter(raw, header)
         return PngPixels.orient(raw, header, target, orientation)
     }

@@ -10,6 +10,7 @@ private const val FILTER_AT = 11
 private const val INTERLACE_AT = 12
 private const val BITS_PER_BYTE = 8
 private const val FILTER_BYTE = 1
+private const val COLOR_PALETTE = 3
 
 // PNG specification, table of colour types: the bit depths each allows, and its samples per pixel.
 @Suppress("MagicNumber")
@@ -23,18 +24,20 @@ private val CHANNELS = mapOf(0 to 1, 2 to 3, 3 to 1, 4 to 2, 6 to 4)
 /** What the IHDR chunk says about the picture: its size and how each pixel is stored. */
 internal class PngHeader(val width: Int, val height: Int, val bitDepth: Int, val colorType: Int) {
 
-    val bitsPerPixel: Int get() = bitDepth * CHANNELS.getValue(colorType)
+    val bitsPerPixel: Int = bitDepth * CHANNELS.getValue(colorType)
 
     /** Bytes one whole pixel takes; a pixel under a byte counts as one. */
-    val bytesPerPixel: Int get() = maxOf(1, bitsPerPixel / BITS_PER_BYTE)
+    val bytesPerPixel: Int = maxOf(1, bitsPerPixel / BITS_PER_BYTE)
 
-    private val rowBytes: Long get() = (width.toLong() * bitsPerPixel + BITS_PER_BYTE - 1) / BITS_PER_BYTE
+    val isPalette: Boolean = colorType == COLOR_PALETTE
+
+    private val rowBytes: Long = (width.toLong() * bitsPerPixel + BITS_PER_BYTE - 1) / BITS_PER_BYTE
 
     /** Bytes of one row of pixels, without its filter byte; only meaningful once [rawSize] has been limited. */
-    val stride: Int get() = rowBytes.toInt()
+    val stride: Int = rowBytes.toInt()
 
     /** Bytes of all the scanlines, each with its filter byte: what one copy of the picture takes in memory. */
-    val rawSize: Long get() = height.toLong() * (rowBytes + FILTER_BYTE)
+    val rawSize: Long = height.toLong() * (rowBytes + FILTER_BYTE)
 
     fun swapped(): PngHeader = PngHeader(height, width, bitDepth, colorType)
 

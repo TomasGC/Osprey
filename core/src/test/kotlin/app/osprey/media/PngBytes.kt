@@ -217,3 +217,14 @@ internal fun decode(png: ByteArray): Samples {
     }
     return Samples(width, height, depth, colorType, values)
 }
+
+/** The filter type of every row of a PNG, read back out of its image data. */
+internal fun filterTypesOf(png: ByteArray): List<Int> {
+    val chunks = chunksOf(png)
+    val header = chunks.first().data
+    val bits = header[8].toInt() * channelsOf(header[9].toInt())
+    val stride = (readInt(header, 0) * bits + BITS_PER_BYTE - 1) / BITS_PER_BYTE
+    val idat = chunks.filter { it.type == "IDAT" }.fold(ByteArray(0)) { acc, part -> acc + part.data }
+    val inflated = InflaterInputStream(ByteArrayInputStream(idat)).readBytes()
+    return (0 until readInt(header, 4)).map { inflated[it * (stride + 1)].toInt() }
+}
