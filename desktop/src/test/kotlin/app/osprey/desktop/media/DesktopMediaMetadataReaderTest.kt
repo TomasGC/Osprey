@@ -76,4 +76,14 @@ class DesktopMediaMetadataReaderTest {
         assertNull(reader.captureDateTime(broken))
         assertNull(reader.decodeFrame(broken, maxSide = null))
     }
+
+    @Test
+    fun `a HEIF frame comes from the renderer too`() {
+        val heifReader = DesktopMediaMetadataReader(HeicRenderer { png(6, 4) })
+
+        val frame = heifReader.decodeFrame(file("IMG_0001.HEIF"), maxSide = null)
+
+        assertEquals(6, frame!!.width)
+        assertEquals(4, frame.height)
+    }
 }

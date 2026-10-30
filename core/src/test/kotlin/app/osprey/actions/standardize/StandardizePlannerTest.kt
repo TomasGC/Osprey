@@ -243,4 +243,14 @@ class StandardizePlannerTest {
         assertEquals(1, renamed)
         assertEquals(1, planner.plan(fs.root).renames.size)
     }
+
+    @Test
+    fun `plan renames a heif like any other photo`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "download_20160828_193034.heif", "not a real heif".toByteArray())
+
+        val rename = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root).renames.single()
+
+        assertEquals("IMG_2016-08-28_19-30-34.heif", rename.targetName)
+    }
 }

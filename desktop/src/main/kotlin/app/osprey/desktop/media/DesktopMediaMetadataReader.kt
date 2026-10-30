@@ -1,5 +1,6 @@
 package app.osprey.desktop.media
 
+import app.osprey.actions.heicExtensions
 import app.osprey.actions.imageExtensions
 import app.osprey.actions.splitStemAndSuffix
 import app.osprey.actions.videoExtensions
