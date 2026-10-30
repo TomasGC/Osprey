@@ -46,7 +46,7 @@ class ViewTurns(
         val pending = turnsOf(handle)
         if (pending == 0) return TurnSaveResult.Saved
         val result = saveTurn(handle, name, pending)
-        if (result == TurnSaveResult.Saved) {
+        if (result.isSaved) {
             revisionState.update { it + (handle to ((it[handle] ?: 0) + 1)) }
             turn(handle, -pending)
         }

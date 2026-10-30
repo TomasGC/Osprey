@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.swing)
 
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":core")))
     testImplementation(compose.desktop.uiTestJUnit4)
 
     constraints {

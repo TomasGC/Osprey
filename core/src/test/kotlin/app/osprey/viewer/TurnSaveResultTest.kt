@@ -1,7 +1,9 @@
 package app.osprey.viewer
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TurnSaveResultTest {
@@ -24,9 +26,28 @@ class TurnSaveResultTest {
     fun `a turned png has no hint`() = assertNull(saveTurnHint("a.png", 1))
 
     @Test
-    fun `a turned heic says only jpeg and png can be saved`() {
-        assertEquals(TurnSaver.UNSUPPORTED_FORMAT, saveTurnHint("a.heic", 3))
+    fun `a turned heic or heif has no hint`() {
+        assertNull(saveTurnHint("a.heic", 3))
+        assertNull(saveTurnHint("a.HEIF", 1))
+    }
+
+    @Test
+    fun `a turned format that cannot be saved says which can`() {
+        assertEquals("Only JPEG, PNG and HEIC photos can be saved turned for now", TurnSaver.UNSUPPORTED_FORMAT)
+        assertEquals(TurnSaver.UNSUPPORTED_FORMAT, saveTurnHint("a.gif", 3))
         assertEquals(TurnSaver.UNSUPPORTED_FORMAT, saveTurnHint("a", 1))
+    }
+
+    @Test
+    fun `a save with a note says the note`() =
+        assertEquals("Saved. Look here", TurnSaveResult.SavedWithNote("Saved. Look here").userMessage)
+
+    @Test
+    fun `saved and saved with a note both count as saved, the others do not`() {
+        assertTrue(TurnSaveResult.Saved.isSaved)
+        assertTrue(TurnSaveResult.SavedWithNote("n").isSaved)
+        assertFalse(TurnSaveResult.Refused("r").isSaved)
+        assertFalse(TurnSaveResult.Failed("f").isSaved)
     }
 
     @Test

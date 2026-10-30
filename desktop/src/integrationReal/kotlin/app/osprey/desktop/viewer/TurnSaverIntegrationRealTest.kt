@@ -7,6 +7,7 @@ import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.testing.toPng
 import app.osprey.media.ExifOrientation
+import app.osprey.media.HeicSamples
 import app.osprey.viewer.TurnSaveResult
 import app.osprey.viewer.TurnSaver
 import java.awt.image.BufferedImage
@@ -31,6 +32,9 @@ private const val RED_SHIFT = 16
 private const val BYTE_MASK = 0xFF
 private const val UPRIGHT = 1
 private const val SIDEWAYS = 6
+private const val IROT_AFTER_ONE_TURN = 2
+private const val EXIF_AFTER_ONE_TURN = 3
+private const val IROT_BOX_AND_ASSOCIATION = 10
 
 private fun isRed(argb: Int): Boolean = (argb shr RED_SHIFT and BYTE_MASK) > RED_MIN && (argb and BYTE_MASK) < OTHER_MAX
 
@@ -200,5 +204,64 @@ class TurnSaverIntegrationRealTest {
         assertTrue(save(path, 1) is TurnSaveResult.Failed)
 
         assertArrayEquals(before, Files.readAllBytes(path))
+    }
+
+    private fun heicFile(name: String, sample: HeicSamples.Sample): Path =
+        Files.write(tempDir.resolve(name), sample.bytes).also {
+            Files.setLastModifiedTime(it, FileTime.from(oldTime))
+        }
+
+    @Test
+    fun `a heic with a rotation is turned in place and keeps its modified time`() {
+        val sample = HeicSamples.rotated
+        val path = heicFile("a.heic", sample)
+
+        assertEquals(TurnSaveResult.Saved, save(path, 1))
+
+        val after = Files.readAllBytes(path)
+        assertEquals(sample.bytes.size, after.size)
+        val changed = sample.bytes.indices.filter { sample.bytes[it] != after[it] }
+        assertEquals(listOf(sample.exifValueAt, sample.irotAt!!), changed)
+        assertEquals(IROT_AFTER_ONE_TURN, after[sample.irotAt!!].toInt())
+        assertEquals(EXIF_AFTER_ONE_TURN, after[sample.exifValueAt].toInt())
+        assertEquals(oldTime, Files.getLastModifiedTime(path).toInstant())
+    }
+
+    @Test
+    fun `a heic with no rotation is replaced by a file ten bytes longer and keeps its modified time`() {
+        val path = heicFile("a.heic", HeicSamples.plain)
+
+        assertEquals(TurnSaveResult.Saved, save(path, 1))
+
+        assertEquals(HeicSamples.plain.bytes.size + IROT_BOX_AND_ASSOCIATION, Files.size(path).toInt())
+        assertEquals(oldTime, Files.getLastModifiedTime(path).toInstant())
+        assertEquals(listOf("a.heic"), namesInFolder())
+    }
+
+    @Test
+    fun `a rebuilt heic is turned in place the next time`() {
+        val path = heicFile("a.heic", HeicSamples.plain)
+        save(path, 1)
+        val size = Files.size(path)
+
+        assertEquals(TurnSaveResult.Saved, save(path, 3))
+
+        assertEquals(size, Files.size(path))
+    }
+
+    @Test
+    fun `a read-only heic fails and is untouched, rotated or not`() {
+        for (sample in listOf(HeicSamples.rotated, HeicSamples.plain)) {
+            val path = heicFile("a.heic", sample)
+            path.toFile().setWritable(false)
+            assumeFalse("this account can write to read-only files", Files.isWritable(path))
+
+            assertTrue(save(path, 1) is TurnSaveResult.Failed)
+
+            assertArrayEquals(sample.bytes, Files.readAllBytes(path))
+            assertEquals(listOf("a.heic"), namesInFolder())
+            path.toFile().setWritable(true)
+            Files.delete(path)
+        }
     }
 }

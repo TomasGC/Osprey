@@ -1,6 +1,7 @@
 package app.osprey.desktop.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,13 +20,15 @@ class TurnSaveControls(val canSave: Boolean, val note: String?, val onSave: () -
 
 /**
  * Saves [handle]'s [pending] turn into its file off the UI thread. The button is off while the file is written, and
- * for a photo that cannot be saved turned the note says why; a refusal or failure stays under the button until the
- * user turns again.
+ * for a photo that cannot be saved turned the note says why; a refusal, a failure or a note about a good save stays
+ * under the button until the user turns again.
  */
 @Composable
 fun rememberTurnSaveControls(viewTurns: ViewTurns, handle: FileHandle, name: String, pending: Int): TurnSaveControls {
     var saving by remember { mutableStateOf(false) }
-    var failure by remember(handle, pending) { mutableStateOf<String?>(null) }
+    var failure by remember(handle) { mutableStateOf<String?>(null) }
+    // A message stays under the button until the user turns again: a save that worked takes pending to 0.
+    LaunchedEffect(handle, pending) { if (pending != 0) failure = null }
     val scope = rememberCoroutineScope()
     val hint = saveTurnHint(name, pending)
     return TurnSaveControls(
