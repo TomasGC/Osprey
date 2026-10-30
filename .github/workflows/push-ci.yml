@@ -25,3 +25,9 @@ jobs:
       # Merged line coverage of :core, :desktop and :app without the Compose screens (#46). :core is held
       # at 100% line and branch by `:core:koverVerify`, which the coverage report task depends on.
       coverage-threshold: 75
+      # The real photos of the private Osprey-fixtures repository (#76, Condor#25): read with a deploy key held by the
+      # `fixtures` environment, which only feature/**, bugfix/** and main can use. A missing folder fails the run.
+      fixtures-repo: TomasGC/Osprey-fixtures
+      require-fixtures: true
+      fixtures-environment: fixtures
+      android-fixtures-device-path: /data/local/tmp/osprey-fixtures
