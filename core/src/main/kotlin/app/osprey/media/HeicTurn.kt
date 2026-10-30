@@ -2,7 +2,7 @@ package app.osprey.media
 
 private const val QUARTER_TURNS_IN_FULL = 4
 private const val DEGREES_PER_TURN = 90
-private const val IROT_ANGLE_MASK = 0x03
+internal const val IROT_ANGLE_MASK = 0x03
 
 /**
  * Turns a HEIC by changing the `irot` property of its primary item and the Exif Orientation that goes with it (#71).
