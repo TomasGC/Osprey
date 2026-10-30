@@ -31,6 +31,9 @@ internal class Quirks(
     val exifExtentLength: Int? = null,
     val ilocOffsetSize: Int = 4,
     val largeMeta: Boolean = false,
+    val primaryHasNoAssociations: Boolean = false,
+    val extraProps: Int = 0,
+    val tileMethod: Int = 0,
 )
 
 internal fun heicBox(type: String, payload: ByteArray = ByteArray(0)): ByteArray =
@@ -92,6 +95,7 @@ internal fun heic(
     val secondIrotIndex = if (twoPrimaryIrot) addProp("irot", byteArrayOf(1)) else null
     val mirrorIndex = if (mirror) addProp("imir", byteArrayOf(0)) else null
     val tileIrotIndex = tileIrot?.let { addProp("irot", byteArrayOf(it.toByte())) }
+    repeat(quirks.extraProps) { addProp("xtra", ByteArray(0)) }
     val ipco = heicBox("ipco", props.joined())
 
     fun association(index: Int, essential: Boolean) = if (ipmaFlags and 1 == 1) {
@@ -109,7 +113,8 @@ internal fun heic(
         mirrorIndex?.let { it to true }, if (badIpmaIndex) MISSING_PROPERTY to false else null,
     )
     val tileIndexes = listOfNotNull(ispe to false, hvcc to false, tileIrotIndex?.let { it to true })
-    val entries = listOf(entry(PRIMARY_ID, primaryIndexes), entry(2, tileIndexes), entry(3, tileIndexes))
+    val tileEntries = listOf(entry(2, tileIndexes), entry(3, tileIndexes))
+    val entries = if (quirks.primaryHasNoAssociations) tileEntries else listOf(entry(PRIMARY_ID, primaryIndexes)) + tileEntries
     val ipma = heicFullBox("ipma", ipmaVersion, ipmaFlags, int32(entries.size) + entries.joined())
     val iprp = heicBox("iprp", ipco + ipma)
 
@@ -143,7 +148,10 @@ internal fun heic(
             }
             return idBytes + methodBytes + int16(0) + int16(extents) + body
         }
-        val rows = mutableListOf(row(2, 0, mdatPayloadAt, TILE_BYTES), row(3, 0, mdatPayloadAt + TILE_BYTES, TILE_BYTES))
+        val rows = mutableListOf(
+            row(2, quirks.tileMethod, mdatPayloadAt, TILE_BYTES),
+            row(3, 0, mdatPayloadAt + TILE_BYTES, TILE_BYTES),
+        )
         if (exif) {
             val length = quirks.exifExtentLength ?: exifBytes.size
             val extents = if (quirks.noExtents) 0 else if (quirks.twoExtents) 2 else 1

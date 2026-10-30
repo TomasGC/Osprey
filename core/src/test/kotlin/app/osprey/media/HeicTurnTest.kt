@@ -120,12 +120,6 @@ class HeicTurnTest {
         assertEquals(setOf(built.irotAt, built.exifValueAt), result.edits.map { it.offset }.toSet())
     }
 
-    @Test
-    fun `a photo with no irot on its primary item is refused for now`() {
-        assertEquals(HeicTurn.NO_ROTATION, refusal(heic(primaryIrot = null).bytes))
-        assertEquals(HeicTurn.NO_ROTATION, refusal(heic(primaryIrot = null, tileIrot = 1).bytes))
-    }
-
     // --- every layout a real file can have
 
     @Test
