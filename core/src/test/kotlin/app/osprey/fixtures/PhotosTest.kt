@@ -35,6 +35,12 @@ class PhotosTest {
     }
 
     @Test
+    fun `the variables are the generic names the pipelines set`() {
+        assertEquals("FIXTURES_DIR", Photos.FOLDER_VARIABLE)
+        assertEquals("REQUIRE_FIXTURES", Photos.REQUIRE_VARIABLE)
+    }
+
+    @Test
     fun `the folder named by the variable wins`() {
         val named = Files.createDirectories(tmp.resolve("elsewhere"))
         val env = mapOf(Photos.FOLDER_VARIABLE to named.toString())

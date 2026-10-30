@@ -14,13 +14,13 @@ private const val REQUIRED = "1"
 
 /**
  * Where the private real-photo fixtures are (#76). Osprey is public, so real photos live in `Osprey-fixtures`: found
- * through `OSPREY_FIXTURES_DIR`, else as the sibling of the repository root. A test that needs them calls [need]:
- * without the folder it is skipped, unless `REQUIRE_REAL_PHOTOS` is 1 (CI on the repository's own branches), where a
+ * through `FIXTURES_DIR`, else as the sibling of the repository root. A test that needs them calls [need]:
+ * without the folder it is skipped, unless `REQUIRE_FIXTURES` is 1 (CI on the repository's own branches), where a
  * missing folder must fail instead of silently turning the tests off.
  */
 object Photos {
-    const val FOLDER_VARIABLE = "OSPREY_FIXTURES_DIR"
-    const val REQUIRE_VARIABLE = "REQUIRE_REAL_PHOTOS"
+    const val FOLDER_VARIABLE = "FIXTURES_DIR"
+    const val REQUIRE_VARIABLE = "REQUIRE_FIXTURES"
 
     /** The fixtures folder, or null. A variable that names a missing folder means none: it never falls back. */
     fun locate(env: (String) -> String? = System::getenv, from: Path = Path.of("").toAbsolutePath()): Path? {

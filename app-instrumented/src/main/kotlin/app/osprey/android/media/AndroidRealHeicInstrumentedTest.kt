@@ -11,12 +11,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val FIXTURES = "/data/local/tmp/osprey-fixtures/heic"
-private const val REQUIRE_ARGUMENT = "requireRealPhotos"
+private const val REQUIRE_ARGUMENT = "requireFixtures"
 private const val REQUIRED = "1"
 private const val WITH_ROTATION_PROPERTY = "gull_1.heic" // stored landscape, irot 3: upright it is a portrait
 private const val WITHOUT_ROTATION_PROPERTY = "sun_1.heic" // a landscape with no irot
@@ -26,35 +25,21 @@ private const val FRAME_SIDE = 256
  * [AndroidOrientationSource] and the app's reader against real HEIC photos on a real device (#76), the one thing a
  * generated file cannot give: a HEVC picture with a real `irot` property. The photos are pushed by hand (or by CI) with
  * `adb push Osprey-fixtures/heic/. /data/local/tmp/osprey-fixtures/heic/`, so nothing private is in the APK; without
- * them the tests are skipped, or fail when the run is given `-e requireRealPhotos 1`.
+ * them the tests are skipped, or fail when the run is given `-e requireFixtures 1`.
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidRealHeicInstrumentedTest {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private var testRoot: DocumentFile? = null
-
-    @Before
-    fun setUp() {
-        val granted = context.contentResolver.persistedUriPermissions
-            .firstOrNull { it.isReadPermission && it.isWritePermission }
-        assumeTrue(
-            "No persisted SAF grant on this device -- open the app once, Pick folder, Allow, then re-run.",
-            granted != null,
-        )
-        val root = DocumentFile.fromTreeUri(context, granted!!.uri)
-        assumeTrue("Granted tree Uri no longer resolves to a real folder.", root != null && root.isDirectory)
-        testRoot = root!!.createDirectory("osprey_real_heic_instrumented_test_${System.currentTimeMillis()}")
-            ?: error("could not create a throwaway test folder under the granted tree")
-    }
+    private val files = mutableListOf<File>()
 
     @After
     fun tearDown() {
-        testRoot?.delete()
+        files.forEach { it.delete() }
     }
 
-    /** The photo [name] copied into the granted tree, or the test is skipped (failed when the photos are required). */
+    /** The photo [name] copied into the app's cache folder, or the test is skipped (failed when they are required). */
     private fun photo(name: String): AndroidFileHandle {
         val source = File(FIXTURES, name)
         if (!source.isFile) {
@@ -62,10 +47,9 @@ class AndroidRealHeicInstrumentedTest {
             if (InstrumentationRegistry.getArguments().getString(REQUIRE_ARGUMENT) == REQUIRED) fail(reason)
             assumeTrue(reason, false)
         }
-        val doc = testRoot!!.createFile("image/heic", name) ?: error("could not create $name")
-        context.contentResolver.openOutputStream(doc.uri)?.use { out -> source.inputStream().use { it.copyTo(out) } }
-            ?: error("could not open $name for write")
-        return AndroidFileHandle(doc)
+        source.copyTo(File(context.cacheDir, name).also { files += it }, overwrite = true)
+        // Found through its folder, like every photo the app lists, so the handle knows its parent.
+        return AndroidFileHandle(DocumentFile.fromFile(context.cacheDir).findFile(name) ?: error("no $name"))
     }
 
     @Test
