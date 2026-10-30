@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   kotlin-pipeline:
-    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@main
+    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@feature/25-private-fixtures
     secrets: inherit
     with:
       app-name: osprey
