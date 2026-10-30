@@ -19,7 +19,7 @@ private fun ByteBuffer.putEntry(entry: Entry) {
     if (entry.type == TYPE_SHORT) putShort(entry.value.toShort()).putShort(0) else putInt(entry.value)
 }
 
-private fun tiff(bigEndian: Boolean, orientation: Int?, type: Int, count: Int, thumbnail: Int?): ByteArray {
+internal fun tiff(bigEndian: Boolean, orientation: Int?, type: Int, count: Int, thumbnail: Int?): ByteArray {
     val ifd0 = buildList {
         add(Entry(0x0100, TYPE_LONG, 1, 4000))
         add(Entry(0x010F, TYPE_ASCII, 4, 0x41626300))

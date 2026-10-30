@@ -20,12 +20,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import app.osprey.desktop.testing.toJpeg
+import app.osprey.desktop.testing.toPng
 import app.osprey.desktop.ui.OspreyApp
 import app.osprey.media.ExifOrientation
 import app.osprey.media.JpegOrientation
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import javax.imageio.ImageIO
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
@@ -44,6 +46,7 @@ private const val HALF_OF_STORED_HIGH = 150
 private const val ROTATE_90 = 6
 private const val ROTATE_270 = 8
 private const val PLAIN = "plain.jpg"
+private const val PLAIN_PNG = "plain.png"
 private const val TAG_6 = "tag6.jpg"
 private const val TAG_8 = "tag8.jpg"
 
@@ -63,6 +66,7 @@ class ViewerEndToEndTest {
         root = Files.createTempDirectory("osprey-e2e")
         val dedupe = Files.createDirectories(root.resolve("Library").resolve("Trash").resolve("2026").resolve("Dedupe"))
         Files.write(dedupe.resolve(PLAIN), uprightRedLeft().toJpeg())
+        Files.write(dedupe.resolve(PLAIN_PNG), uprightRedLeft().toPng())
         Files.write(dedupe.resolve(TAG_6), storedSideways(redOnTop = false).toJpeg(ROTATE_90))
         Files.write(dedupe.resolve(TAG_8), storedSideways(redOnTop = true).toJpeg(ROTATE_270))
         val config = JSONObject()
@@ -96,7 +100,7 @@ class ViewerEndToEndTest {
         setContent { OspreyApp(state) }
         onNodeWithText("🗑").performClick()
         waitUntil(timeoutMillis = WAIT_MS) {
-            listOf(PLAIN, TAG_6, TAG_8).all { onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty() }
+            listOf(PLAIN, PLAIN_PNG, TAG_6, TAG_8).all { onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty() }
         }
     }
 
@@ -180,6 +184,30 @@ class ViewerEndToEndTest {
         waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(TAG_6).fetchSemanticsNodes().size == 1 }
 
         val pixels = card(TAG_6)
+        assertTrue("after the save, the red left side is on top", pixels.at(0.5, 0.25).isRed())
+        assertTrue("after the save, the blue right side is at the bottom", pixels.at(0.5, 0.75).isBlue())
+    }
+
+    private fun dimensionsOf(name: String): Pair<Int, Int>? =
+        runCatching { ImageIO.read(dedupeFolder().resolve(name).toFile()) }.getOrNull()?.let { it.width to it.height }
+
+    @Test
+    fun `saving a turn into a png writes it and the card looks the same afterwards`() = runComposeUiTest {
+        openTrash()
+
+        onNodeWithContentDescription(PLAIN_PNG).performClick()
+        waitForText("100%")
+        onNodeWithContentDescription("Rotate right").performClick()
+        saveButton().performClick()
+
+        waitUntil(timeoutMillis = WAIT_MS) { dimensionsOf(PLAIN_PNG) == HIGH to WIDE }
+        waitUntil(timeoutMillis = WAIT_MS) {
+            onAllNodes(hasContentDescription("Save turn") and isNotEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Close").performClick()
+        waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(PLAIN_PNG).fetchSemanticsNodes().size == 1 }
+
+        val pixels = card(PLAIN_PNG)
         assertTrue("after the save, the red left side is on top", pixels.at(0.5, 0.25).isRed())
         assertTrue("after the save, the blue right side is at the bottom", pixels.at(0.5, 0.75).isBlue())
     }

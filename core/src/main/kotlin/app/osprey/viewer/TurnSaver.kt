@@ -12,13 +12,21 @@ private const val KIBIBYTE = 1024
 /**
  * Saves a quarter turn into a JPEG by changing its EXIF orientation value in place (#61): one byte of the file, found
  * in the first [HEADER_LIMIT] bytes, so nothing else is rewritten and no pixel, metadata field or trailer can be lost.
+ * A PNG is turned in its pixels and the file replaced as a whole ([PngTurnSaver], #70).
  */
-class TurnSaver(private val files: FileSystemRepository) {
+class TurnSaver(
+    private val files: FileSystemRepository,
+    freeMemory: () -> Long = ::freeHeapBytes,
+) {
+
+    private val png = PngTurnSaver(files, freeMemory)
 
     fun save(entry: FileHandle, name: String, quarterTurns: Int): TurnSaveResult {
-        if (!isJpeg(name)) return TurnSaveResult.Refused(NOT_A_JPEG)
+        if (!canSave(name)) return TurnSaveResult.Refused(UNSUPPORTED_FORMAT)
         var result: TurnSaveResult = TurnSaveResult.Saved
-        val failure = failureReason { result = turn(entry, quarterTurns) }
+        val failure = failureReason {
+            result = if (isPng(name)) png.save(entry, quarterTurns) else turn(entry, quarterTurns)
+        }
         return failure?.let { TurnSaveResult.Failed(it) } ?: result
     }
 
@@ -48,13 +56,18 @@ class TurnSaver(private val files: FileSystemRepository) {
     }
 
     companion object {
-        /** Only a JPEG can be saved turned for now: PNG and HEIC keep their orientation elsewhere. */
         fun isJpeg(name: String): Boolean = splitStemAndSuffix(name).second.lowercase() in JPEG_EXTENSIONS
 
+        fun isPng(name: String): Boolean = splitStemAndSuffix(name).second.lowercase() == PNG_EXTENSION
+
+        /** A JPEG and a PNG can be saved turned; a HEIC keeps its rotation in the container, for its own issue. */
+        fun canSave(name: String): Boolean = isJpeg(name) || isPng(name)
+
         const val HEADER_LIMIT = 256 * KIBIBYTE
-        const val NOT_A_JPEG = "Only JPEG photos can be saved turned for now"
+        const val UNSUPPORTED_FORMAT = "Only JPEG and PNG photos can be saved turned for now"
         const val NO_ORIENTATION_TAG = "This JPEG has no orientation tag to change"
         private const val DID_NOT_TAKE = "The photo did not take the change"
         private val JPEG_EXTENSIONS = setOf(".jpg", ".jpeg")
+        private const val PNG_EXTENSION = ".png"
     }
 }

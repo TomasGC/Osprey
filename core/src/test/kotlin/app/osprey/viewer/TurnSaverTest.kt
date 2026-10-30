@@ -7,7 +7,19 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTimestamps
 import app.osprey.media.ExifOrientation
 import app.osprey.media.JpegOrientation
+import app.osprey.media.PngTurn
+import app.osprey.media.RGB
+import app.osprey.media.Samples
+import app.osprey.media.TiffOrientation
+import app.osprey.media.chunk
+import app.osprey.media.chunksOf
+import app.osprey.media.decode
+import app.osprey.media.exifChunk
+import app.osprey.media.ihdrData
 import app.osprey.media.jpegWith
+import app.osprey.media.pngOf
+import app.osprey.media.randomSamples
+import app.osprey.media.rawPng
 import app.osprey.media.segment
 import java.io.IOException
 import java.time.Instant
@@ -20,6 +32,7 @@ import org.junit.Test
 /** Counts what the saver reads and writes, and can make the next write land the wrong byte. */
 private class Recording(private val inner: FileSystemRepository) : FileSystemRepository by inner {
     var writes = 0
+    var replaces = 0
     var bytesWritten = 0
     var largestRead = 0
     var corruptNextWrite = false
@@ -35,6 +48,11 @@ private class Recording(private val inner: FileSystemRepository) : FileSystemRep
         val landed = if (corruptNextWrite) ByteArray(bytes.size) { WRONG_BYTE } else bytes
         corruptNextWrite = false
         inner.overwriteAt(entry, offset, landed)
+    }
+
+    override fun replaceContent(entry: FileHandle, bytes: ByteArray) {
+        replaces++
+        inner.replaceContent(entry, bytes)
     }
 
     private companion object {
@@ -108,10 +126,10 @@ class TurnSaverTest {
 
     @Test
     fun `other formats are refused and left alone`() {
-        for (name in listOf("a.png", "a.heic", "a")) {
+        for (name in listOf("a.heic", "a", "a.gif")) {
             val original = jpegWith(orientation = 1)
             val entry = photo(original, name)
-            assertEquals(TurnSaveResult.Refused(TurnSaver.NOT_A_JPEG), saver.save(entry, name, 1))
+            assertEquals(TurnSaveResult.Refused(TurnSaver.UNSUPPORTED_FORMAT), saver.save(entry, name, 1))
             assertArrayEquals(original, files.readBytes(entry))
         }
         assertEquals(0, recording.writes)
@@ -187,5 +205,149 @@ class TurnSaverTest {
         val entry = photo()
         files.delete(entry)
         assertTrue(saver.save(entry, "a.jpg", 1) is TurnSaveResult.Failed)
+    }
+
+    private val samples = randomSamples(7, 5, 8, RGB)
+
+    private fun pngPhoto(
+        image: Samples = samples,
+        before: List<ByteArray> = emptyList(),
+        name: String = "a.png",
+        interlace: Int = 0,
+    ): FileHandle = files.addFile(files.root, name, pngOf(image, before = before, interlace = interlace))
+        .also { files.writeTimestamps(it, FileTimestamps(created, modified)) }
+
+    @Test
+    fun `isPng accepts png in any case and nothing else`() {
+        for (name in listOf("a.png", "A.PNG", "b.Png")) assertTrue(name, TurnSaver.isPng(name))
+        for (name in listOf("a.jpg", "a.heic", "a", "png", "a.png.txt")) assertFalse(name, TurnSaver.isPng(name))
+    }
+
+    @Test
+    fun `a png is saved turned and keeps every pixel`() {
+        val entry = pngPhoto()
+
+        assertEquals(TurnSaveResult.Saved, saver.save(entry, "a.png", 1))
+
+        assertTrue(decode(files.readBytes(entry)).sameAs(samples.oriented(ExifOrientation.ROTATE_90)))
+    }
+
+    @Test
+    fun `png in any case is accepted`() {
+        for (name in listOf("a.PNG", "b.Png")) {
+            assertEquals(TurnSaveResult.Saved, saver.save(pngPhoto(name = name), name, 1))
+        }
+    }
+
+    @Test
+    fun `a stored orientation in a png is baked into the pixels and reset to upright`() {
+        val entry = pngPhoto(before = listOf(exifChunk(6)))
+
+        saver.save(entry, "a.png", 1)
+
+        val result = files.readBytes(entry)
+        assertTrue(decode(result).sameAs(samples.oriented(ExifOrientation.ROTATE_180)))
+        val exif = chunksOf(result).first { it.type == "eXIf" }.data
+        assertEquals(ExifOrientation.NORMAL, TiffOrientation.read(exif, TiffOrientation.locate(exif)!!))
+    }
+
+    @Test
+    fun `whole turns of a png write nothing`() {
+        val entry = pngPhoto()
+        val original = files.readBytes(entry)
+
+        assertEquals(TurnSaveResult.Saved, saver.save(entry, "a.png", 4))
+        assertEquals(TurnSaveResult.Saved, saver.save(entry, "a.png", -4))
+
+        assertEquals(0, recording.replaces)
+        assertArrayEquals(original, files.readBytes(entry))
+    }
+
+    @Test
+    fun `a png that cannot be turned is refused with its reason and left alone`() {
+        val entry = pngPhoto(interlace = 1)
+        val original = files.readBytes(entry)
+
+        assertEquals(TurnSaveResult.Refused(PngTurn.INTERLACED), saver.save(entry, "a.png", 1))
+
+        assertEquals(0, recording.replaces)
+        assertArrayEquals(original, files.readBytes(entry))
+    }
+
+    @Test
+    fun `a png that cannot be replaced is a failure and the file stays as it was`() {
+        val entry = pngPhoto()
+        val original = files.readBytes(entry)
+        faulty.failReplace = { IOException("disk full") }
+
+        assertEquals(TurnSaveResult.Failed("disk full"), saver.save(entry, "a.png", 1))
+
+        assertArrayEquals(original, files.readBytes(entry))
+    }
+
+    @Test
+    fun `the modified and created times of a png are kept`() {
+        val entry = pngPhoto()
+
+        saver.save(entry, "a.png", 1)
+
+        assertEquals(FileTimestamps(created, modified), files.readTimestamps(entry))
+    }
+
+    @Test
+    fun `a png time that cannot be restored does not undo the save`() {
+        val entry = pngPhoto()
+        faulty.failWriteTimestamps = { IOException("no") }
+
+        assertEquals(TurnSaveResult.Saved, saver.save(entry, "a.png", 1))
+        assertTrue(decode(files.readBytes(entry)).sameAs(samples.oriented(ExifOrientation.ROTATE_90)))
+    }
+
+    @Test
+    fun `a png save replaces the file once and writes nothing else`() {
+        saver.save(pngPhoto(), "a.png", 1)
+
+        assertEquals(1, recording.replaces)
+        assertEquals(0, recording.writes)
+    }
+
+    private val rawOfSample = 5 * (7 * 3 + 1)
+
+    @Test
+    fun `a png whose copies do not fit the memory is refused before any pixel is read`() {
+        val entry = pngPhoto()
+        val tight = TurnSaver(recording) { 3L * rawOfSample - 1 }
+
+        assertEquals(TurnSaveResult.Refused(PngTurn.TOO_BIG), tight.save(entry, "a.png", 1))
+
+        assertEquals(0, recording.replaces)
+    }
+
+    @Test
+    fun `a png whose copies just fit the memory is saved`() {
+        val entry = pngPhoto()
+
+        assertEquals(TurnSaveResult.Saved, TurnSaver(recording) { 3L * rawOfSample }.save(entry, "a.png", 1))
+    }
+
+    @Test
+    fun `no memory at all refuses rather than fails`() {
+        val result = TurnSaver(recording) { -5L }.save(pngPhoto(), "a.png", 1)
+
+        assertEquals(TurnSaveResult.Refused(PngTurn.TOO_BIG), result)
+    }
+
+    @Test
+    fun `a picture over the fixed ceiling is refused however much memory is free`() {
+        val huge = rawPng(
+            chunk("IHDR", ihdrData(10_000, 10_000, 8, RGB)),
+            chunk("IDAT", byteArrayOf(1, 2)),
+            chunk("IEND"),
+        )
+        val entry = files.addFile(files.root, "huge.png", huge)
+
+        val result = TurnSaver(recording) { 4L shl 30 }.save(entry, "huge.png", 1)
+
+        assertEquals(TurnSaveResult.Refused(PngTurn.TOO_BIG), result)
     }
 }

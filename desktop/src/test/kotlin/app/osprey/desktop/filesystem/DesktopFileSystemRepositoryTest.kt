@@ -15,6 +15,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -244,5 +246,66 @@ class DesktopFileSystemRepositoryTest {
         val expected = java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file))
             .joinToString("") { "%02x".format(it) }
         assertEquals(expected, repo.contentHash(PathHandle(file)))
+    }
+
+    @Test
+    fun `replaceContent grows shrinks and empties a file and its handle keeps working`() {
+        val path = tempDir.resolve("a.png")
+        Files.write(path, byteArrayOf(1, 2, 3))
+        val entry = PathHandle(path)
+
+        repo.replaceContent(entry, ByteArray(100_000) { it.toByte() })
+        assertArrayEquals(ByteArray(100_000) { it.toByte() }, Files.readAllBytes(path))
+        repo.replaceContent(entry, byteArrayOf(9))
+        assertArrayEquals(byteArrayOf(9), Files.readAllBytes(path))
+        repo.replaceContent(entry, byteArrayOf())
+        assertEquals(0L, Files.size(path))
+        assertEquals(0L, repo.list(root()).single().sizeBytes)
+    }
+
+    @Test
+    fun `replaceContent leaves nothing beside the file`() {
+        val path = tempDir.resolve("a.png")
+        Files.write(path, byteArrayOf(1, 2, 3))
+
+        repo.replaceContent(PathHandle(path), byteArrayOf(4, 5))
+
+        assertEquals(listOf("a.png"), repo.list(root()).map { it.name })
+    }
+
+    @Test
+    fun `replaceContent keeps the creation time`() {
+        val path = tempDir.resolve("a.png")
+        Files.write(path, byteArrayOf(1, 2, 3))
+        val created = Instant.parse("2019-01-02T03:04:05Z")
+        repo.writeTimestamps(PathHandle(path), FileTimestamps(created = created))
+        assumeTrue(
+            "this file system keeps no creation time",
+            repo.readTimestamps(PathHandle(path)).created == created,
+        )
+
+        repo.replaceContent(PathHandle(path), byteArrayOf(4, 5))
+
+        assertEquals(created, repo.readTimestamps(PathHandle(path)).created)
+    }
+
+    @Test
+    fun `replaceContent on a read-only file fails and leaves the file and the folder as they were`() {
+        val path = tempDir.resolve("a.png")
+        Files.write(path, byteArrayOf(1, 2, 3))
+        path.toFile().setWritable(false)
+        assumeFalse("this account can write to read-only files", Files.isWritable(path))
+
+        assertThrows(IOException::class.java) { repo.replaceContent(PathHandle(path), byteArrayOf(4, 5)) }
+
+        assertArrayEquals(byteArrayOf(1, 2, 3), Files.readAllBytes(path))
+        assertEquals(listOf("a.png"), repo.list(root()).map { it.name })
+    }
+
+    @Test
+    fun `replaceContent of a file that is missing throws and creates nothing`() {
+        assertThrows(IOException::class.java) { repo.replaceContent(PathHandle(tempDir.resolve("gone.png")), byteArrayOf(1)) }
+
+        assertTrue(repo.list(root()).isEmpty())
     }
 }

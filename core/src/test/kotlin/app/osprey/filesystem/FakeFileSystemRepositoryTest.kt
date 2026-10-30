@@ -1,6 +1,8 @@
 package app.osprey.filesystem
 
+import java.io.IOException
 import java.time.Instant
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -193,5 +195,41 @@ class FakeFileSystemRepositoryTest {
         val file = repo.addFile(repo.root, "a.jpg", "abc".toByteArray())
 
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", repo.contentHash(file))
+    }
+
+    @Test
+    fun `replaceContent swaps the bytes whatever the size and keeps the handle and the name`() {
+        val repo = FakeFileSystemRepository()
+        val file = repo.addFile(repo.root, "a.png", byteArrayOf(1, 2, 3))
+
+        repo.replaceContent(file, ByteArray(10) { 7 })
+        assertArrayEquals(ByteArray(10) { 7 }, repo.readBytes(file))
+        repo.replaceContent(file, byteArrayOf())
+        assertArrayEquals(byteArrayOf(), repo.readBytes(file))
+
+        val entry = repo.list(repo.root).single()
+        assertEquals("a.png", entry.name)
+        assertEquals(0L, entry.sizeBytes)
+    }
+
+    @Test
+    fun `replaceContent touches the modified time like a real write`() {
+        val repo = FakeFileSystemRepository()
+        val file = repo.addFile(repo.root, "a.png", byteArrayOf(1))
+        val old = Instant.parse("2020-01-02T03:04:05Z")
+        repo.writeTimestamps(file, FileTimestamps(modified = old))
+
+        repo.replaceContent(file, byteArrayOf(2))
+
+        assertTrue(repo.readTimestamps(file).modified!! > old)
+    }
+
+    @Test
+    fun `replaceContent of a file that is gone throws`() {
+        val repo = FakeFileSystemRepository()
+        val file = repo.addFile(repo.root, "a.png", byteArrayOf(1))
+        repo.delete(file)
+
+        assertThrows(IOException::class.java) { repo.replaceContent(file, byteArrayOf(2)) }
     }
 }

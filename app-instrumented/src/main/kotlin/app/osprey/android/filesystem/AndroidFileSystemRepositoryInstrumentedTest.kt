@@ -115,6 +115,38 @@ class AndroidFileSystemRepositoryInstrumentedTest {
     }
 
     @Test
+    fun replaceContentGrowsAndShrinksAFileAndKeepsItsHandle() {
+        val handle = binary("replace.bin", 1, 2, 3)
+        val bigger = ByteArray(200_000) { it.toByte() }
+
+        fs.replaceContent(handle, bigger)
+        assertArrayEquals(bigger, fs.readBytes(handle))
+        fs.replaceContent(handle, byteArrayOf(9))
+        assertArrayEquals(byteArrayOf(9), fs.readBytes(handle))
+
+        assertEquals(1L, fs.list(AndroidFileHandle(testRoot!!)).single { it.name == "replace.bin" }.sizeBytes)
+    }
+
+    @Test
+    fun replaceContentLeavesNoBackupBehind() {
+        val handle = binary("clean.bin", 1, 2, 3)
+
+        fs.replaceContent(handle, byteArrayOf(4, 5))
+
+        assertEquals(listOf("clean.bin"), fs.list(AndroidFileHandle(testRoot!!)).map { it.name })
+    }
+
+    @Test
+    fun replaceContentOfADeletedFileThrowsAndCreatesNothing() {
+        val handle = binary("gone.bin", 1, 2, 3)
+        fs.delete(handle)
+
+        assertThrows(Exception::class.java) { fs.replaceContent(handle, byteArrayOf(4)) }
+
+        assertEquals(emptyList<String>(), fs.list(AndroidFileHandle(testRoot!!)).map { it.name })
+    }
+
+    @Test
     fun aSavedTurnIsReadBackAndChangesOneByteInPlace() {
         val handle = AndroidFileHandle(jpegWithOrientation("turn.jpg", ExifInterface.ORIENTATION_NORMAL))
         val before = fs.readBytes(handle)

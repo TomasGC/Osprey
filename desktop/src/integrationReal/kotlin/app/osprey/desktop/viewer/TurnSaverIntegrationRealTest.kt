@@ -112,14 +112,82 @@ class TurnSaverIntegrationRealTest {
         assertArrayEquals(before, Files.readAllBytes(path))
     }
 
-    @Test
-    fun `a png is refused and untouched`() {
-        val path = Files.write(tempDir.resolve("a.png"), image().toPng(SIDEWAYS))
-        val before = Files.readAllBytes(path)
+    private fun png(name: String, orientation: Int? = null): Path =
+        Files.write(tempDir.resolve(name), image().toPng(orientation)).also {
+            Files.setLastModifiedTime(it, FileTime.from(oldTime))
+        }
 
-        assertTrue(save(path, 1) is TurnSaveResult.Refused)
+    private fun namesInFolder(): List<String> =
+        Files.list(tempDir).use { stream -> stream.map { it.fileName.toString() }.toList() }
+
+    @Test
+    fun `a saved png turn shows upright in the reader the app uses`() {
+        val path = png("a.png")
+
+        assertEquals(TurnSaveResult.Saved, save(path, 1))
+
+        val frame = reader.decodeFrame(PathHandle(path))!!
+        assertEquals(HIGH, frame.width)
+        assertEquals(WIDE, frame.height)
+        assertTrue(isRed(frame.pixels[frame.width - 1]))
+    }
+
+    @Test
+    fun `a stored png orientation is baked into the pixels and reset`() {
+        val path = png("a.png", SIDEWAYS)
+        val before = reader.decodeFrame(PathHandle(path))!!
+
+        save(path, 1)
+
+        val after = reader.decodeFrame(PathHandle(path))!!
+        assertEquals(before.height, after.width)
+        assertEquals(before.width, after.height)
+        for (y in 0 until after.height) {
+            for (x in 0 until after.width) {
+                assertEquals(before.pixels[(before.height - 1 - x) * before.width + y], after.pixels[y * after.width + x])
+            }
+        }
+        assertEquals(ExifOrientation.NORMAL, DesktopOrientationSource().orientationOf(PathHandle(path)))
+    }
+
+    @Test
+    fun `a png keeps its modified time and leaves nothing beside it`() {
+        val path = png("a.png")
+
+        save(path, 1)
+
+        assertEquals(oldTime, Files.getLastModifiedTime(path).toInstant())
+        assertEquals(listOf("a.png"), namesInFolder())
+    }
+
+    @Test
+    fun `four saved png turns give the original pixels back`() {
+        val path = png("a.png")
+        val before = reader.decodeFrame(PathHandle(path))!!
+
+        repeat(4) { save(path, 1) }
+
+        val after = reader.decodeFrame(PathHandle(path))!!
+        assertEquals(before.width, after.width)
+        assertArrayEquals(before.pixels, after.pixels)
+    }
+
+    @Test
+    fun `a read-only png fails and is untouched`() {
+        val path = png("a.png")
+        val before = Files.readAllBytes(path)
+        path.toFile().setWritable(false)
+        assumeFalse("this account can write to read-only files", Files.isWritable(path))
+
+        assertTrue(save(path, 1) is TurnSaveResult.Failed)
 
         assertArrayEquals(before, Files.readAllBytes(path))
+        assertEquals(listOf("a.png"), namesInFolder())
+    }
+
+    @Test
+    fun `a png that is gone is a failure`() {
+        assertTrue(save(tempDir.resolve("gone.png"), 1) is TurnSaveResult.Failed)
     }
 
     @Test
