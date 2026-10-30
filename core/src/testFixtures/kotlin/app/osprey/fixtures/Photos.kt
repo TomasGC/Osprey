@@ -8,6 +8,8 @@ import org.junit.AssumptionViolatedException
 private const val SIBLING = "Osprey-fixtures"
 private const val REPOSITORY_MARKER = "settings.gradle.kts"
 private const val HEIC_FOLDER = "heic"
+private const val JPEG_FOLDER = "jpg"
+private const val PNG_FOLDER = "png"
 private const val REQUIRED = "1"
 
 /**
@@ -37,12 +39,20 @@ object Photos {
         throw AssumptionViolatedException(reason)
     }
 
+    /** The JPEG photos of [folder], in name order. */
+    fun jpeg(folder: Path): List<Path> = listing(folder, JPEG_FOLDER, setOf(".jpg", ".jpeg"))
+
+    /** The PNG photos of [folder], in name order. */
+    fun png(folder: Path): List<Path> = listing(folder, PNG_FOLDER, setOf(".png"))
+
     /** The HEIC photos of [folder], in name order. */
-    fun heic(folder: Path): List<Path> {
-        val directory = folder.resolve(HEIC_FOLDER)
+    fun heic(folder: Path): List<Path> = listing(folder, HEIC_FOLDER, heicExtensions)
+
+    private fun listing(folder: Path, name: String, extensions: Set<String>): List<Path> {
+        val directory = folder.resolve(name)
         if (!Files.isDirectory(directory)) return emptyList()
         return Files.list(directory).use { entries ->
-            entries.filter { entry -> heicExtensions.any { entry.fileName.toString().lowercase().endsWith(it) } }
+            entries.filter { entry -> extensions.any { entry.fileName.toString().lowercase().endsWith(it) } }
                 .sorted().toList()
         }
     }

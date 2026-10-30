@@ -105,6 +105,26 @@ class PhotosTest {
     }
 
     @Test
+    fun `jpeg and png list the files of their own folders, in name order`() {
+        val folder = Files.createDirectories(tmp.resolve("Osprey-fixtures"))
+        val jpg = Files.createDirectories(folder.resolve("jpg"))
+        val png = Files.createDirectories(folder.resolve("png"))
+        listOf("b_1.jpg", "a_1.jpeg", "c_1.JPG", "note.txt", "d_1.png").forEach { Files.writeString(jpg.resolve(it), "x") }
+        listOf("b_1.png", "a_1.PNG", "z_1.jpg").forEach { Files.writeString(png.resolve(it), "x") }
+
+        assertEquals(listOf("a_1.jpeg", "b_1.jpg", "c_1.JPG"), Photos.jpeg(folder).map { it.fileName.toString() })
+        assertEquals(listOf("a_1.PNG", "b_1.png"), Photos.png(folder).map { it.fileName.toString() })
+    }
+
+    @Test
+    fun `a folder with no jpg or png folder has no such photos`() {
+        val folder = Files.createDirectories(tmp.resolve("Osprey-fixtures"))
+
+        assertEquals(emptyList<Path>(), Photos.jpeg(folder))
+        assertEquals(emptyList<Path>(), Photos.png(folder))
+    }
+
+    @Test
     fun `a folder with no heic folder has no heic photos`() {
         assertEquals(emptyList<Path>(), Photos.heic(Files.createDirectories(tmp.resolve("Osprey-fixtures"))))
     }

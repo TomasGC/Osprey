@@ -1,5 +1,7 @@
 package app.osprey.media
 
+import app.osprey.actions.heicExtensions
+
 private val TOP_LEVEL = listOf("ftyp", "mdat", "meta")
 private const val ENTRY_SIZE = 12
 private const val NEXT_IFD_SIZE = 4
@@ -27,6 +29,16 @@ internal object FixtureScrub {
     fun problems(name: String, file: ByteArray): List<String> {
         val found = mutableListOf<String>()
         if (CAMERA_NAME.containsMatchIn(name)) found += "the name looks like a camera file name or a capture date"
+        val extension = name.substringAfterLast('.').lowercase()
+        return found + when (extension) {
+            "jpg", "jpeg" -> JpegScrub.problems(file)
+            "png" -> PngScrub.problems(file)
+            else -> if (".$extension" in heicExtensions) heicProblems(file) else listOf("unknown fixture format: .$extension")
+        }
+    }
+
+    private fun heicProblems(file: ByteArray): List<String> {
+        val found = mutableListOf<String>()
         val layout = try {
             HeicLayout.of(file)
         } catch (refusal: HeicRefusal) {
