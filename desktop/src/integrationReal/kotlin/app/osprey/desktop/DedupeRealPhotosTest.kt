@@ -39,7 +39,7 @@ class DedupeRealPhotosTest {
 
     @After
     fun tearDown() {
-        libraryDir.toFile().deleteRecursively()
+        if (::libraryDir.isInitialized) libraryDir.toFile().deleteRecursively()
     }
 
     private fun copyName(original: Path) = original.fileName.toString().replace(".heic", "$COPY_SUFFIX.heic")

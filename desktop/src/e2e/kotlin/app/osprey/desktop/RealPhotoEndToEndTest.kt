@@ -60,7 +60,7 @@ class RealPhotoEndToEndTest {
     @After
     fun tearDown() {
         System.clearProperty("osprey.config.path")
-        root.toFile().deleteRecursively()
+        if (::root.isInitialized) root.toFile().deleteRecursively()
     }
 
     private fun file(name: String) = root.resolve("Library").resolve("Trash").resolve("2026").resolve("Dedupe").resolve(name)

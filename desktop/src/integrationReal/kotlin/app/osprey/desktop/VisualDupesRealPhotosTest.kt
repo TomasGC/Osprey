@@ -31,7 +31,7 @@ class VisualDupesRealPhotosTest {
 
     @After
     fun tearDown() {
-        folder.toFile().deleteRecursively()
+        if (::folder.isInitialized) folder.toFile().deleteRecursively()
     }
 
     private fun place(photo: Path) = Files.copy(photo, folder.resolve(photo.fileName.toString()))
