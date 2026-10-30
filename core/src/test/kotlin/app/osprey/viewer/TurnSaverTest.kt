@@ -126,7 +126,7 @@ class TurnSaverTest {
 
     @Test
     fun `other formats are refused and left alone`() {
-        for (name in listOf("a.heic", "a", "a.gif")) {
+        for (name in listOf("a", "a.gif", "a.bmp")) {
             val original = jpegWith(orientation = 1)
             val entry = photo(original, name)
             assertEquals(TurnSaveResult.Refused(TurnSaver.UNSUPPORTED_FORMAT), saver.save(entry, name, 1))

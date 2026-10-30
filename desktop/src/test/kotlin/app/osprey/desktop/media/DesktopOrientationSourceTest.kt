@@ -64,4 +64,9 @@ class DesktopOrientationSourceTest {
     fun `a video is upright, its frame comes out of ffmpeg already turned`() {
         assertEquals(ExifOrientation.NORMAL, source.orientationOf(handle("clip.mp4", image.toJpeg(6))))
     }
+
+    @Test
+    fun `a HEIF is never turned again either`() {
+        assertEquals(ExifOrientation.NORMAL, source.orientationOf(handle("photo.heif", image.toJpeg(6))))
+    }
 }

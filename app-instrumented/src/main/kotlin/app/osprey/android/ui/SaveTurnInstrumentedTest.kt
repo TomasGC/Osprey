@@ -18,9 +18,11 @@ import app.osprey.android.filesystem.AndroidFileSystemRepository
 import app.osprey.android.media.AndroidOrientationSource
 import app.osprey.filesystem.FileHandle
 import app.osprey.media.ExifOrientation
+import app.osprey.media.HeicSamples
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
 import app.osprey.media.PixelBuffer
+import app.osprey.media.HeicTurn
 import app.osprey.viewer.TurnSaver
 import app.osprey.viewer.ViewTurns
 import java.io.File
@@ -39,6 +41,8 @@ private const val SIZE = 8
 private const val RED = 0xFFFF0000.toInt()
 private const val BLUE = 0xFF0000FF.toInt()
 private const val SAVE = "Save turn"
+private const val IROT_AFTER_ONE_TURN = 2
+private const val IROT_BOX_AND_ASSOCIATION = 10
 private val ONE_PIXEL = PixelBuffer(1, 1, intArrayOf(0xFF336699.toInt()))
 
 /**
@@ -96,6 +100,15 @@ class SaveTurnInstrumentedTest {
         return AndroidFileHandle(DocumentFile.fromFile(context.cacheDir).findFile(name) ?: error("no $name"))
     }
 
+    /** One of the hand-built [HeicSamples], written to a file the app lists like any photo. */
+    private fun heic(name: String, sample: HeicSamples.Sample): AndroidFileHandle {
+        val file = File(context.cacheDir, name).also { files += it }
+        file.writeBytes(sample.bytes)
+        return AndroidFileHandle(DocumentFile.fromFile(context.cacheDir).findFile(name) ?: error("no $name"))
+    }
+
+    private fun bytesOf(name: String): ByteArray = File(context.cacheDir, name).readBytes()
+
     private fun showViewer(handle: AndroidFileHandle, name: String) {
         composeRule.setContent {
             MediaPreview(
@@ -141,13 +154,63 @@ class SaveTurnInstrumentedTest {
     }
 
     @Test
-    fun aTurnedHeicCannotBeSavedAndSaysWhy() {
-        showViewer(jpeg("really-a-jpeg-named-heic.heic", ExifInterface.ORIENTATION_NORMAL), "photo.heic")
+    fun aTurnedFormatThatCannotBeSavedSaysWhy() {
+        showViewer(jpeg("really-a-jpeg-named-gif.gif", ExifInterface.ORIENTATION_NORMAL), "photo.gif")
 
         rotateRight()
 
         waitForText(TurnSaver.UNSUPPORTED_FORMAT)
         composeRule.onNodeWithContentDescription(SAVE).assertIsNotEnabled()
+    }
+
+    @Test
+    fun aTurnedHeicIsSavedInPlaceAndReloaded() {
+        val sample = HeicSamples.rotated
+        val handle = heic("turn.heic", sample)
+        showViewer(handle, "turn.heic")
+        val decodedBefore = decodes.get()
+
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+
+        waitFor { bytesOf("turn.heic")[sample.irotAt!!].toInt() == IROT_AFTER_ONE_TURN }
+        waitFor { decodes.get() > decodedBefore }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(SAVE).assertIsNotEnabled()
+        assertEquals(sample.bytes.size, bytesOf("turn.heic").size)
+        assertEquals(0, turns.turnsOf(handle))
+        assertEquals(1, turns.revisionOf(handle))
+    }
+
+    @Test
+    fun aHeicWithNoRotationGainsOne() {
+        val handle = heic("plain.heic", HeicSamples.plain)
+        showViewer(handle, "plain.heic")
+
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+
+        waitFor { bytesOf("plain.heic").size == HeicSamples.plain.bytes.size + IROT_BOX_AND_ASSOCIATION }
+        composeRule.waitForIdle()
+        assertEquals(0, turns.turnsOf(handle))
+    }
+
+    @Test
+    fun theNoteAboutAnExifWithoutOrientationStaysUnderTheButtonUntilTheNextTurn() {
+        val handle = heic("note.heic", HeicSamples.exifWithoutOrientation)
+        showViewer(handle, "note.heic")
+
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+
+        waitForText(HeicTurn.EXIF_NOTE)
+        composeRule.waitForIdle()
+        assertEquals(0, turns.turnsOf(handle))
+        assertTrue(composeRule.onAllNodesWithText(HeicTurn.EXIF_NOTE).fetchSemanticsNodes().isNotEmpty())
+
+        rotateRight()
+
+        waitFor { composeRule.onAllNodesWithText(HeicTurn.EXIF_NOTE).fetchSemanticsNodes().isEmpty() }
     }
 
     @Test

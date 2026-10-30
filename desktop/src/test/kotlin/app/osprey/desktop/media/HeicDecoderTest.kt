@@ -70,4 +70,9 @@ class HeicDecoderTest {
     fun `bytes that are not a picture have no pixels`() {
         assertNull(decodeHeicPixelBuffer(photo) { byteArrayOf(1, 2, 3, 4) })
     }
+
+    @Test
+    fun `heic and heif photos are decoded through ffmpeg`() {
+        assertEquals(setOf(".heic", ".heif"), app.osprey.actions.heicExtensions)
+    }
 }

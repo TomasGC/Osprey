@@ -39,15 +39,15 @@ object TiffOrientation {
     fun read(data: ByteArray, located: Located): ExifOrientation =
         ExifOrientation.fromExif(data.u16(located.offset, located.bigEndian))
 
-    /** A copy of [data] holding [orientation] at [located] and differing in nothing else. */
-    fun write(data: ByteArray, located: Located, orientation: ExifOrientation): ByteArray {
+    /** The two bytes that hold [orientation] in a block of the given byte order. */
+    fun valueBytes(orientation: ExifOrientation, bigEndian: Boolean): ByteArray {
         val value = (orientation.ordinal + 1).toByte()
-        val (high, low) = if (located.bigEndian) 0.toByte() to value else value to 0.toByte()
-        return data.copyOf().also {
-            it[located.offset] = high
-            it[located.offset + 1] = low
-        }
+        return if (bigEndian) byteArrayOf(0, value) else byteArrayOf(value, 0)
     }
+
+    /** A copy of [data] holding [orientation] at [located] and differing in nothing else. */
+    fun write(data: ByteArray, located: Located, orientation: ExifOrientation): ByteArray =
+        data.copyOf().also { valueBytes(orientation, located.bigEndian).copyInto(it, located.offset) }
 
     /** The entry must be one short; the value's own bytes are read once so a file cut inside them has no value. */
     private fun orientationEntry(data: ByteArray, tiff: Int, bigEndian: Boolean): Located? {

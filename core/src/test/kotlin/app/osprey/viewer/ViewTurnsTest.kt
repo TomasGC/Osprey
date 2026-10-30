@@ -90,6 +90,18 @@ class ViewTurnsTest {
     }
 
     @Test
+    fun `a save that comes with a note counts as saved and returns the note`() {
+        val note = TurnSaveResult.SavedWithNote("look here")
+        val noting = ViewTurns(Saver(note)::save)
+        noting.turn(photo, 1)
+
+        assertEquals(note, noting.save(photo, "a.heic"))
+
+        assertEquals(0, noting.turnsOf(photo))
+        assertEquals(1, noting.revisionOf(photo))
+    }
+
+    @Test
     fun `a saved photo's revision goes up each time`() {
         saving.turn(photo, 1)
         saving.save(photo, "a.jpg")

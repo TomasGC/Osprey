@@ -5,6 +5,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
+import app.osprey.actions.heicExtensions
 import app.osprey.actions.imageExtensions
 import app.osprey.actions.splitStemAndSuffix
 import app.osprey.android.filesystem.AndroidFileHandle
@@ -12,7 +13,6 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.media.ExifOrientation
 import app.osprey.media.OrientationSource
 
-private const val HEIC_EXTENSION = ".heic"
 
 /**
  * Orientation of a photo over the Storage Access Framework. A JPEG or PNG: the EXIF Orientation tag, through
@@ -26,7 +26,7 @@ class AndroidOrientationSource(private val context: Context) : OrientationSource
         val doc = (entry as AndroidFileHandle).documentFile
         val extension = splitStemAndSuffix(doc.name.orEmpty()).second.lowercase()
         return when {
-            extension == HEIC_EXTENSION -> heicRotation(doc.uri)
+            extension in heicExtensions -> heicRotation(doc.uri)
             extension in imageExtensions -> exifOrientation(doc.uri)
             else -> ExifOrientation.NORMAL
         }
