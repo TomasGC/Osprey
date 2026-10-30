@@ -15,6 +15,7 @@ kotlin {
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
 
+    testFixturesImplementation(libs.junit)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

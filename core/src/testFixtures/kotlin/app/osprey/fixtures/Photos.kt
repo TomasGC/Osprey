@@ -1,0 +1,49 @@
+package app.osprey.fixtures
+
+import app.osprey.actions.heicExtensions
+import java.nio.file.Files
+import java.nio.file.Path
+import org.junit.AssumptionViolatedException
+
+private const val SIBLING = "Osprey-fixtures"
+private const val REPOSITORY_MARKER = "settings.gradle.kts"
+private const val HEIC_FOLDER = "heic"
+private const val REQUIRED = "1"
+
+/**
+ * Where the private real-photo fixtures are (#76). Osprey is public, so real photos live in `Osprey-fixtures`: found
+ * through `OSPREY_FIXTURES_DIR`, else as the sibling of the repository root. A test that needs them calls [need]:
+ * without the folder it is skipped, unless `REQUIRE_REAL_PHOTOS` is 1 (CI on the repository's own branches), where a
+ * missing folder must fail instead of silently turning the tests off.
+ */
+object Photos {
+    const val FOLDER_VARIABLE = "OSPREY_FIXTURES_DIR"
+    const val REQUIRE_VARIABLE = "REQUIRE_REAL_PHOTOS"
+
+    /** The fixtures folder, or null. A variable that names a missing folder means none: it never falls back. */
+    fun locate(env: (String) -> String? = System::getenv, from: Path = Path.of("").toAbsolutePath()): Path? {
+        val named = env(FOLDER_VARIABLE)
+        if (named != null) return Path.of(named).takeIf { Files.isDirectory(it) }
+        val root = generateSequence(from) { it.parent }.firstOrNull { Files.exists(it.resolve(REPOSITORY_MARKER)) }
+        return root?.resolveSibling(SIBLING)?.takeIf { Files.isDirectory(it) }
+    }
+
+    /** The fixtures folder; where it is missing the test is skipped, or fails when [REQUIRE_VARIABLE] is 1. */
+    fun need(env: (String) -> String? = System::getenv, from: Path = Path.of("").toAbsolutePath()): Path {
+        val folder = locate(env, from)
+        if (folder != null) return folder
+        val reason = "The real-photo fixtures are missing: clone $SIBLING next to the repository or set $FOLDER_VARIABLE"
+        if (env(REQUIRE_VARIABLE) == REQUIRED) throw AssertionError("$reason ($REQUIRE_VARIABLE is set)")
+        throw AssumptionViolatedException(reason)
+    }
+
+    /** The HEIC photos of [folder], in name order. */
+    fun heic(folder: Path): List<Path> {
+        val directory = folder.resolve(HEIC_FOLDER)
+        if (!Files.isDirectory(directory)) return emptyList()
+        return Files.list(directory).use { entries ->
+            entries.filter { entry -> heicExtensions.any { entry.fileName.toString().lowercase().endsWith(it) } }
+                .sorted().toList()
+        }
+    }
+}
