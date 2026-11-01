@@ -31,29 +31,67 @@ class ViewTurns(
 
     fun turnsOf(handle: FileHandle): Int = state.value[handle] ?: 0
 
+    private val savingState = MutableStateFlow<Set<FileHandle>>(emptySet())
+
+    /** Photos whose file is being written right now (#74): the viewer shows it, and a second save is refused. */
+    val savingNow: StateFlow<Set<FileHandle>> = savingState.asStateFlow()
+
+    private val messageState = MutableStateFlow<Map<FileHandle, String>>(emptyMap())
+
+    /**
+     * What the last save of each photo said when it was not a clean success (#74): a failure, a refusal or the note of
+     * a good save. It outlives the viewer, so a save that failed after Close is told when the photo is opened again,
+     * and it goes when the photo is turned again or saved cleanly.
+     */
+    val saveMessages: StateFlow<Map<FileHandle, String>> = messageState.asStateFlow()
+
     /** Adds [quarterTurns] (negative turns left) to [handle]'s turn. */
-    fun turn(handle: FileHandle, quarterTurns: Int) = state.update { current ->
-        val total = ((current[handle] ?: 0) + quarterTurns).mod(QUARTER_TURNS_IN_FULL)
-        if (total == 0) current - handle else current + (handle to total)
+    fun turn(handle: FileHandle, quarterTurns: Int) {
+        state.update { current ->
+            val total = ((current[handle] ?: 0) + quarterTurns).mod(QUARTER_TURNS_IN_FULL)
+            if (total == 0) current - handle else current + (handle to total)
+        }
+        messageState.update { it - handle }
     }
 
     /**
      * Writes [handle]'s pending turn into its file (#61). On success exactly the turns that were written are taken off
      * (one made while the file was being written stays) and the photo's revision goes up so every view reads it
      * again; on a refusal or a failure nothing changes. A photo with no pending turn asks nothing.
+     * A photo already being saved is refused, and a saver that throws is a failed save: one photo never stops the rest.
      */
     fun save(handle: FileHandle, name: String): TurnSaveResult {
         val pending = turnsOf(handle)
         if (pending == 0) return TurnSaveResult.Saved
-        val result = saveTurn(handle, name, pending)
-        if (result.isSaved) {
-            revisionState.update { it + (handle to ((it[handle] ?: 0) + 1)) }
-            turn(handle, -pending)
+        if (!claim(handle)) return TurnSaveResult.Refused(ALREADY_SAVING)
+        try {
+            val result = runSaver(handle, name, pending)
+            if (result.isSaved) {
+                revisionState.update { it + (handle to ((it[handle] ?: 0) + 1)) }
+                turn(handle, -pending)
+            }
+            result.userMessage?.let { message -> messageState.update { it + (handle to message) } }
+            return result
+        } finally {
+            savingState.update { it - handle }
         }
-        return result
     }
+
+    private fun claim(handle: FileHandle): Boolean = synchronized(savingState) {
+        (handle !in savingState.value).also { free -> if (free) savingState.update { it + handle } }
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Any saver error is one photo's failure, told to the user, never a crash.
+    private fun runSaver(handle: FileHandle, name: String, pending: Int): TurnSaveResult =
+        try {
+            saveTurn(handle, name, pending)
+        } catch (e: Exception) {
+            TurnSaveResult.Failed(e.message ?: e.javaClass.simpleName)
+        }
 
     companion object {
         const val NO_SAVER = "Saving a turn is not available here"
+        const val ALREADY_SAVING = "This photo is already being saved"
+        const val SAVING = "Saving…"
     }
 }

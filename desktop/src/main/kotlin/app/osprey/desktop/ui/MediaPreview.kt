@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +66,9 @@ private val SCRIM = Color(0xE6000000)
 
 private const val DEGREES_PER_TURN = 90f
 private const val PERCENT = 100
+private val SAVING_SPINNER_SIZE = 18.dp
+private val SAVING_SPINNER_STROKE = 2.dp
+private val SAVING_SLOT_WIDTH = 90.dp
 
 /**
  * Fullscreen image preview with its own checkbox ([checkLabel]), kept in sync with the grid. The photo is shown at
@@ -199,6 +204,9 @@ private fun ViewerControls(
                 enabled = save.canSave,
                 modifier = Modifier.semantics { contentDescription = "Save turn" },
             ) { Text("Save turn") }
+            Spacer(Modifier.width(8.dp))
+            // A slot of its own width, empty when idle: the buttons must not move when a save starts or ends.
+            Box(modifier = Modifier.width(SAVING_SLOT_WIDTH)) { if (save.saving) SavingIndicator() }
             Spacer(Modifier.width(14.dp))
             Text("${(zoom * PERCENT).roundToInt()}%", color = Color.White)
             Spacer(Modifier.width(14.dp))
@@ -216,6 +224,20 @@ private fun ViewerControls(
             Button(onClick = onClose) { Text("Close") }
         }
         save.note?.let { Text(it, color = Color.Gray) }
+    }
+}
+
+/** Shown beside Save turn while the file is written (#74): a big PNG takes seconds, a grey button looks stuck. */
+@Composable
+private fun SavingIndicator() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(SAVING_SPINNER_SIZE),
+            strokeWidth = SAVING_SPINNER_STROKE,
+            color = Color.White,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(ViewTurns.SAVING, color = Color.White)
     }
 }
 
