@@ -33,3 +33,5 @@ jobs:
       require-fixtures: true
       fixtures-environment: fixtures
       android-fixtures-device-path: /data/local/tmp/osprey-fixtures
+      # The folder-grant tests (#72) take their SAF grant from the system picker, driven by the test (SafGrant).
+      android-instrumentation-arguments: grantViaPicker=1

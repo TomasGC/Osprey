@@ -7,6 +7,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.android.filesystem.AndroidFileHandle
+import app.osprey.android.filesystem.SafGrant
 import app.osprey.media.MediaDateSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -20,9 +21,8 @@ private const val IMAGE_SIZE = 64
 
 /**
  * [AndroidMediaMetadataReader] against a real on-device JPEG with real EXIF, written through a
- * real SAF file descriptor -- same persisted-grant reuse and skip-if-none as
- * [app.osprey.android.filesystem.AndroidFileSystemRepositoryInstrumentedTest]; see its doc for
- * the one-time manual bootstrap this needs.
+ * real SAF file descriptor -- the tree grant comes from [SafGrant], as in
+ * [app.osprey.android.filesystem.AndroidFileSystemRepositoryInstrumentedTest].
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidMediaMetadataReaderInstrumentedTest {
@@ -33,16 +33,8 @@ class AndroidMediaMetadataReaderInstrumentedTest {
 
     @Before
     fun setUp() {
-        val granted = context.contentResolver.persistedUriPermissions
-            .firstOrNull { it.isReadPermission && it.isWritePermission }
-        assumeTrue(
-            "No persisted SAF grant on this device -- open the app once, Pick folder, Allow, then re-run.",
-            granted != null,
-        )
-        val root = DocumentFile.fromTreeUri(context, granted!!.uri)
-        assumeTrue("Granted tree Uri no longer resolves to a real folder.", root != null && root.isDirectory)
-        testRoot = root!!.createDirectory("osprey_media_instrumented_test_${System.currentTimeMillis()}")
-            ?: error("could not create a throwaway test folder under the granted tree")
+        testRoot = SafGrant.workFolder(context, "osprey_media_instrumented_test")
+        assumeTrue(SafGrant.SKIP_REASON, testRoot != null)
     }
 
     @After
