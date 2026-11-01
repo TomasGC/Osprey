@@ -30,12 +30,9 @@ private const val QUALITY = 90
 
 /**
  * Runs [AndroidFileSystemRepository] against a real Storage Access Framework tree on a real
- * device/emulator -- the DoD #13 asks for. SAF has no way to grant a tree permission without the
- * interactive system picker (confirmed by #9's spike too), so this reuses whatever tree this app
- * was already, manually, granted on this device: open the app once, tap "Pick folder", choose
- * any folder, tap Allow. The grant then persists across installs on this device/emulator, so this
- * test runs unattended from then on; with no persisted grant at all, it skips with a clear reason
- * rather than failing CI, which has no interactive picker to grant one.
+ * device/emulator -- the DoD #13 asks for. The tree grant comes from [SafGrant]: the one this app was
+ * given on the device, or one taken from the system picker when the run passes `-e grantViaPicker 1`
+ * (CI does); with neither, the tests skip with a clear reason.
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidFileSystemRepositoryInstrumentedTest {
@@ -46,16 +43,8 @@ class AndroidFileSystemRepositoryInstrumentedTest {
 
     @Before
     fun setUp() {
-        val granted = context.contentResolver.persistedUriPermissions
-            .firstOrNull { it.isReadPermission && it.isWritePermission }
-        assumeTrue(
-            "No persisted SAF grant on this device -- open the app once, Pick folder, Allow, then re-run.",
-            granted != null,
-        )
-        val root = DocumentFile.fromTreeUri(context, granted!!.uri)
-        assumeTrue("Granted tree Uri no longer resolves to a real folder.", root != null && root.isDirectory)
-        testRoot = root!!.createDirectory("osprey_instrumented_test_${System.currentTimeMillis()}")
-            ?: error("could not create a throwaway test folder under the granted tree")
+        testRoot = SafGrant.workFolder(context, "osprey_instrumented_test")
+        assumeTrue(SafGrant.SKIP_REASON, testRoot != null)
     }
 
     @After

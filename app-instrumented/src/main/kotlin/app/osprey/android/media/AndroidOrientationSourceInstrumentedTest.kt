@@ -7,6 +7,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.android.filesystem.AndroidFileHandle
+import app.osprey.android.filesystem.SafGrant
 import app.osprey.media.ExifOrientation
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,8 +21,8 @@ private const val HIGH = 32
 private const val JPEG_QUALITY = 90
 
 /**
- * [AndroidOrientationSource] against real on-device JPEGs with a real EXIF Orientation tag (#51). Same persisted-grant
- * reuse and skip-if-none as [AndroidMediaMetadataReaderInstrumentedTest]. The HEIC rotation property cannot be
+ * [AndroidOrientationSource] against real on-device JPEGs with a real EXIF Orientation tag (#51). The tree grant comes
+ * from [SafGrant], as in [AndroidMediaMetadataReaderInstrumentedTest]. The HEIC rotation property cannot be
  * generated on a device, and real HEIC photos carry GPS data, so it is checked by hand against a real photo.
  */
 @RunWith(AndroidJUnit4::class)
@@ -33,16 +34,8 @@ class AndroidOrientationSourceInstrumentedTest {
 
     @Before
     fun setUp() {
-        val granted = context.contentResolver.persistedUriPermissions
-            .firstOrNull { it.isReadPermission && it.isWritePermission }
-        assumeTrue(
-            "No persisted SAF grant on this device -- open the app once, Pick folder, Allow, then re-run.",
-            granted != null,
-        )
-        val root = DocumentFile.fromTreeUri(context, granted!!.uri)
-        assumeTrue("Granted tree Uri no longer resolves to a real folder.", root != null && root.isDirectory)
-        testRoot = root!!.createDirectory("osprey_orientation_instrumented_test_${System.currentTimeMillis()}")
-            ?: error("could not create a throwaway test folder under the granted tree")
+        testRoot = SafGrant.workFolder(context, "osprey_orientation_instrumented_test")
+        assumeTrue(SafGrant.SKIP_REASON, testRoot != null)
     }
 
     @After
