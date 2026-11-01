@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +63,8 @@ private val SCRIM = Color(0xE6000000)
 private const val PREVIEW_DECODE_MAX_SIDE = 2048
 
 private const val DEGREES_PER_TURN = 90f
+private val SAVING_SPINNER_SIZE = 18.dp
+private val SAVING_SPINNER_STROKE = 2.dp
 private const val PERCENT = 100
 
 /** The size a reader reported for a photo, or none: told apart from "not read yet", which is no holder at all. */
@@ -195,6 +199,10 @@ private fun ViewerControls(
             Checkbox(checked = checked, onCheckedChange = onCheckedChange)
             Text(checkLabel, color = Color.White)
             Spacer(Modifier.weight(1f))
+            if (save.saving) {
+                SavingIndicator()
+                Spacer(Modifier.width(8.dp))
+            }
             Button(
                 onClick = save.onSave,
                 enabled = save.canSave,
@@ -203,6 +211,20 @@ private fun ViewerControls(
             ) { Text("Save turn") }
         }
         Text(name, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Shown beside Save turn while the file is written (#74): a big PNG takes seconds, a grey button looks stuck. */
+@Composable
+private fun SavingIndicator() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(SAVING_SPINNER_SIZE),
+            strokeWidth = SAVING_SPINNER_STROKE,
+            color = Color.White,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(ViewTurns.SAVING, color = Color.White)
     }
 }
 

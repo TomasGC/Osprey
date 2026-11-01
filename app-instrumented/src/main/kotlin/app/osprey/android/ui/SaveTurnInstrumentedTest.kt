@@ -3,6 +3,7 @@ package app.osprey.android.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -23,9 +24,12 @@ import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
 import app.osprey.media.PixelBuffer
 import app.osprey.media.HeicTurn
+import app.osprey.viewer.TurnSaveResult
 import app.osprey.viewer.TurnSaver
 import app.osprey.viewer.ViewTurns
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -35,6 +39,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val WAIT_MS = 5_000L
+private const val HOLD_MS = 120_000L
 private const val JPEG_QUALITY = 90
 private const val PNG_QUALITY = 100
 private const val SIZE = 8
@@ -60,6 +65,7 @@ class SaveTurnInstrumentedTest {
     private val orientations = AndroidOrientationSource(context)
     private val turns = ViewTurns(TurnSaver(AndroidFileSystemRepository(context))::save)
     private val files = mutableListOf<File>()
+    private val held = mutableListOf<CountDownLatch>()
     private val decodes = AtomicInteger()
 
     private val reader = object : MediaMetadataReader {
@@ -73,6 +79,7 @@ class SaveTurnInstrumentedTest {
 
     @After
     fun tearDown() {
+        held.forEach { it.countDown() }
         files.forEach { it.delete() }
     }
 
@@ -109,10 +116,10 @@ class SaveTurnInstrumentedTest {
 
     private fun bytesOf(name: String): ByteArray = File(context.cacheDir, name).readBytes()
 
-    private fun showViewer(handle: AndroidFileHandle, name: String) {
+    private fun showViewer(handle: AndroidFileHandle, name: String, viewTurns: ViewTurns = turns) {
         composeRule.setContent {
             MediaPreview(
-                reader, turns, handle, name, checked = false, checkLabel = "Keep",
+                reader, viewTurns, handle, name, checked = false, checkLabel = "Keep",
                 onCheckedChange = {}, onClose = {},
             )
         }
@@ -246,5 +253,79 @@ class SaveTurnInstrumentedTest {
         waitForText(TurnSaver.NO_ORIENTATION_TAG)
         composeRule.onNodeWithContentDescription(SAVE).assertIsEnabled()
         assertTrue(turns.turnsOf(handle) == 1)
+    }
+
+    /** A [ViewTurns] whose saver waits for [release], then answers [outcome]: a stand-in for a big PNG. */
+    private fun heldTurns(release: CountDownLatch, outcome: () -> TurnSaveResult): ViewTurns {
+        held += release
+        return ViewTurns { _, _, _ ->
+            release.await(HOLD_MS, TimeUnit.MILLISECONDS)
+            outcome()
+        }
+    }
+
+    private fun indicatorShown() = composeRule.onAllNodesWithText(ViewTurns.SAVING).fetchSemanticsNodes().isNotEmpty()
+
+    @Test
+    fun aSaveInProgressShowsItsProgressAndGivesItUpWhenDone() {
+        val release = CountDownLatch(1)
+        val handle = jpeg("held.jpg", ExifInterface.ORIENTATION_NORMAL)
+        val held = heldTurns(release) { TurnSaveResult.Saved }
+        showViewer(handle, "held.jpg", held)
+        assertTrue(!indicatorShown())
+
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+
+        waitFor { indicatorShown() }
+        composeRule.onNodeWithContentDescription(SAVE).assertIsNotEnabled()
+        release.countDown()
+        waitFor { !indicatorShown() }
+        assertEquals(0, held.turnsOf(handle))
+    }
+
+    @Test
+    fun aFailedSaveGivesUpTheIndicatorAndSaysWhy() {
+        val release = CountDownLatch(1)
+        val handle = jpeg("failing.jpg", ExifInterface.ORIENTATION_NORMAL)
+        showViewer(handle, "failing.jpg", heldTurns(release) { error("disk gone") })
+
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+        waitFor { indicatorShown() }
+        release.countDown()
+
+        waitFor { !indicatorShown() }
+        waitForText("Could not save the turn: disk gone")
+        composeRule.onNodeWithContentDescription(SAVE).assertIsEnabled()
+    }
+
+    @Test
+    fun reopeningTheViewerInTheMiddleOfASaveStillShowsItAndCannotSaveTwice() {
+        val release = CountDownLatch(1)
+        val handle = jpeg("reopened.jpg", ExifInterface.ORIENTATION_NORMAL)
+        val held = heldTurns(release) { TurnSaveResult.Saved }
+        val open = mutableStateOf(true)
+        composeRule.setContent {
+            if (open.value) {
+                MediaPreview(
+                    reader, held, handle, "reopened.jpg", checked = false, checkLabel = "Keep",
+                    onCheckedChange = {}, onClose = {},
+                )
+            }
+        }
+        waitFor { decodes.get() >= 1 }
+        rotateRight()
+        composeRule.onNodeWithContentDescription(SAVE).performClick()
+        waitFor { indicatorShown() }
+
+        open.value = false
+        composeRule.waitForIdle()
+        open.value = true
+
+        waitFor { indicatorShown() }
+        composeRule.onNodeWithContentDescription(SAVE).assertIsNotEnabled()
+        release.countDown()
+        waitFor { held.savingNow.value.isEmpty() }
     }
 }
