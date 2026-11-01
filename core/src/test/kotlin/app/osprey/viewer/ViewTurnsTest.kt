@@ -169,4 +169,161 @@ class ViewTurnsTest {
 
         assertEquals(1, turns.turnsOf(photo))
     }
+
+    @Test
+    fun `a photo is being saved only while the saver runs`() {
+        saving.turn(photo, 1)
+        val during = mutableListOf<Set<FileHandle>>()
+        saver.during = { during += saving.savingNow.value }
+
+        assertTrue(saving.savingNow.value.isEmpty())
+        saving.save(photo, "a.jpg")
+
+        assertEquals(listOf(setOf(photo)), during)
+        assertTrue(saving.savingNow.value.isEmpty())
+    }
+
+    @Test
+    fun `a refused or failed save stops being a save in flight`() {
+        for (result in listOf(TurnSaveResult.Refused("no"), TurnSaveResult.Failed("busy"))) {
+            saver.result = result
+            saving.turn(photo, 1)
+
+            saving.save(photo, "a.jpg")
+
+            assertTrue(saving.savingNow.value.isEmpty())
+            saving.turn(photo, -1)
+        }
+    }
+
+    @Test
+    fun `a second save of a photo already being saved is refused and writes nothing`() {
+        saving.turn(photo, 1)
+        var second: TurnSaveResult? = null
+        saver.during = { second = saving.save(photo, "a.jpg") }
+
+        saving.save(photo, "a.jpg")
+
+        assertEquals(TurnSaveResult.Refused(ViewTurns.ALREADY_SAVING), second)
+        assertEquals(1, saver.calls.size)
+        assertTrue(saving.saveMessages.value.isEmpty())
+    }
+
+    @Test
+    fun `another photo can be saved while one is being saved`() {
+        saving.turn(photo, 1)
+        saving.turn(other, 1)
+        var inner: Set<FileHandle>? = null
+        saver.during = {
+            saver.during = { inner = saving.savingNow.value }
+            saving.save(other, "b.jpg")
+        }
+
+        saving.save(photo, "a.jpg")
+
+        assertEquals(setOf(photo, other), inner)
+        assertEquals(2, saver.calls.size)
+    }
+
+    @Test
+    fun `a saver that throws is a failed save, not a crash`() {
+        saving.turn(photo, 1)
+        saver.during = { error("disk gone") }
+
+        val result = saving.save(photo, "a.jpg")
+
+        assertEquals(TurnSaveResult.Failed("disk gone"), result)
+        assertTrue(saving.savingNow.value.isEmpty())
+        assertEquals(1, saving.turnsOf(photo))
+        assertEquals(0, saving.revisionOf(photo))
+    }
+
+    @Test
+    fun `a saver that throws without a message is named by its error`() {
+        saving.turn(photo, 1)
+        saver.during = { throw IllegalStateException() }
+
+        assertEquals(TurnSaveResult.Failed("IllegalStateException"), saving.save(photo, "a.jpg"))
+    }
+
+    @Test
+    fun `what a failed save said is kept for that photo`() {
+        saver.result = TurnSaveResult.Failed("busy")
+        saving.turn(photo, 1)
+
+        saving.save(photo, "a.jpg")
+
+        assertEquals(mapOf(photo to "Could not save the turn: busy"), saving.saveMessages.value)
+    }
+
+    @Test
+    fun `a thrown error is kept like a failed save`() {
+        saving.turn(photo, 1)
+        saver.during = { error("disk gone") }
+
+        saving.save(photo, "a.jpg")
+
+        assertEquals(mapOf(photo to "Could not save the turn: disk gone"), saving.saveMessages.value)
+    }
+
+    @Test
+    fun `a refusal and the note of a good save are kept too`() {
+        saver.result = TurnSaveResult.Refused("no")
+        saving.turn(photo, 1)
+        saving.save(photo, "a.jpg")
+        saver.result = TurnSaveResult.SavedWithNote("look here")
+        saving.turn(other, 1)
+        saving.save(other, "b.heic")
+
+        assertEquals(mapOf(photo to "no", other to "look here"), saving.saveMessages.value)
+    }
+
+    @Test
+    fun `one failed photo does not stop the others and each keeps its own message`() {
+        saving.turn(photo, 1)
+        saving.turn(other, 1)
+        saver.result = TurnSaveResult.Failed("busy")
+        saving.save(photo, "a.jpg")
+        saver.result = TurnSaveResult.Saved
+        saving.save(other, "b.jpg")
+
+        assertEquals(mapOf(photo to "Could not save the turn: busy"), saving.saveMessages.value)
+        assertEquals(1, saving.turnsOf(photo))
+        assertEquals(0, saving.turnsOf(other))
+    }
+
+    @Test
+    fun `a later failure replaces the earlier message of the same photo`() {
+        saving.turn(photo, 1)
+        saver.result = TurnSaveResult.Failed("busy")
+        saving.save(photo, "a.jpg")
+        saver.result = TurnSaveResult.Failed("full")
+        saving.save(photo, "a.jpg")
+
+        assertEquals(mapOf(photo to "Could not save the turn: full"), saving.saveMessages.value)
+    }
+
+    @Test
+    fun `a save that works clears the photo's message`() {
+        saving.turn(photo, 1)
+        saver.result = TurnSaveResult.Failed("busy")
+        saving.save(photo, "a.jpg")
+        saver.result = TurnSaveResult.Saved
+        saving.save(photo, "a.jpg")
+
+        assertTrue(saving.saveMessages.value.isEmpty())
+    }
+
+    @Test
+    fun `turning a photo again clears its message and leaves the others`() {
+        saver.result = TurnSaveResult.Failed("busy")
+        saving.turn(photo, 1)
+        saving.turn(other, 1)
+        saving.save(photo, "a.jpg")
+        saving.save(other, "b.jpg")
+
+        saving.turn(photo, 1)
+
+        assertEquals(mapOf(other to "Could not save the turn: busy"), saving.saveMessages.value)
+    }
 }
