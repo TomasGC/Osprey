@@ -186,11 +186,13 @@ class SaveTurnInstrumentedTest {
     fun aHeicWithNoRotationGainsOne() {
         val handle = heic("plain.heic", HeicSamples.plain)
         showViewer(handle, "plain.heic")
+        val decodedBefore = decodes.get()
 
         rotateRight()
         composeRule.onNodeWithContentDescription(SAVE).performClick()
 
         waitFor { bytesOf("plain.heic").size == HeicSamples.plain.bytes.size + IROT_BOX_AND_ASSOCIATION }
+        waitFor { decodes.get() > decodedBefore }
         composeRule.waitForIdle()
         assertEquals(0, turns.turnsOf(handle))
     }
