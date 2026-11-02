@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -28,6 +29,7 @@ import org.junit.runner.RunWith
 
 private const val WAIT_MS = 5_000L
 private const val SETTLE_MS = 1_000L
+private const val DECODE_DELAY_MS = 1_000L
 private const val EDGE_MARGIN = 3f
 private const val FINGER_GAP = 40f
 private const val PINCH_SPREAD = 200f
@@ -52,7 +54,11 @@ class ViewerGesturesInstrumentedTest {
     private val reader = object : MediaMetadataReader {
         override fun captureDateTime(entry: FileHandle): MediaDate? = null
 
-        override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer = ONE_PIXEL
+        // Slower than a test thread that does not wait: a gesture sent before the photo is shown must not be lost.
+        override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer {
+            Thread.sleep(DECODE_DELAY_MS)
+            return ONE_PIXEL
+        }
     }
 
     private fun showViewer() {
@@ -63,6 +69,11 @@ class ViewerGesturesInstrumentedTest {
             )
         }
         waitForZoomReadout("100%")
+        // "100%" is also what the readout says before the photo is loaded; the photo itself is the signal.
+        composeRule.waitUntil(timeoutMillis = WAIT_MS) {
+            composeRule.onAllNodesWithContentDescription("IMG_0001.jpg").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitForIdle()
     }
 
     private fun waitForZoomReadout(text: String) {
