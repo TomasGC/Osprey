@@ -3,10 +3,12 @@ package app.osprey.android.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -28,6 +30,7 @@ import org.junit.runner.RunWith
 
 private const val WAIT_MS = 10_000L
 private const val SETTLE_MS = 2_000L
+private const val PHOTO_NAME = "IMG_0001.jpg"
 private const val PHOTO_WIDTH = 4100
 private const val PHOTO_HEIGHT = 3075
 private const val BASE_WIDTH = 164
@@ -73,12 +76,20 @@ class DetailLayerInstrumentedTest {
     private fun showViewer() {
         composeRule.setContent {
             MediaPreview(
-                reader, ViewTurns(), handle, "IMG_0001.jpg", checked = false, checkLabel = "Keep",
+                reader, ViewTurns(), handle, PHOTO_NAME, checked = false, checkLabel = "Keep",
                 onCheckedChange = {}, onClose = {},
             )
         }
         waitForZoomReadout("100%")
-        waitForCentre(BASE_COLOR)
+        waitForPhoto()
+    }
+
+    /** The photo node exists once the base picture is shown; unlike its pixels, it needs no screen capture to read. */
+    private fun waitForPhoto() {
+        composeRule.waitUntil(timeoutMillis = WAIT_MS) {
+            composeRule.onAllNodesWithContentDescription(PHOTO_NAME).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.waitForIdle()
     }
 
     private fun waitForZoomReadout(text: String) =
@@ -95,8 +106,24 @@ class DetailLayerInstrumentedTest {
         abs(((expected shr shift) and BYTE_MASK) - ((actual shr shift) and BYTE_MASK)) <= TOLERANCE
     }
 
-    private fun waitForCentre(color: Int) =
-        composeRule.waitUntil(timeoutMillis = WAIT_MS) { isNear(color, centrePixel()) }
+    /** Fails saying what the centre pixel was, so a timeout tells a blank screen from a wrong layer from no read. */
+    private fun waitForCentre(color: Int) {
+        var last: Int? = null
+        var reads = 0
+        try {
+            composeRule.waitUntil(timeoutMillis = WAIT_MS) {
+                val pixel = centrePixel()
+                last = pixel
+                reads++
+                isNear(color, pixel)
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            val seen = last?.let { hex(it) } ?: "nothing"
+            throw AssertionError("centre pixel never ${hex(color)}: last $seen after $reads reads", timeout)
+        }
+    }
+
+    private fun hex(color: Int) = "#%08X".format(color)
 
     @Test
     fun noDetailIsRequestedAtFit() {
