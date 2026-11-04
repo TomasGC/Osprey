@@ -1,6 +1,7 @@
 package app.osprey.viewer
 
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.FileState
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.RunRecorder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ class ViewTurns(
         TurnSaveResult.Refused(NO_SAVER)
     },
     private val recorder: RunRecorder = RunRecorder(InMemoryJobHistoryStore()),
+    private val fileState: (FileHandle, String) -> FileState? = { _, _ -> null },
 ) {
 
     private val state = MutableStateFlow<Map<FileHandle, Int>>(emptyMap())
@@ -69,13 +71,15 @@ class ViewTurns(
         if (!claim(handle)) return TurnSaveResult.Refused(ALREADY_SAVING)
         val run = recorder.begin(SAVE_TURN).also { it.start() }
         try {
+            val before = stateOf(handle, name)
             val result = runSaver(handle, name, pending)
+            val after = if (result.isSaved) stateOf(handle, name) else null
             if (result.isSaved) {
                 revisionState.update { it + (handle to ((it[handle] ?: 0) + 1)) }
                 turn(handle, -pending)
             }
             result.userMessage?.let { message -> messageState.update { it + (handle to message) } }
-            run.endSave(name, pending, result)
+            run.endSave(name, pending, result, before, after)
             return result
         } finally {
             savingState.update { it - handle }
@@ -85,6 +89,15 @@ class ViewTurns(
     private fun claim(handle: FileHandle): Boolean = synchronized(savingState) {
         (handle !in savingState.value).also { free -> if (free) savingState.update { it + handle } }
     }
+
+    /** The photo's file as it is now, for the History; a lookup that fails gives none and never breaks the save. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun stateOf(handle: FileHandle, name: String): FileState? =
+        try {
+            fileState(handle, name)
+        } catch (ignored: Exception) {
+            null
+        }
 
     @Suppress("TooGenericExceptionCaught") // Any saver error is one photo's failure, told to the user, never a crash.
     private fun runSaver(handle: FileHandle, name: String, pending: Int): TurnSaveResult =

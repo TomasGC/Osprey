@@ -12,10 +12,14 @@ import app.osprey.desktop.FakeSettingsStore
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.toJpeg
+import app.osprey.history.FileResult
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobState
+import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -117,6 +121,26 @@ class HistoryEndToEndTest {
             onNodeWithText("No runs yet.").assertExists()
             assertEquals(0, historyDir.list()!!.size)
         }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    @Test
+    fun `a Save turn through the app state is recorded with the file before and after`() {
+        val state = launch()
+        val original = BufferedImage(8, 4, BufferedImage.TYPE_INT_RGB).toJpeg(orientation = 6)
+        val photo = Files.write(year.resolve("p.jpg"), original)
+        val handle = PathHandle(photo)
+        state.viewTurns.turn(handle, 1)
+
+        state.viewTurns.save(handle, "p.jpg")
+
+        val record = state.history.runs().first { it.action == "Save turn" }.files.single()
+        assertEquals(FileResult.Done, record.result)
+        assertEquals(sha256(original), record.before?.hash)
+        assertEquals(sha256(Files.readAllBytes(photo)), record.after?.hash)
+        assertEquals(original.size.toLong(), record.before?.size)
+    }
 
     @Test
     fun `a new launch shows the runs of the last one and closes a run the app died in`() = runComposeUiTest {

@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.android.AndroidAppState
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.history.FileResult
 import app.osprey.history.RunRecorder
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobQueue
@@ -20,6 +21,7 @@ import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsStore
 import java.io.File
+import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +30,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -146,6 +149,23 @@ class HistoryEndToEndInstrumentedTest {
 
         composeRule.onNodeWithText("No runs yet.").assertExists()
         assertEquals(0, historyDir.list()!!.size)
+    }
+
+    @Test
+    fun aSaveTurnThroughTheAppStateIsRecordedWithTheFileAsItWas() {
+        val state = launch()
+        val content = "not a jpeg".toByteArray()
+        val photo = (state.fs as FakeFileSystemRepository).addFile(state.yearHandle()!!, "p.jpg", content)
+        state.viewTurns.turn(photo, 1)
+
+        state.viewTurns.save(photo, "p.jpg")
+
+        val record = state.history.runs().first { it.action == "Save turn" }.files.single()
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(content).joinToString("") { "%02x".format(it) }
+        assertEquals(FileResult.Failed, record.result)
+        assertEquals(sha256, record.before?.hash)
+        assertEquals(content.size.toLong(), record.before?.size)
+        assertNull(record.after)
     }
 
     @Test

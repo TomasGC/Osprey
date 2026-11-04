@@ -19,4 +19,7 @@ interface FileTransfer {
 
     /** SHA-256 of [entry]'s content as lowercase hex, read in chunks so a large video is never fully in memory. */
     fun contentHash(entry: FileHandle): String
+
+    /** The size of the file [entry] in bytes, without reading it. */
+    fun size(entry: FileHandle): Long
 }

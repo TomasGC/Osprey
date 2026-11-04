@@ -239,6 +239,13 @@ class DesktopFileSystemRepositoryTest {
     }
 
     @Test
+    fun `size is the number of bytes of the file`() {
+        val file = tempDir.resolve("a.jpg").also { Files.write(it, ByteArray(1234)) }
+
+        assertEquals(1234L, repo.size(PathHandle(file)))
+    }
+
+    @Test
     fun `contentHash reads a file larger than one chunk`() {
         val file = tempDir.resolve("big.mp4")
         Files.write(file, ByteArray(3_000_000) { (it % 251).toByte() })

@@ -35,4 +35,6 @@ class DesktopFileTransfer : FileTransfer {
 
     override fun contentHash(entry: FileHandle): String =
         Files.newInputStream((entry as PathHandle).path).use { sha256Hex(it) }
+
+    override fun size(entry: FileHandle): Long = Files.size((entry as PathHandle).path)
 }

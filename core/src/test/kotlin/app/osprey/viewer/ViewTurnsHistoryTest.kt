@@ -3,6 +3,7 @@ package app.osprey.viewer
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
+import app.osprey.history.FileState
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.RunRecord
 import app.osprey.history.RunRecorder
@@ -45,6 +46,69 @@ class ViewTurnsHistoryTest {
             ),
             only(),
         )
+    }
+
+    private val before = FileState(10, T0, T0, "hash-before", "a.jpg")
+    private val after = FileState(10, T0, T0, "hash-after", "a.jpg")
+
+    @Test
+    fun `a saved turn records the file as it was before and after, read around the save`() {
+        val log = mutableListOf<String>()
+        val states = mutableListOf(before, after)
+        val turns = ViewTurns({ _, _, _ -> log += "save"; TurnSaveResult.Saved }, recorder) { _, _ ->
+            log += "state"
+            states.removeFirst()
+        }
+        turns.turn(photo, 1)
+
+        turns.save(photo, "a.jpg")
+
+        assertEquals(listOf("state", "save", "state"), log)
+        assertEquals(
+            FileRecord("a.jpg", FileResult.Done, "saved a 90° clockwise turn", before, after),
+            only().files.single(),
+        )
+    }
+
+    @Test
+    fun `a refused save records the file as it was and nothing after`() {
+        var lookups = 0
+        val turns = ViewTurns({ _, _, _ -> TurnSaveResult.Refused("interlaced PNG") }, recorder) { _, _ ->
+            lookups++
+            before
+        }
+        turns.turn(photo, 1)
+
+        turns.save(photo, "a.jpg")
+
+        assertEquals(
+            listOf(FileRecord("a.jpg", FileResult.Failed, "interlaced PNG", before = before)),
+            only().files,
+        )
+        assertEquals(1, lookups)
+    }
+
+    @Test
+    fun `a file whose state cannot be read is recorded without it and the save goes on`() {
+        val turns = ViewTurns({ _, _, _ -> TurnSaveResult.Saved }, recorder) { _, _ -> null }
+        turns.turn(photo, 1)
+
+        turns.save(photo, "a.jpg")
+
+        assertEquals(RunState.Done, only().state)
+        assertEquals(FileRecord("a.jpg", FileResult.Done, "saved a 90° clockwise turn"), only().files.single())
+    }
+
+    @Test
+    fun `a state lookup that throws never breaks a save`() {
+        val turns = ViewTurns({ _, _, _ -> TurnSaveResult.Saved }, recorder) { _, _ -> error("bug in the lookup") }
+        turns.turn(photo, 1)
+
+        val result = turns.save(photo, "a.jpg")
+
+        assertEquals(TurnSaveResult.Saved, result)
+        assertEquals(RunState.Done, only().state)
+        assertEquals(FileRecord("a.jpg", FileResult.Done, "saved a 90° clockwise turn"), only().files.single())
     }
 
     @Test

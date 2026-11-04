@@ -6,18 +6,27 @@ import app.osprey.desktop.media.DesktopOrientationSource
 import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.testing.toPng
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.RunRecorder
+import app.osprey.history.contentStateOf
 import app.osprey.media.ExifOrientation
 import app.osprey.media.HeicSamples
 import app.osprey.viewer.TurnSaveResult
 import app.osprey.viewer.TurnSaver
+import app.osprey.viewer.ViewTurns
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
+import java.security.MessageDigest
 import java.time.Instant
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Before
@@ -263,5 +272,68 @@ class TurnSaverIntegrationRealTest {
             path.toFile().setWritable(true)
             Files.delete(path)
         }
+    }
+
+    private val history = InMemoryJobHistoryStore()
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    /** Saves one turn the way the viewer does and gives back the one file record the run left in the history (#79). */
+    private fun savedThroughTheViewer(path: Path): FileRecord {
+        val turns = ViewTurns(saver::save, RunRecorder(history), files::contentStateOf)
+        val handle = PathHandle(path)
+        turns.turn(handle, 1)
+        turns.save(handle, path.fileName.toString())
+        return history.runs().single().files.single()
+    }
+
+    private fun assertRecordedBeforeAndAfter(path: Path, originalBytes: ByteArray, record: FileRecord) {
+        assertEquals(FileResult.Done, record.result)
+        assertEquals(sha256(originalBytes), record.before?.hash)
+        assertEquals(sha256(Files.readAllBytes(path)), record.after?.hash)
+        assertNotEquals(record.before?.hash, record.after?.hash)
+        assertEquals(originalBytes.size.toLong(), record.before?.size)
+        assertEquals(Files.size(path), record.after?.size)
+        assertEquals(path.fileName.toString(), record.after?.name)
+    }
+
+    @Test
+    fun `a saved jpeg turn is recorded with the hash and size of the file before and after`() {
+        val path = jpeg("a.jpg", SIDEWAYS)
+        val original = Files.readAllBytes(path)
+
+        assertRecordedBeforeAndAfter(path, original, savedThroughTheViewer(path))
+    }
+
+    @Test
+    fun `a saved png turn is recorded with the hash and size of the file before and after`() {
+        val path = png("a.png")
+        val original = Files.readAllBytes(path)
+
+        assertRecordedBeforeAndAfter(path, original, savedThroughTheViewer(path))
+    }
+
+    @Test
+    fun `a saved heic turn is recorded with the hash and size of the file before and after`() {
+        val path = heicFile("a.heic", HeicSamples.plain)
+        val original = Files.readAllBytes(path)
+
+        assertRecordedBeforeAndAfter(path, original, savedThroughTheViewer(path))
+    }
+
+    @Test
+    fun `a save that failed records the file as it was and nothing after`() {
+        val path = jpeg("a.jpg", SIDEWAYS)
+        val original = Files.readAllBytes(path)
+        path.toFile().setWritable(false)
+        assumeFalse("this account can write to read-only files", Files.isWritable(path))
+
+        val record = savedThroughTheViewer(path)
+
+        assertEquals(FileResult.Failed, record.result)
+        assertEquals(sha256(original), record.before?.hash)
+        assertNull(record.after)
+        path.toFile().setWritable(true)
     }
 }

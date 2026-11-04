@@ -94,6 +94,8 @@ class FakeFileSystemRepository : FileSystemRepository {
     override fun contentHash(entry: FileHandle): String =
         sha256Hex(ByteArrayInputStream(nodes.getValue(entry.id()).bytes))
 
+    override fun size(entry: FileHandle): Long = nodes.getValue(entry.id()).bytes.size.toLong()
+
     override fun readBytes(entry: FileHandle): ByteArray = nodes.getValue(entry.id()).bytes.copyOf()
 
     override fun readTimestamps(entry: FileHandle): FileTimestamps = nodes.getValue(entry.id()).timestamps

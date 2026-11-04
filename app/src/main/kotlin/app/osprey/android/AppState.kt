@@ -13,6 +13,7 @@ import app.osprey.history.HistoryController
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.JobHistoryStore
 import app.osprey.history.RunRecorder
+import app.osprey.history.contentStateOf
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.FolderSetting
@@ -48,7 +49,7 @@ class AndroidAppState(
      * The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51), and the
      * viewer can write a turn into a JPEG's file (#61).
      */
-    val viewTurns = ViewTurns(TurnSaver(fs)::save, RunRecorder(history))
+    val viewTurns = ViewTurns(TurnSaver(fs)::save, RunRecorder(history), fs::contentStateOf)
 
     val settingsState = SettingsState(
         settingsStore,
