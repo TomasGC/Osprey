@@ -4,7 +4,10 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
-import app.osprey.jobs.withStoppedNote
+import app.osprey.jobs.appliedSuffix
+import app.osprey.jobs.applyOutcome
+import app.osprey.jobs.scopedName
+import app.osprey.jobs.underFolder
 
 /**
  * Scan-then-apply bookkeeping shared by the simple action tabs: queue [scan] as a job, cache its plan, and
@@ -25,37 +28,40 @@ class SimpleActionController<Plan>(
     val state = ActionUiState()
     private var cachedPlan: Plan? = null
 
-    fun onScan(yearDir: FileHandle) {
+    fun onScan(yearDir: FileHandle, scope: String? = null) {
         if (!claim()) return
+        val label = scopedName(name, scope)
         state.appliedSuffix = ""
-        jobs.enqueue("$name scan", onDone = { state.busy = false }, writes = false) { control ->
+        jobs.enqueue("$label scan", onDone = { state.busy = false }, writes = false) { control ->
             val result = scan(yearDir, control)
             if (control.shouldStop()) {
                 cachedPlan = null
                 state.summary = "Scan stopped"
                 state.lines = emptyList()
                 state.applyEnabled = false
-                JobOutcome("$name scan: stopped", stopped = true)
+                JobOutcome("$label scan: stopped", stopped = true)
             } else {
                 cachedPlan = result.plan
                 state.lines = result.lines
                 state.summary = result.summary
                 state.applyEnabled = result.count > 0
-                JobOutcome("$name scan: ${result.summary.trim()}", lines = result.lines)
+                JobOutcome("$label scan: ${result.summary.trim()}", lines = result.lines)
             }
         }
     }
 
-    fun onApply(yearDir: FileHandle) {
+    fun onApply(yearDir: FileHandle, scope: String? = null) {
         val plan = cachedPlan ?: return
         if (!claim()) return
+        val label = scopedName(name, scope)
         cachedPlan = null
         state.applyEnabled = false
-        jobs.enqueue("$name apply", onDone = { state.busy = false; onApplied() }) { control ->
-            val applied = apply(yearDir, plan, control)
+        jobs.enqueue("$label apply", onDone = { state.busy = false; onApplied() }) { control ->
+            val applied = apply(yearDir, plan, control.underFolder(scope))
             val stopped = control.shouldStop()
-            state.appliedSuffix = "  -- APPLIED ($applied)" + if (stopped) " -- STOPPED" else ""
-            JobOutcome(withStoppedNote("$name apply: $applied done", stopped), stopped = stopped)
+            val failed = control.failedFiles
+            state.appliedSuffix = appliedSuffix(applied, failed, stopped)
+            applyOutcome(label, applied, failed, stopped)
         }
     }
 

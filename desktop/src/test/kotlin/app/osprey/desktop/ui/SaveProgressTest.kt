@@ -41,11 +41,13 @@ class SaveProgressTest {
     private val started = CountDownLatch(1)
     private val release = CountDownLatch(1)
     private var outcome: () -> TurnSaveResult = { TurnSaveResult.Saved }
-    private val turns = ViewTurns { _, _, _ ->
-        started.countDown()
-        release.await(HOLD_MS, TimeUnit.MILLISECONDS)
-        outcome()
-    }
+    private val turns = ViewTurns(
+        saveTurn = { _, _, _ ->
+            started.countDown()
+            release.await(HOLD_MS, TimeUnit.MILLISECONDS)
+            outcome()
+        },
+    )
     private val photo = PathHandle(Path.of("IMG_0001.jpg"))
     private var open by mutableStateOf(true)
 

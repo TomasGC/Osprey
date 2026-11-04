@@ -3,6 +3,9 @@ package app.osprey.actions.trash
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.FirstMoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -236,5 +239,40 @@ class TrashMigrationPlannerTest {
         assertEquals(1, moved)
         assertEquals(emptyList<String>(), logs)
         assertEquals(2, planner.plan(fs.root).moves.size)
+    }
+
+    @Test
+    fun `apply records each file with where it went`() {
+        val year = yearFolder("2019")
+        fs.addFile(fs.addFolder(year, "TODELETE"), "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.addFolder(year, "TODELETEDUPS"), "b.jpg", byteArrayOf(2))
+        val plan = planner.plan(fs.root)
+        val control = RecordingJobControl()
+
+        planner.apply(plan, fs.root, control) {}
+
+        val paths = plan.moves.associate { it.destName to it.sourcePath }
+        assertEquals(
+            setOf(
+                FileRecord(paths.getValue("a.jpg"), FileResult.Done, "moved to Trash/2019/Dedupe/a.jpg"),
+                FileRecord(paths.getValue("b.jpg"), FileResult.Done, "moved to Trash/2019/VisualDupes/b.jpg"),
+            ),
+            control.files.toSet(),
+        )
+    }
+
+    @Test
+    fun `a file that could not be moved is recorded as failed and the others still move`() {
+        val old = fs.addFolder(yearFolder("2019"), "TODELETE")
+        listOf("a", "b", "c").forEach { fs.addFile(old, "$it.jpg", byteArrayOf(1)) }
+        val plan = planner.plan(fs.root)
+        val control = RecordingJobControl()
+
+        val moved = TrashMigrationPlanner(FirstMoveFails(fs)).apply(plan, fs.root, control) {}
+
+        assertEquals(2, moved)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done, FileResult.Done), control.files.map { it.result })
+        assertEquals("locked", control.files.first().message)
+        assertEquals(1, control.failedFiles)
     }
 }

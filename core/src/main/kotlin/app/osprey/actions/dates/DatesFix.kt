@@ -10,4 +10,5 @@ data class DatesFix(
     val name: String,
     val dateTime: LocalDateTime,
     val source: MediaDateSource,
+    val sizeBytes: Long = 0,
 )

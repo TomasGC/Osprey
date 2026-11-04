@@ -36,7 +36,7 @@ fun VisualDupesScreen(state: AppState, yearDir: FileHandle) {
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Row {
-            Button(onClick = { controller.onScan(yearDir) }, enabled = !controller.scanning) {
+            Button(onClick = { controller.onScan(yearDir, state.selectedYear) }, enabled = !controller.scanning) {
                 Text(if (controller.scanning) "Scanning..." else "Scan (can take a minute or two)")
             }
         }

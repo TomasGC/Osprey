@@ -55,4 +55,6 @@ class AndroidFileTransfer(private val context: Context) : FileTransfer {
         val uri = (entry as AndroidFileHandle).documentFile.uri
         return context.contentResolver.openInputStream(uri)?.use { sha256Hex(it) } ?: error("cannot open $uri")
     }
+
+    override fun size(entry: FileHandle): Long = (entry as AndroidFileHandle).documentFile.length()
 }

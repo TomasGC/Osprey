@@ -50,10 +50,12 @@ sourceSets {
         runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
     }
     // integrationReal and e2e also see `test`'s own classes, for the shared test photos (`app.osprey.desktop.testing`).
+    // integrationReal also sees integrationMock's output: the harness that runs an action over a temp library (#79).
     create("integrationReal") {
         kotlin.srcDir("src/integrationReal/kotlin")
-        compileClasspath += sourceSets.test.get().compileClasspath + sourceSets.test.get().output
-        runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
+        val mock = named("integrationMock").get().output
+        compileClasspath += sourceSets.test.get().compileClasspath + sourceSets.test.get().output + mock
+        runtimeClasspath += sourceSets.test.get().runtimeClasspath + output + mock
     }
     create("e2e") {
         kotlin.srcDir("src/e2e/kotlin")
@@ -79,6 +81,8 @@ tasks.register<Test>("integrationReal") {
 tasks.register<Test>("e2e") {
     testClassesDirs = sourceSets["e2e"].output.classesDirs
     classpath = sourceSets["e2e"].runtimeClasspath
+    // A test that starts the app as its own process (#79) gives it the same classpath.
+    systemProperty("osprey.e2e.classpath", classpath.asPath)
     useJUnit()
 }
 

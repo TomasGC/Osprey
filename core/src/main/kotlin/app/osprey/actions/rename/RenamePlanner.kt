@@ -4,8 +4,10 @@ import app.osprey.actions.splitStemAndSuffix
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.stateOf
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.applyToFile
 import app.osprey.jobs.forEachUntilStopped
 
 /**
@@ -30,7 +32,7 @@ class RenamePlanner(private val fs: FileSystemRepository) {
         val skips = mutableListOf<RenameAction>()
 
         control.forEachUntilStopped(entries.filterNot { it.isDirectory }, FileEntry::name) { entry ->
-            val action = candidateRename(entry.handle, entry.name)
+            val action = candidateRename(entry)
             when {
                 action == null -> Unit
                 action.targetName in existingNames || action.targetName in claimed -> skips += action
@@ -43,11 +45,11 @@ class RenamePlanner(private val fs: FileSystemRepository) {
         return RenamePlan(renames, skips)
     }
 
-    private fun candidateRename(handle: FileHandle, name: String): RenameAction? {
-        val (stem, suffix) = splitStemAndSuffix(name)
+    private fun candidateRename(entry: FileEntry): RenameAction? {
+        val (stem, suffix) = splitStemAndSuffix(entry.name)
         val newStem = cleanStem(stem)
         if (newStem == stem) return null
-        return RenameAction(handle, name, "$newStem$suffix")
+        return RenameAction(entry.handle, entry.name, "$newStem$suffix", entry.sizeBytes)
     }
 
     /** Logs skips, then renames — one line each. Returns the rename count. */
@@ -61,12 +63,19 @@ class RenamePlanner(private val fs: FileSystemRepository) {
         return plan.renames.size
     }
 
-    /** Renames every file in [plan], stopping between two files when [control] says so; returns how many. */
+    /**
+     * Renames every file in [plan], stopping between two files when [control] says so; returns how many.
+     * A file the file system refuses is recorded as failed and the next one is still renamed (#79).
+     */
     fun apply(plan: RenamePlan, control: JobControl = NoJobControl): Int {
         var renamed = 0
         control.forEachUntilStopped(plan.renames, RenameAction::sourceName) { rename ->
-            fs.rename(rename.source, rename.targetName)
-            renamed++
+            val worked = control.applyToFile(rename.sourceName) {
+                before = fs.stateOf(rename.source, rename.sourceName, rename.sizeBytes)
+                val target = fs.rename(rename.source, rename.targetName)
+                after = fs.stateOf(target, rename.targetName, rename.sizeBytes)
+            }
+            if (worked) renamed++
         }
         return renamed
     }

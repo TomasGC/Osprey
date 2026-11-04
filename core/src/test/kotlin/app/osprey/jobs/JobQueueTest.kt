@@ -2,7 +2,9 @@ package app.osprey.jobs
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +20,7 @@ import org.junit.Test
 
 private const val WAIT_MS = 5_000L
 private const val SPIN_MS = 5L
+private const val HOOK_MS = 100L
 
 class JobQueueTest {
 
@@ -45,6 +48,32 @@ class JobQueueTest {
     }
 
     private fun hold(latch: CountDownLatch) = assertTrue(latch.await(WAIT_MS, TimeUnit.MILLISECONDS))
+
+    @Test
+    fun `a job still shows as running while its completion hook runs`() {
+        val seen = AtomicReference<JobState>()
+        val handle = queue.enqueue("Reorg", onDone = { seen.set(queue.entries.value.single().state) }) {
+            JobOutcome("Reorg: 1 done")
+        }
+
+        waitFor { handle.await() }
+
+        assertTrue(seen.get() is JobState.Running)
+        assertTrue(queue.entries.value.single().state is JobState.Finished)
+    }
+
+    @Test
+    fun `the caller gets the outcome only once the completion hook has run`() {
+        val hookRan = AtomicBoolean(false)
+        val handle = queue.enqueue("Reorg", onDone = {
+            Thread.sleep(HOOK_MS)
+            hookRan.set(true)
+        }) { JobOutcome("Reorg: 1 done") }
+
+        waitFor { handle.await() }
+
+        assertTrue(hookRan.get())
+    }
 
     @Test
     fun `a job runs and its outcome comes back to the caller`() {
@@ -228,17 +257,15 @@ class JobQueueTest {
     }
 
     @Test
-    fun `the completion callback gets the outcome once the job is finished`() {
-        val seen = mutableListOf<Pair<JobOutcome, JobState?>>()
-        val handle = queue.enqueue("A", onDone = { outcome ->
-            seen += outcome to queue.entries.value.singleOrNull()?.state
-        }) { JobOutcome("A done") }
+    fun `the completion callback gets the outcome of the job`() {
+        val seen = mutableListOf<JobOutcome>()
+        val handle = queue.enqueue("A", onDone = { outcome -> seen += outcome }) { JobOutcome("A done") }
 
         waitFor { handle.await() }
         waitUntil { seen.isNotEmpty() }
 
-        assertEquals(JobOutcome("A done"), seen.single().first)
-        assertEquals(JobState.Finished(JobOutcome("A done")), seen.single().second)
+        assertEquals(JobOutcome("A done"), seen.single())
+        assertEquals(JobState.Finished(JobOutcome("A done")), queue.entries.value.single().state)
     }
 
     @Test

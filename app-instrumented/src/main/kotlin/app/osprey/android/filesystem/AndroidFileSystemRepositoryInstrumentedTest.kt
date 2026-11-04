@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.android.media.AndroidOrientationSource
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileTimestamps
+import app.osprey.history.contentStateOf
 import app.osprey.media.ExifOrientation
 import app.osprey.viewer.TurnSaveResult
 import app.osprey.viewer.TurnSaver
@@ -73,6 +74,24 @@ class AndroidFileSystemRepositoryInstrumentedTest {
             }
         } ?: error("could not open $name for write")
         return doc
+    }
+
+    @Test
+    fun sizeIsTheNumberOfBytesOfTheFile() {
+        val handle = binary("size.bin", 1, 2, 3, 4, 5)
+
+        assertEquals(5L, fs.size(handle))
+    }
+
+    @Test
+    fun theContentStateHasTheNameSizeAndSha256OfTheFile() {
+        val handle = binary("state.bin", 'a'.code.toByte(), 'b'.code.toByte(), 'c'.code.toByte())
+
+        val state = fs.contentStateOf(handle, "state.bin")
+
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", state?.hash)
+        assertEquals(3L, state?.size)
+        assertEquals("state.bin", state?.name)
     }
 
     @Test

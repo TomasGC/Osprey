@@ -5,13 +5,23 @@ import java.time.ZoneId
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileEntry
+import app.osprey.filesystem.FileTimestamps
+import app.osprey.filesystem.FirstTimestampWriteFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import app.osprey.history.FileState
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
+import java.time.Instant
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+private val DAY: Instant = Instant.parse("2019-05-04T12:00:00Z")
 
 class DatesPlannerTest {
 
@@ -214,5 +224,48 @@ class DatesPlannerTest {
 
         val expected = LocalDateTime.of(2017, 4, 25, 15, 26, 2).atZone(ZoneId.systemDefault()).toInstant()
         assertEquals(expected, fs.readTimestamps(plan.fixes.single().entry).modified)
+    }
+
+    @Test
+    fun `apply records the dates before and after each write`() {
+        val fs = FakeFileSystemRepository()
+        val photo = fs.addFile(fs.root, "IMG_20170425_152602.jpg", ByteArray(7))
+        fs.writeTimestamps(photo, FileTimestamps(created = DAY, modified = DAY))
+        val planner = DatesPlanner(fs, FakeMediaMetadataReader())
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(fs.root), ZoneOffset.UTC, control)
+
+        val set = LocalDateTime.of(2017, 4, 25, 15, 26, 2).toInstant(ZoneOffset.UTC)
+        assertEquals(
+            listOf(
+                FileRecord(
+                    "IMG_20170425_152602.jpg",
+                    FileResult.Done,
+                    before = FileState(7, DAY, DAY, name = "IMG_20170425_152602.jpg"),
+                    after = FileState(7, set, set, name = "IMG_20170425_152602.jpg"),
+                ),
+            ),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `a write that fails is recorded and the next file still gets its date`() {
+        val inner = FakeFileSystemRepository()
+        twoFixes(inner)
+        val fs = FirstTimestampWriteFails(inner)
+        val planner = DatesPlanner(fs, FakeMediaMetadataReader())
+        val control = RecordingJobControl()
+
+        val fixed = planner.apply(planner.plan(inner.root), ZoneOffset.UTC, control)
+
+        assertEquals(1, fixed)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done), control.files.map { it.result })
+        val failed = control.files.first()
+        assertEquals("locked", failed.message)
+        assertNull(failed.after)
+        assertNotNull(failed.before)
+        assertEquals(1, inner.list(inner.root).count { inner.readTimestamps(it.handle).modified != null })
     }
 }

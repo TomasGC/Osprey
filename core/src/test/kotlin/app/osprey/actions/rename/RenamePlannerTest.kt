@@ -1,10 +1,18 @@
 package app.osprey.actions.rename
 
-import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.filesystem.FirstRenameFails
+import app.osprey.filesystem.FileTimestamps
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import app.osprey.history.FileState
+import app.osprey.jobs.RecordingJobControl
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+private val DAY: Instant = Instant.parse("2019-05-04T12:00:00Z")
 
 class RenamePlannerTest {
 
@@ -155,5 +163,45 @@ class RenamePlannerTest {
 
         assertEquals(1, renamed)
         assertEquals(listOf("b (1).jpg"), planner.plan(fs.root).renames.map { it.sourceName })
+    }
+
+    @Test
+    fun `apply records each rename with the name, size and dates before and after`() {
+        val fs = FakeFileSystemRepository()
+        val photo = fs.addFile(fs.root, "photo (1).jpg", ByteArray(7))
+        fs.writeTimestamps(photo, FileTimestamps(created = DAY, modified = DAY))
+        val planner = RenamePlanner(fs)
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(fs.root), control)
+
+        assertEquals(
+            listOf(
+                FileRecord(
+                    "photo (1).jpg",
+                    FileResult.Done,
+                    before = FileState(7, DAY, DAY, name = "photo (1).jpg"),
+                    after = FileState(7, DAY, DAY, name = "photo.jpg"),
+                ),
+            ),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `a rename that fails is recorded and the next file is still renamed`() {
+        val inner = FakeFileSystemRepository()
+        inner.addFile(inner.root, "a (1).jpg")
+        inner.addFile(inner.root, "b (1).jpg")
+        val fs = FirstRenameFails(inner)
+        val planner = RenamePlanner(fs)
+        val control = RecordingJobControl()
+
+        val renamed = planner.apply(planner.plan(inner.root), control)
+
+        assertEquals(1, renamed)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done), control.files.map { it.result })
+        assertEquals("locked", control.files.first().message)
+        assertEquals(listOf("a (1).jpg", "b.jpg"), fs.list(inner.root).map { it.name }.sorted())
     }
 }

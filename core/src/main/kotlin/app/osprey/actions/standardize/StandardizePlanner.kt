@@ -8,8 +8,10 @@ import app.osprey.actions.videoExtensions
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.stateOf
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.applyToFile
 import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
@@ -64,7 +66,14 @@ class StandardizePlanner(
         val resolved = resolveMediaDate(entry.handle, entry.name, mediaMetadataReader) ?: return EntryOutcome.Unfixable
         val targetName = targetNameFor(entry.name, prefix, resolved, existingNames, claimed)
         if (targetName == entry.name) return EntryOutcome.Skip
-        val rename = StandardizeRename(entry.handle, entry.name, targetName, resolved.dateTime, resolved.source)
+        val rename = StandardizeRename(
+            entry.handle,
+            entry.name,
+            targetName,
+            resolved.dateTime,
+            resolved.source,
+            entry.sizeBytes,
+        )
         return EntryOutcome.Rename(rename)
     }
 
@@ -79,12 +88,19 @@ class StandardizePlanner(
         return plan.renames.size
     }
 
-    /** Renames every file in [plan], stopping between two files when [control] says so; returns how many. */
+    /**
+     * Renames every file in [plan], stopping between two files when [control] says so; returns how many.
+     * A file the file system refuses is recorded as failed and the next one is still renamed (#79).
+     */
     fun apply(plan: StandardizePlan, control: JobControl = NoJobControl): Int {
         var renamed = 0
         control.forEachUntilStopped(plan.renames, StandardizeRename::sourceName) { rename ->
-            fs.rename(rename.entry, rename.targetName)
-            renamed++
+            val worked = control.applyToFile(rename.sourceName) {
+                before = fs.stateOf(rename.entry, rename.sourceName, rename.sizeBytes)
+                val target = fs.rename(rename.entry, rename.targetName)
+                after = fs.stateOf(target, rename.targetName, rename.sizeBytes)
+            }
+            if (worked) renamed++
         }
         return renamed
     }

@@ -11,6 +11,8 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
+import app.osprey.jobs.scopedName
+import app.osprey.jobs.underFolder
 import app.osprey.jobs.withStoppedNote
 import app.osprey.media.MediaMetadataReader
 
@@ -27,6 +29,7 @@ class VisualDupesController(
 ) {
     private var scannedDir by mutableStateOf<FileHandle?>(null)
     private var groups by mutableStateOf(emptyList<VisualDupeGroupUi>())
+    private var scannedScope: String? = null
 
     var scanning by mutableStateOf(false)
         private set
@@ -34,17 +37,19 @@ class VisualDupesController(
     /** The groups found in [yearDir] by the last scan, or none when that scan was of another folder. */
     fun groupsIn(yearDir: FileHandle): List<VisualDupeGroupUi> = if (scannedDir == yearDir) groups else emptyList()
 
-    fun onScan(yearDir: FileHandle) {
+    fun onScan(yearDir: FileHandle, scope: String? = null) {
         if (scanning) return
         scanning = true
-        jobs.enqueue("Visual Dupes scan", onDone = { scanning = false }, writes = false) { control ->
+        val label = scopedName("Visual Dupes", scope)
+        jobs.enqueue("$label scan", onDone = { scanning = false }, writes = false) { control ->
             val plan = VisualDupePlanner(fs, mediaMetadataReader).plan(yearDir, control = control)
             if (control.shouldStop()) {
-                JobOutcome("Visual Dupes scan: stopped", stopped = true)
+                JobOutcome("$label scan: stopped", stopped = true)
             } else {
                 groups = toUiGroups(plan.groups)
                 scannedDir = yearDir
-                JobOutcome("Visual Dupes scan: ${plan.groups.size} groups")
+                scannedScope = scope
+                JobOutcome("$label scan: ${plan.groups.size} groups")
             }
         }
     }
@@ -59,20 +64,26 @@ class VisualDupesController(
             else -> {
                 group.moving = true
                 val trash = trashLocation()
-                jobs.enqueue("Visual Dupes group #${group.index}", onDone = { group.moving = false }) { control ->
-                    val result = moveUncheckedToTrash(fs, trash, yearDir, group.members, kept, control)
+                val label = scopedName("Visual Dupes", scannedScope)
+                jobs.enqueue("$label group #${group.index}", onDone = { group.moving = false }) { control ->
+                    val placed = control.underFolder(scannedScope)
+                    val result = moveUncheckedToTrash(fs, trash, yearDir, group.members, kept, placed)
                     val stopped = control.shouldStop()
-                    group.done = !stopped
+                    group.done = !stopped && result.failed.isEmpty()
                     group.status = moveStatus(result, stopped)
-                    val summary = "Visual Dupes group #${group.index}: moved ${result.moved.size}"
-                    JobOutcome(withStoppedNote(summary, stopped), stopped = stopped)
+                    val failures = result.failed.size
+                    val counts = "$label group #${group.index}: moved ${result.moved.size}"
+                    val summary = if (failures > 0) "$counts, $failures failed" else counts
+                    JobOutcome(withStoppedNote(summary, stopped), stopped = stopped, failures = failures)
                 }
             }
         }
     }
 
     private fun moveStatus(result: MoveDupsResult, stopped: Boolean): String {
+        val failed = result.failed.takeIf { it.isNotEmpty() }?.let { ", failed ${it.size} (${it.joinToString(", ")})" }
         val skipped = result.skipped.takeIf { it.isNotEmpty() }?.let { " (skipped: ${it.joinToString(", ")})" }
-        return (if (stopped) "Stopped after moving " else "Moved ") + result.moved.size + skipped.orEmpty()
+        return (if (stopped) "Stopped after moving " else "Moved ") + result.moved.size + failed.orEmpty() +
+            skipped.orEmpty()
     }
 }

@@ -11,6 +11,11 @@ import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.HistoryController
+import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.JobHistoryStore
+import app.osprey.history.RunRecorder
+import app.osprey.history.contentStateOf
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.SettingsStore
@@ -39,14 +44,15 @@ class AppState(
     val fs: FileSystemRepository,
     val mediaMetadataReader: MediaMetadataReader,
     private val settingsStore: SettingsStore,
-    val jobs: JobQueue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO)),
+    val history: JobHistoryStore = InMemoryJobHistoryStore(),
+    val jobs: JobQueue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO), RunRecorder(history)),
 ) {
 
     /**
      * The quarter turns given to photos in the viewer this session; cards and viewer both follow them (#51), and the
      * viewer can write a turn into a JPEG's file (#61).
      */
-    val viewTurns = ViewTurns(TurnSaver(fs)::save)
+    val viewTurns = ViewTurns(TurnSaver(fs)::save, RunRecorder(history), fs::contentStateOf)
 
     val settingsState = SettingsState(settingsStore) { openLibrary(it) }
     var libraryPath by mutableStateOf<Path?>(null)
@@ -58,6 +64,12 @@ class AppState(
 
     /** Whether the Trash screen is showing instead of the selected action. */
     var showsTrash by mutableStateOf(false)
+
+    /** Whether the History screen is showing instead of the selected action. */
+    var showsHistory by mutableStateOf(false)
+
+    /** The logic of the History screen over this app's run history. */
+    val historyScreen = HistoryController(history)
 
     val flatten = flattenController(fs, jobs)
     val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
@@ -94,8 +106,21 @@ class AppState(
             return
         }
         settingsState.showing = false
+        showsHistory = false
         trash.refresh(root)
         showsTrash = true
+    }
+
+    /** Opens the History screen on its list, or goes back to the actions when it is already open. */
+    fun toggleHistory() {
+        if (showsHistory || libraryHandle() == null) {
+            showsHistory = false
+            return
+        }
+        settingsState.showing = false
+        showsTrash = false
+        historyScreen.back()
+        showsHistory = true
     }
 
     /** The tabs to show: "Migrate old trash" only while an old `TODELETE*` folder is left. */

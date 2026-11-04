@@ -1,14 +1,22 @@
 package app.osprey.actions.standardize
 
-import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.filesystem.FileTimestamps
+import app.osprey.filesystem.FirstRenameFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import app.osprey.history.FileState
+import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
+import java.time.Instant
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+private val DAY: Instant = Instant.parse("2019-05-04T12:00:00Z")
 
 class StandardizePlannerTest {
 
@@ -252,5 +260,47 @@ class StandardizePlannerTest {
         val rename = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root).renames.single()
 
         assertEquals("IMG_2016-08-28_19-30-34.heif", rename.targetName)
+    }
+
+    @Test
+    fun `apply records each rename with the name, size and dates before and after`() {
+        val fs = FakeFileSystemRepository()
+        val photo = fs.addFile(fs.root, "download_20160828_193034.jpeg", ByteArray(7))
+        fs.writeTimestamps(photo, FileTimestamps(created = DAY, modified = DAY))
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(fs.root), control)
+
+        assertEquals(
+            listOf(
+                FileRecord(
+                    "download_20160828_193034.jpeg",
+                    FileResult.Done,
+                    before = FileState(7, DAY, DAY, name = "download_20160828_193034.jpeg"),
+                    after = FileState(7, DAY, DAY, name = "IMG_2016-08-28_19-30-34.jpeg"),
+                ),
+            ),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `a rename that fails is recorded and the next file is still renamed`() {
+        val inner = FakeFileSystemRepository()
+        inner.addFile(inner.root, "download_20160828_193034.jpeg", "x".toByteArray())
+        inner.addFile(inner.root, "download_20160901_100000.jpeg", "x".toByteArray())
+        val fs = FirstRenameFails(inner)
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+        val control = RecordingJobControl()
+
+        val renamed = planner.apply(planner.plan(inner.root), control)
+
+        assertEquals(1, renamed)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done), control.files.map { it.result })
+        assertEquals("locked", control.files.first().message)
+        val names = fs.list(inner.root).map { it.name }
+        assertTrue(control.files.first().path in names)
+        assertEquals(1, names.count { it.startsWith("IMG_") })
     }
 }

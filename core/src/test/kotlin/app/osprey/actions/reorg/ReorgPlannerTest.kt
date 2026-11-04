@@ -7,6 +7,8 @@ import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import app.osprey.jobs.JobProgress
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
@@ -531,5 +533,44 @@ class ReorgPlannerTest {
 
         override fun list(folder: FileHandle): List<FileEntry> =
             inner.list(folder).map { if (it.handle in copies) it.copy(sizeBytes = it.sizeBytes + 1) else it }
+    }
+
+    @Test
+    fun `apply records every file with where it went`() {
+        file(camera, "a.jpg", 2018)
+        file(whatsapp, "b.jpg", 2019)
+        file(fs.addFolder(output, "2019"), "c.jpg", 2016)
+        val control = RecordingJobControl()
+        val plan = planner.plan(output, listOf(copyFrom(camera), moveFrom(whatsapp, "WhatsApp")))
+
+        planner.apply(plan, output, control)
+
+        assertEquals(
+            setOf(
+                FileRecord("Camera/a.jpg", FileResult.Done, "copied to 2018/a.jpg"),
+                FileRecord("WhatsApp/b.jpg", FileResult.Done, "moved to 2019/b.jpg"),
+                FileRecord("2019/c.jpg", FileResult.Done, "refiled to 2016/c.jpg"),
+            ),
+            control.files.toSet(),
+        )
+    }
+
+    @Test
+    fun `apply records a file that failed with the reason and the one after it as done`() {
+        file(camera, "a.jpg", 2018)
+        file(camera, "b.jpg", 2018)
+        val plan = planner.plan(output, listOf(copyFrom(camera)))
+        fs.addFile(fs.createFolder(output, "2018"), "a.jpg", byteArrayOf(9)) // appears after planning
+        val control = RecordingJobControl()
+
+        val result = planner.apply(plan, output, control)
+
+        assertEquals(
+            listOf(
+                FileRecord("Camera/a.jpg", FileResult.Failed, result.failures.single().reason),
+                FileRecord("Camera/b.jpg", FileResult.Done, "copied to 2018/b.jpg"),
+            ),
+            control.files,
+        )
     }
 }

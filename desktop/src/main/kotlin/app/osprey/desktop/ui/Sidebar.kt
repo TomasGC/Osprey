@@ -1,5 +1,6 @@
 package app.osprey.desktop.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,7 @@ fun Sidebar(state: AppState) {
             Spacer(Modifier.height(8.dp))
             NavList(state)
             Spacer(Modifier.weight(1f))
+            HistoryButton(state)
             SettingsButton(state)
         }
     }
@@ -69,20 +71,33 @@ private fun LibraryBlock(state: AppState) {
     }
 }
 
+/** The clock: opens the History screen (#79), or returns to the actions when it is already open. */
+@Composable
+private fun HistoryButton(state: AppState) {
+    Row(modifier = Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = state::toggleHistory) {
+            Text("🕘")
+        }
+        if (!state.sidebarCollapsed) {
+            Text("History", modifier = Modifier.clickable(onClick = state::toggleHistory))
+        }
+    }
+}
+
 /** The cog: opens the Settings screen, or returns to the actions when it is already open. */
 @Composable
 private fun SettingsButton(state: AppState) {
+    val toggleSettings = {
+        state.showsTrash = false
+        state.showsHistory = false
+        state.settingsState.showing = !state.settingsState.showing
+    }
     Row(modifier = Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
-            onClick = {
-                state.showsTrash = false
-                state.settingsState.showing = !state.settingsState.showing
-            },
-        ) {
+        IconButton(onClick = toggleSettings) {
             Text("⚙")
         }
         if (!state.sidebarCollapsed) {
-            Text("Settings")
+            Text("Settings", modifier = Modifier.clickable(onClick = toggleSettings))
             Spacer(Modifier.weight(1f))
         }
         IconButton(onClick = state::toggleTrash) {
@@ -128,6 +143,7 @@ private fun NavList(state: AppState) {
         Button(
             onClick = {
                 state.showsTrash = false
+                state.showsHistory = false
                 state.selectedTab = tab
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),

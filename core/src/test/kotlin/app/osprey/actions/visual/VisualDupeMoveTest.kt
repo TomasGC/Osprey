@@ -6,6 +6,9 @@ import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.FirstMoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -104,5 +107,64 @@ class VisualDupeMoveTest {
 
         assertEquals(listOf("dup1.jpg"), result.moved)
         assertTrue(exists(year, "dup2.jpg"))
+    }
+
+    @Test
+    fun `records each moved member with where it went`() {
+        val keep = write("keep.jpg")
+        val dup = write("dup.jpg")
+        val control = RecordingJobControl()
+
+        moveUncheckedToTrash(fs, trash, year, listOf(keep, dup), setOf("keep.jpg"), control)
+
+        assertEquals(
+            listOf(FileRecord("dup.jpg", FileResult.Done, "moved to Trash/2019/VisualDupes/dup.jpg")),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `records a member that is no longer in the folder as skipped`() {
+        val keep = write("keep.jpg")
+        val dup = write("dup.jpg")
+        fs.delete(dup.handle)
+        val control = RecordingJobControl()
+
+        moveUncheckedToTrash(fs, trash, year, listOf(keep, dup), setOf("keep.jpg"), control)
+
+        assertEquals(
+            listOf(FileRecord("dup.jpg", FileResult.Skipped, "no longer in the folder")),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `a member that could not be moved is recorded as failed and the others still move`() {
+        val keep = write("keep.jpg")
+        val dup1 = write("dup1.jpg")
+        val dup2 = write("dup2.jpg")
+        val control = RecordingJobControl()
+
+        val result = moveUncheckedToTrash(
+            FirstMoveFails(fs), trash, year, listOf(keep, dup1, dup2), setOf("keep.jpg"), control,
+        )
+
+        assertEquals(listOf("dup2.jpg"), result.moved)
+        assertEquals(listOf("dup1.jpg"), result.failed)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done), control.files.map { it.result })
+        assertEquals("locked", control.files.first().message)
+    }
+
+    @Test
+    fun `members whose trash names would collide with each other still all move`() {
+        val keep = write("keep.jpg")
+        val first = write("a.jpg")
+        val second = write("a__dup1.jpg")
+        fs.addFile(trashFolder(), "a.jpg", ByteArray(1)) // the Trash already holds a.jpg
+
+        val result = moveUncheckedToTrash(fs, trash, year, listOf(keep, first, second), setOf("keep.jpg"))
+
+        assertEquals(2, result.moved.size)
+        assertEquals(3, fs.list(trashFolder()).size)
     }
 }

@@ -18,6 +18,10 @@ import app.osprey.android.filesystem.AndroidFileHandle
 import app.osprey.android.filesystem.AndroidFileSystemRepository
 import app.osprey.android.media.AndroidOrientationSource
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.FileResult
+import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.RunRecorder
+import app.osprey.history.contentStateOf
 import app.osprey.media.ExifOrientation
 import app.osprey.media.HeicSamples
 import app.osprey.media.MediaDate
@@ -28,11 +32,13 @@ import app.osprey.viewer.TurnSaveResult
 import app.osprey.viewer.TurnSaver
 import app.osprey.viewer.ViewTurns
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -63,7 +69,9 @@ class SaveTurnInstrumentedTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val orientations = AndroidOrientationSource(context)
-    private val turns = ViewTurns(TurnSaver(AndroidFileSystemRepository(context))::save)
+    private val repository = AndroidFileSystemRepository(context)
+    private val history = InMemoryJobHistoryStore()
+    private val turns = ViewTurns(TurnSaver(repository)::save, RunRecorder(history), repository::contentStateOf)
     private val files = mutableListOf<File>()
     private val held = mutableListOf<CountDownLatch>()
     private val decodes = AtomicInteger()
@@ -115,6 +123,40 @@ class SaveTurnInstrumentedTest {
     }
 
     private fun bytesOf(name: String): ByteArray = File(context.cacheDir, name).readBytes()
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    /** Saves one turn the way the viewer does, and checks the run it left in the History against the file (#79). */
+    private fun assertSavedAndRecorded(handle: AndroidFileHandle, name: String) {
+        val original = bytesOf(name)
+        turns.turn(handle, 1)
+
+        turns.save(handle, name)
+
+        val record = history.runs().single().files.single()
+        assertEquals(FileResult.Done, record.result)
+        assertEquals(sha256(original), record.before?.hash)
+        assertEquals(sha256(bytesOf(name)), record.after?.hash)
+        assertNotEquals(record.before?.hash, record.after?.hash)
+        assertEquals(original.size.toLong(), record.before?.size)
+        assertEquals(bytesOf(name).size.toLong(), record.after?.size)
+    }
+
+    @Test
+    fun aSavedJpegTurnIsRecordedWithTheHashAndSizeOfTheFileBeforeAndAfter() {
+        assertSavedAndRecorded(jpeg("recorded.jpg", ExifInterface.ORIENTATION_ROTATE_90), "recorded.jpg")
+    }
+
+    @Test
+    fun aSavedPngTurnIsRecordedWithTheHashAndSizeOfTheFileBeforeAndAfter() {
+        assertSavedAndRecorded(png("recorded.png"), "recorded.png")
+    }
+
+    @Test
+    fun aSavedHeicTurnIsRecordedWithTheHashAndSizeOfTheFileBeforeAndAfter() {
+        assertSavedAndRecorded(heic("recorded.heic", HeicSamples.plain), "recorded.heic")
+    }
 
     private fun showViewer(handle: AndroidFileHandle, name: String, viewTurns: ViewTurns = turns) {
         composeRule.setContent {
@@ -258,10 +300,12 @@ class SaveTurnInstrumentedTest {
     /** A [ViewTurns] whose saver waits for [release], then answers [outcome]: a stand-in for a big PNG. */
     private fun heldTurns(release: CountDownLatch, outcome: () -> TurnSaveResult): ViewTurns {
         held += release
-        return ViewTurns { _, _, _ ->
-            release.await(HOLD_MS, TimeUnit.MILLISECONDS)
-            outcome()
-        }
+        return ViewTurns(
+            saveTurn = { _, _, _ ->
+                release.await(HOLD_MS, TimeUnit.MILLISECONDS)
+                outcome()
+            },
+        )
     }
 
     private fun indicatorShown() = composeRule.onAllNodesWithText(ViewTurns.SAVING).fetchSemanticsNodes().isNotEmpty()

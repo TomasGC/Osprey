@@ -47,6 +47,10 @@ private fun OspreyContent(state: AppState) {
         TrashScreen(state, libraryDir)
         return
     }
+    if (state.showsHistory && libraryDir != null) {
+        HistoryScreen(state.historyScreen)
+        return
+    }
     val rootAction = libraryDir?.let { rootActionFor(state, state.selectedTab, it) }
     if (rootAction != null) {
         ActionPane(rootAction.ui, rootAction.scan, rootAction.apply)
@@ -68,7 +72,8 @@ private fun YearContent(state: AppState) {
         return
     }
     val controller = controllerFor(state, state.selectedTab)
-    ActionPane(controller.state, { controller.onScan(yearDir) }, { controller.onApply(yearDir) })
+    val year = state.selectedYear
+    ActionPane(controller.state, { controller.onScan(yearDir, year) }, { controller.onApply(yearDir, year) })
 }
 
 /** A pane that runs on the library root: what it shows, how it scans and applies, and whether it can stop. */

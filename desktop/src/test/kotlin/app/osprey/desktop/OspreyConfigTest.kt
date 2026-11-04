@@ -1,7 +1,10 @@
 package app.osprey.desktop
 
+import app.osprey.jobs.JobOutcome
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -96,6 +99,20 @@ class OspreyConfigTest {
     }
 
     @Test
+    fun `the run history folder is beside the config file`() {
+        assertEquals(tempDir.resolve("history").toFile(), OspreyConfig.historyDir())
+    }
+
+    @Test
+    fun `the real app state keeps its run history in that folder`() {
+        val state = desktopAppState()
+
+        runBlocking { withTimeout(WAIT_MS) { state.jobs.enqueue("Probe") { JobOutcome("Probe: 1 done") }.await() } }
+
+        assertEquals(listOf("1.jsonl"), OspreyConfig.historyDir().list().orEmpty().toList())
+    }
+
+    @Test
     fun `without an override the config lives in the osprey folder of the user home`() {
         val home = Files.createDirectory(tempDir.resolve("home"))
         val previousHome = System.getProperty("user.home")
@@ -111,5 +128,9 @@ class OspreyConfigTest {
         } finally {
             System.setProperty("user.home", previousHome)
         }
+    }
+
+    private companion object {
+        const val WAIT_MS = 5_000L
     }
 }
