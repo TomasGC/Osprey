@@ -6,9 +6,12 @@ import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.freeTrashName
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
+import app.osprey.jobs.recordingFile
 
 /**
  * Moves every member of [group] not in [keepNames] into [trash]'s VisualDupes folder --
@@ -39,9 +42,13 @@ fun moveUncheckedToTrash(
     control.forEachUntilStopped(extras, VisualDupeMember::name) { extra ->
         if (extra.name !in currentNames) {
             skipped += extra.name
+            control.record(FileRecord(extra.name, FileResult.Skipped, "no longer in the folder"))
         } else {
             val targetName = freeTrashName(extra.name, taken)
-            fs.move(extra.handle, destination, targetName)
+            val where = "${TrashAction.VISUAL_DUPES.folderName}/$targetName"
+            control.recordingFile(extra.name, "moved to Trash/${trash.year}/$where") {
+                fs.move(extra.handle, destination, targetName)
+            }
             taken += targetName
             moved += extra.name
         }

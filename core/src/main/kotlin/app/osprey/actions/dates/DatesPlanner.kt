@@ -6,8 +6,10 @@ import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTimestamps
+import app.osprey.history.stateOf
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
+import app.osprey.jobs.applyToFile
 import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaDateSource
 import app.osprey.media.MediaMetadataReader
@@ -38,7 +40,7 @@ class DatesPlanner(
             if (resolved == null) {
                 unfixable += entry
             } else {
-                fixes += DatesFix(entry.handle, entry.name, resolved.dateTime, resolved.source)
+                fixes += DatesFix(entry.handle, entry.name, resolved.dateTime, resolved.source, entry.sizeBytes)
             }
         }
         return DatesPlan(fixes, unfixable)
@@ -47,14 +49,20 @@ class DatesPlanner(
     /**
      * Sets the created and modified time of every file in [plan] to its resolved date, read as local time in
      * [zone], and returns how many it set. [control] can stop it between two files. A platform that cannot write
-     * timestamps (Android's file system) ignores the call, so the count is then the files it asked about.
+     * timestamps (Android's file system) ignores the call, so the count is then the files it asked about and the
+     * recorded "after" dates are the unchanged ones. A file the file system refuses is recorded as failed and the
+     * next one still gets its date (#79).
      */
     fun apply(plan: DatesPlan, zone: ZoneId = ZoneId.systemDefault(), control: JobControl = NoJobControl): Int {
         var fixed = 0
         control.forEachUntilStopped(plan.fixes, DatesFix::name) { fix ->
-            val instant = fix.dateTime.atZone(zone).toInstant()
-            fs.writeTimestamps(fix.entry, FileTimestamps(created = instant, modified = instant))
-            fixed++
+            val worked = control.applyToFile(fix.name) {
+                before = fs.stateOf(fix.entry, fix.name, fix.sizeBytes)
+                val instant = fix.dateTime.atZone(zone).toInstant()
+                fs.writeTimestamps(fix.entry, FileTimestamps(created = instant, modified = instant))
+                after = fs.stateOf(fix.entry, fix.name, fix.sizeBytes)
+            }
+            if (worked) fixed++
         }
         return fixed
     }

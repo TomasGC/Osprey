@@ -6,7 +6,12 @@ import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.MoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import java.io.IOException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,5 +109,47 @@ class VisualDupeMoveTest {
 
         assertEquals(listOf("dup1.jpg"), result.moved)
         assertTrue(exists(year, "dup2.jpg"))
+    }
+
+    @Test
+    fun `records each moved member with where it went`() {
+        val keep = write("keep.jpg")
+        val dup = write("dup.jpg")
+        val control = RecordingJobControl()
+
+        moveUncheckedToTrash(fs, trash, year, listOf(keep, dup), setOf("keep.jpg"), control)
+
+        assertEquals(
+            listOf(FileRecord("dup.jpg", FileResult.Done, "moved to Trash/2019/VisualDupes/dup.jpg")),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `records a member that is no longer in the folder as skipped`() {
+        val keep = write("keep.jpg")
+        val dup = write("dup.jpg")
+        fs.delete(dup.handle)
+        val control = RecordingJobControl()
+
+        moveUncheckedToTrash(fs, trash, year, listOf(keep, dup), setOf("keep.jpg"), control)
+
+        assertEquals(
+            listOf(FileRecord("dup.jpg", FileResult.Skipped, "no longer in the folder")),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `records the member that could not be moved and still fails the run`() {
+        val keep = write("keep.jpg")
+        val dup = write("dup.jpg")
+        val control = RecordingJobControl()
+
+        assertThrows(IOException::class.java) {
+            moveUncheckedToTrash(MoveFails(fs), trash, year, listOf(keep, dup), setOf("keep.jpg"), control)
+        }
+
+        assertEquals(listOf(FileRecord("dup.jpg", FileResult.Failed, "locked")), control.files)
     }
 }

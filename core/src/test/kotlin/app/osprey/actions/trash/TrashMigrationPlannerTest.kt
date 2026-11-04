@@ -3,8 +3,13 @@ package app.osprey.actions.trash
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.MoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -236,5 +241,36 @@ class TrashMigrationPlannerTest {
         assertEquals(1, moved)
         assertEquals(emptyList<String>(), logs)
         assertEquals(2, planner.plan(fs.root).moves.size)
+    }
+
+    @Test
+    fun `apply records each file with where it went`() {
+        val year = yearFolder("2019")
+        fs.addFile(fs.addFolder(year, "TODELETE"), "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.addFolder(year, "TODELETEDUPS"), "b.jpg", byteArrayOf(2))
+        val plan = planner.plan(fs.root)
+        val control = RecordingJobControl()
+
+        planner.apply(plan, fs.root, control) {}
+
+        val paths = plan.moves.associate { it.destName to it.sourcePath }
+        assertEquals(
+            setOf(
+                FileRecord(paths.getValue("a.jpg"), FileResult.Done, "moved to Trash/2019/Dedupe/a.jpg"),
+                FileRecord(paths.getValue("b.jpg"), FileResult.Done, "moved to Trash/2019/VisualDupes/b.jpg"),
+            ),
+            control.files.toSet(),
+        )
+    }
+
+    @Test
+    fun `apply records the file that could not be moved and still fails the run`() {
+        fs.addFile(fs.addFolder(yearFolder("2019"), "TODELETE"), "a.jpg", byteArrayOf(1))
+        val plan = planner.plan(fs.root)
+        val control = RecordingJobControl()
+
+        assertThrows(IOException::class.java) { TrashMigrationPlanner(MoveFails(fs)).apply(plan, fs.root, control) {} }
+
+        assertEquals(listOf(FileRecord(plan.moves.single().sourcePath, FileResult.Failed, "locked")), control.files)
     }
 }

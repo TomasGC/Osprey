@@ -2,8 +2,13 @@ package app.osprey.actions.flatten
 
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.filesystem.MoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -244,5 +249,29 @@ class FlattenPlannerTest {
         assertEquals(1, moved)
         assertEquals(emptyList<String>(), logs)
         assertEquals(1, planner.plan(fs.root).moves.size)
+    }
+
+    @Test
+    fun `apply records each file with where it went`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        val planner = FlattenPlanner(fs)
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(fs.root), fs.root, control) {}
+
+        assertEquals(listOf(FileRecord("06/a.jpg", FileResult.Done, "moved up as a.jpg")), control.files)
+    }
+
+    @Test
+    fun `apply records the file that could not be moved and still fails the run`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg")
+        val plan = FlattenPlanner(fs).plan(fs.root)
+        val control = RecordingJobControl()
+
+        assertThrows(IOException::class.java) { FlattenPlanner(MoveFails(fs)).apply(plan, fs.root, control) {} }
+
+        assertEquals(listOf(FileRecord("06/a.jpg", FileResult.Failed, "locked")), control.files)
     }
 }

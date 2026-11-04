@@ -7,6 +7,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
+import app.osprey.jobs.recordResult
 
 private const val NOT_IN_TRASH = "not in the Trash any more"
 
@@ -45,6 +46,7 @@ class TrashRestorer(private val fs: FileSystemRepository) {
         val finished = control.forEachUntilStopped(plan.direct, TrashEntry::label) { entry ->
             touched += entry.year to entry.action
             val failure = attempt(entry.label) { moveBack(locator, libraryRoot, entry, entry.name) }
+            control.recordResult(entry.label, failure?.reason, "restored")
             if (failure == null) restored++ else failures += failure
         }
         val pruned = touched.sumOf { (year, action) -> locator.prune(year, action) }

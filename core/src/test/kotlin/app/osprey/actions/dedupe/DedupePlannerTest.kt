@@ -7,8 +7,13 @@ import app.osprey.actions.trash.TrashFolders
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.MoveFails
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -190,5 +195,31 @@ class DedupePlannerTest {
 
         assertEquals(0, planner.apply(DedupePlan(emptyList()), trash, control))
         assertEquals(emptyList<JobProgress>(), control.reports)
+    }
+
+    @Test
+    fun `apply records each extra with where it went and what it duplicates`() {
+        fs.addFile(year, "a.jpg", "dup content".toByteArray())
+        fs.addFile(year, "b.jpg", "dup content".toByteArray())
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(year, trash), trash, control)
+
+        assertEquals(
+            listOf(FileRecord("b.jpg", FileResult.Done, "moved to Trash/2019/Dedupe/b.jpg (same as a.jpg)")),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `apply records the file that could not be moved and still fails the run`() {
+        fs.addFile(year, "a.jpg", "dup content".toByteArray())
+        fs.addFile(year, "b.jpg", "dup content".toByteArray())
+        val plan = planner.plan(year, trash)
+        val control = RecordingJobControl()
+
+        assertThrows(IOException::class.java) { DedupePlanner(MoveFails(fs)).apply(plan, trash, control) }
+
+        assertEquals(listOf(FileRecord("b.jpg", FileResult.Failed, "locked")), control.files)
     }
 }

@@ -8,6 +8,7 @@ import app.osprey.filesystem.failureReason
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
+import app.osprey.jobs.recordResult
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.InputMode
 
@@ -106,6 +107,7 @@ class ReorgPlanner(
             val failure = attempt(item) {
                 perform(item, yearFolders.getOrPut(item.year) { fs.createFolder(output, item.year.toString()) })
             }
+            control.recordResult(item.label, failure?.reason, item.doneMessage())
             if (failure == null) counts.merge(item.operation, 1, Int::plus) else failures += failure
         }
         return ReorgResult(
@@ -115,6 +117,15 @@ class ReorgPlanner(
             failures = failures,
             cancelled = !finished,
         )
+    }
+
+    private fun ReorgItem.doneMessage(): String {
+        val verb = when (operation) {
+            ReorgOperation.COPY -> "copied"
+            ReorgOperation.MOVE -> "moved"
+            ReorgOperation.REFILE -> "refiled"
+        }
+        return "$verb to $year/$destName"
     }
 
     private fun perform(item: ReorgItem, dest: FileHandle) {

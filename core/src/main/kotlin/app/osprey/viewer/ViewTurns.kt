@@ -1,6 +1,8 @@
 package app.osprey.viewer
 
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.RunRecorder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +18,7 @@ class ViewTurns(
     private val saveTurn: (FileHandle, String, Int) -> TurnSaveResult = { _, _, _ ->
         TurnSaveResult.Refused(NO_SAVER)
     },
+    private val recorder: RunRecorder = RunRecorder(InMemoryJobHistoryStore()),
 ) {
 
     private val state = MutableStateFlow<Map<FileHandle, Int>>(emptyMap())
@@ -64,6 +67,7 @@ class ViewTurns(
         val pending = turnsOf(handle)
         if (pending == 0) return TurnSaveResult.Saved
         if (!claim(handle)) return TurnSaveResult.Refused(ALREADY_SAVING)
+        val run = recorder.begin(SAVE_TURN).also { it.start() }
         try {
             val result = runSaver(handle, name, pending)
             if (result.isSaved) {
@@ -71,6 +75,7 @@ class ViewTurns(
                 turn(handle, -pending)
             }
             result.userMessage?.let { message -> messageState.update { it + (handle to message) } }
+            run.endSave(name, pending, result)
             return result
         } finally {
             savingState.update { it - handle }
@@ -93,5 +98,6 @@ class ViewTurns(
         const val NO_SAVER = "Saving a turn is not available here"
         const val ALREADY_SAVING = "This photo is already being saved"
         const val SAVING = "Saving…"
+        const val SAVE_TURN = "Save turn"
     }
 }

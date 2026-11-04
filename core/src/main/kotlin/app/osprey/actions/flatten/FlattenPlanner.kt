@@ -7,6 +7,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
+import app.osprey.jobs.recordingFile
 
 private const val TODELETE = "TODELETE"
 
@@ -75,7 +76,9 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
     fun apply(plan: FlattenPlan, root: FileHandle, control: JobControl = NoJobControl, log: (String) -> Unit): Int {
         var moved = 0
         val finished = control.forEachUntilStopped(plan.moves, FlattenMove::sourcePath) { move ->
-            fs.move(move.source, root, move.destName)
+            control.recordingFile(move.sourcePath, "moved up as ${move.destName} ${move.note}".trim()) {
+                fs.move(move.source, root, move.destName)
+            }
             moved++
         }
         if (!finished) return moved

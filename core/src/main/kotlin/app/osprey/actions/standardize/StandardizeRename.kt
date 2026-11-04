@@ -11,4 +11,5 @@ data class StandardizeRename(
     val targetName: String,
     val dateTime: LocalDateTime,
     val source: MediaDateSource,
+    val sizeBytes: Long = 0,
 )

@@ -1,5 +1,7 @@
 package app.osprey.actions.trash
 
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.RecordingJobControl
@@ -124,5 +126,23 @@ class TrashClearerTest {
 
         assertEquals(1, result.deleted)
         assertFalse(result.cancelled)
+    }
+
+    @Test
+    fun `records each deleted file and each one that could not be`() {
+        val gone = lib.trash("2019", TrashAction.DEDUPE, "gone.jpg")
+        val b = lib.trash("2019", TrashAction.DEDUPE, "b.jpg")
+        lib.fs.delete(gone.handle)
+        val control = RecordingJobControl()
+
+        val result = clear(listOf(gone, b), control)
+
+        assertEquals(
+            listOf(
+                FileRecord("Trash/2019/Dedupe/gone.jpg", FileResult.Failed, result.failures.single().reason),
+                FileRecord("Trash/2019/Dedupe/b.jpg", FileResult.Done, "deleted"),
+            ),
+            control.files,
+        )
     }
 }

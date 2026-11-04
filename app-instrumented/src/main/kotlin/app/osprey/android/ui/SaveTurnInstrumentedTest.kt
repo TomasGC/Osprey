@@ -258,10 +258,12 @@ class SaveTurnInstrumentedTest {
     /** A [ViewTurns] whose saver waits for [release], then answers [outcome]: a stand-in for a big PNG. */
     private fun heldTurns(release: CountDownLatch, outcome: () -> TurnSaveResult): ViewTurns {
         held += release
-        return ViewTurns { _, _, _ ->
-            release.await(HOLD_MS, TimeUnit.MILLISECONDS)
-            outcome()
-        }
+        return ViewTurns(
+            saveTurn = { _, _, _ ->
+                release.await(HOLD_MS, TimeUnit.MILLISECONDS)
+                outcome()
+            },
+        )
     }
 
     private fun indicatorShown() = composeRule.onAllNodesWithText(ViewTurns.SAVING).fetchSemanticsNodes().isNotEmpty()

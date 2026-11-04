@@ -1,5 +1,7 @@
 package app.osprey.jobs
 
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,9 +36,11 @@ class JobTypesTest {
     }
 
     @Test
-    fun `no job control never stops and ignores progress`() {
+    fun `no job control never stops and ignores progress and files`() {
         NoJobControl.report(1, 2, "a.jpg")
+        NoJobControl.record(FileRecord("a.jpg", FileResult.Done))
 
         assertFalse(NoJobControl.shouldStop())
+        assertEquals(0, NoJobControl.failedFiles)
     }
 }

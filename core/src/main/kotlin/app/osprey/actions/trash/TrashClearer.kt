@@ -5,6 +5,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
+import app.osprey.jobs.recordResult
 
 /**
  * Deletes files from the Trash: the only irreversible step in Osprey. It acts on the entries it is
@@ -30,6 +31,7 @@ class TrashClearer(private val fs: FileSystemRepository) {
         val finished = control.forEachUntilStopped(entries, TrashEntry::label) { entry ->
             touched += entry.year to entry.action
             val failure = attempt(entry.label) { delete(locator, entry) }
+            control.recordResult(entry.label, failure?.reason, "deleted")
             if (failure == null) deleted++ else failures += failure
         }
         val pruned = touched.sumOf { (year, action) -> locator.prune(year, action) }

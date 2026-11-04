@@ -1,6 +1,11 @@
 package app.osprey.jobs
 
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
+import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.RunRecorder
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -17,13 +22,17 @@ private const val FINISHED_KEPT = 5
  * file it is on and checks [JobControl.shouldStop] between two files. Nothing here knows about Android or
  * a desktop window, so the same queue backs both.
  */
-class JobQueue(scope: CoroutineScope) {
+class JobQueue(
+    scope: CoroutineScope,
+    private val recorder: RunRecorder = RunRecorder(InMemoryJobHistoryStore()),
+) {
 
     private class Pending(
         val id: Long,
         val name: String,
         val work: (JobControl) -> JobOutcome,
         val onDone: (JobOutcome) -> Unit,
+        val run: RunRecorder.Run,
     ) {
         val outcome = CompletableDeferred<JobOutcome>()
         val stopRequested = AtomicBoolean(false)
@@ -56,7 +65,7 @@ class JobQueue(scope: CoroutineScope) {
         writes: Boolean = true,
         work: (JobControl) -> JobOutcome,
     ): JobHandle {
-        val job = Pending(ids.getAndIncrement(), name, work, onDone)
+        val job = Pending(ids.getAndIncrement(), name, work, onDone, recorder.begin(name))
         synchronized(lock) {
             active[job.id] = job
             mutableEntries.value = mutableEntries.value + JobEntry(job.id, name, JobState.Queued, writes)
@@ -74,7 +83,10 @@ class JobQueue(scope: CoroutineScope) {
 
     private fun run(job: Pending) {
         val started = synchronized(lock) {
-            if (!job.removed) setState(job.id, JobState.Running())
+            if (!job.removed) {
+                setState(job.id, JobState.Running())
+                job.run.start()
+            }
             !job.removed
         }
         if (!started) return
@@ -84,6 +96,7 @@ class JobQueue(scope: CoroutineScope) {
             setState(job.id, JobState.Finished(outcome))
             keepLastFinished()
         }
+        job.run.end(outcome)
         job.outcome.complete(outcome)
         notifyDone(job, outcome)
     }
@@ -99,6 +112,7 @@ class JobQueue(scope: CoroutineScope) {
     fun stop(id: Long) {
         val removed = synchronized(lock) { active[id]?.takeIf { stopLocked(it) } } ?: return
         val outcome = JobOutcome("${removed.name}: stopped before it started", stopped = true)
+        removed.run.end(outcome)
         removed.outcome.complete(outcome)
         notifyDone(removed, outcome)
     }
@@ -141,6 +155,15 @@ class JobQueue(scope: CoroutineScope) {
     private inner class Control(private val job: Pending) : JobControl {
 
         override fun shouldStop(): Boolean = job.stopRequested.get()
+
+        private val failed = AtomicInteger(0)
+
+        override val failedFiles: Int get() = failed.get()
+
+        override fun record(file: FileRecord) {
+            if (file.result == FileResult.Failed) failed.incrementAndGet()
+            job.run.file(file)
+        }
 
         override fun report(done: Int, total: Int, current: String) {
             val progress = JobProgress(done, total, current)

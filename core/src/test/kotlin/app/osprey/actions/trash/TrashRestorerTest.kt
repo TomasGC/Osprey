@@ -3,6 +3,8 @@ package app.osprey.actions.trash
 import app.osprey.filesystem.FaultyFileSystemRepository
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import app.osprey.jobs.RecordingJobControl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -208,5 +210,23 @@ class TrashRestorerTest {
 
             assertNull("$choice", TrashRestorer(library.fs).resolve(library.root, conflict, choice))
         }
+    }
+
+    @Test
+    fun `records each restored file and each one that could not be`() {
+        val gone = lib.trash("2019", TrashAction.DEDUPE, "gone.jpg")
+        val b = lib.trash("2019", TrashAction.DEDUPE, "b.jpg")
+        lib.fs.delete(gone.handle)
+        val control = RecordingJobControl()
+
+        val result = restorer.restore(lib.root, restorer.plan(lib.root, listOf(gone, b)), control)
+
+        assertEquals(
+            listOf(
+                FileRecord("Trash/2019/Dedupe/gone.jpg", FileResult.Failed, result.failures.single().reason),
+                FileRecord("Trash/2019/Dedupe/b.jpg", FileResult.Done, "restored"),
+            ),
+            control.files,
+        )
     }
 }
