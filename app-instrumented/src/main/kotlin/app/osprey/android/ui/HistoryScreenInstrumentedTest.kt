@@ -1,6 +1,7 @@
 package app.osprey.android.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
@@ -20,6 +21,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -124,7 +126,20 @@ class HistoryScreenInstrumentedTest {
         composeRule.onNodeWithText("/b.jpg: FAILED: boom").assertExists()
         composeRule.onNodeWithText("Failed (1)").assertExists()
         composeRule.onNodeWithText("Done (1)").assertExists()
+        composeRule.onNodeWithText("Skipped (0)").assertDoesNotExist()
         composeRule.onNodeWithText("Clear history").assertDoesNotExist()
+    }
+
+    @Test
+    fun theFailedFilesOfARunAreListedAboveTheDoneOnes() {
+        threeRuns()
+        screen()
+
+        click("Dates")
+
+        val failedTop = composeRule.onNodeWithText("Failed (1)").fetchSemanticsNode().positionInRoot.y
+        val doneTop = composeRule.onNodeWithText("Done (1)").fetchSemanticsNode().positionInRoot.y
+        assertTrue("the failed group is above the done group", failedTop < doneTop)
     }
 
     @Test

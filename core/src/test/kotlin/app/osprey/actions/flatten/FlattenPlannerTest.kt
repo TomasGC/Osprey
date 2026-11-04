@@ -262,6 +262,22 @@ class FlattenPlannerTest {
     }
 
     @Test
+    fun `apply records a file renamed for a name collision with its new name and the reason`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "a.jpg", byteArrayOf(1))
+        fs.addFile(fs.addFolder(fs.root, "06"), "a.jpg", byteArrayOf(2))
+        val planner = FlattenPlanner(fs)
+        val control = RecordingJobControl()
+
+        planner.apply(planner.plan(fs.root), fs.root, control) {}
+
+        assertEquals(
+            listOf(FileRecord("06/a.jpg", FileResult.Done, "moved up as a__flat1.jpg (renamed, name collision)")),
+            control.files,
+        )
+    }
+
+    @Test
     fun `a file that could not be moved is recorded as failed and the others still move`() {
         val fs = FakeFileSystemRepository()
         val month = fs.addFolder(fs.root, "06")

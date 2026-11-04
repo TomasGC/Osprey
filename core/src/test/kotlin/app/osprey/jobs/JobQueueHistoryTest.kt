@@ -96,6 +96,20 @@ class JobQueueHistoryTest {
     }
 
     @Test
+    fun `a job that throws does not stop the next one, and each has its own run in the order they were queued`() {
+        val failing = queue.enqueue("Rename") { error("boom") }
+        val next = queue.enqueue("Flatten") { JobOutcome("Flatten done") }
+
+        await(failing)
+        await(next)
+
+        assertEquals(
+            listOf("Rename" to RunState.Failed, "Flatten" to RunState.Done),
+            history.runs().sortedBy { it.id }.map { it.action to it.state },
+        )
+    }
+
+    @Test
     fun `a job removed before it started is a stopped run that never started`() {
         val gate = CountDownLatch(1)
         val first = queue.enqueue("Long") {

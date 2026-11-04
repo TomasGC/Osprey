@@ -71,6 +71,26 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
+    fun `ids are not reused after Clear history while the app keeps running`() {
+        val store = store()
+        ended(store, "A")
+        ended(store, "B")
+        store.clear()
+
+        assertEquals(3L, store.begin("C", at(5)))
+    }
+
+    @Test
+    fun `ids start again at one after Clear history and a restart, since no file is left to count from`() {
+        val first = store()
+        ended(first, "A")
+        ended(first, "B")
+        first.clear()
+
+        assertEquals(1L, store().begin("C", at(5)))
+    }
+
+    @Test
     fun `a line cut by a crash is ignored and what came before is kept`() {
         val first = store()
         val id = first.begin("A", at(1))

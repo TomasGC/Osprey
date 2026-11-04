@@ -22,15 +22,19 @@ import androidx.compose.ui.test.runComposeUiTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.testing.toPng
 import app.osprey.desktop.ui.OspreyApp
+import app.osprey.history.FileResult
 import app.osprey.media.ExifOrientation
 import app.osprey.media.JpegOrientation
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import javax.imageio.ImageIO
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -94,7 +98,7 @@ class ViewerEndToEndTest {
             for (y in 0 until height) for (x in 0 until width) image.setRGB(x, y, color(x, y))
         }
 
-    private fun ComposeUiTest.openTrash() {
+    private fun ComposeUiTest.openTrash(): AppState {
         val state = desktopAppState()
         state.start()
         setContent { OspreyApp(state) }
@@ -102,6 +106,20 @@ class ViewerEndToEndTest {
         waitUntil(timeoutMillis = WAIT_MS) {
             listOf(PLAIN, PLAIN_PNG, TAG_6, TAG_8).all { onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty() }
         }
+        return state
+    }
+
+    private fun sha256(path: Path): String =
+        MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)).joinToString("") { "%02x".format(it) }
+
+    /** The one Save turn run the app wrote: done, with the file's hash before this test's save and after it (#79). */
+    private fun assertSaveRecorded(state: AppState, name: String, hashBefore: String) {
+        val record = state.history.runs().single { it.action == "Save turn" }.files.single()
+        assertEquals(FileResult.Done, record.result)
+        assertEquals(name, record.after?.name)
+        assertEquals(hashBefore, record.before?.hash)
+        assertEquals(sha256(dedupeFolder().resolve(name)), record.after?.hash)
+        assertNotEquals(record.before?.hash, record.after?.hash)
     }
 
     private fun ComposeUiTest.waitForText(text: String) =
@@ -169,7 +187,8 @@ class ViewerEndToEndTest {
 
     @Test
     fun `saving a turn writes it into the file and the card looks the same afterwards`() = runComposeUiTest {
-        openTrash()
+        val state = openTrash()
+        val hashBefore = sha256(dedupeFolder().resolve(TAG_6))
 
         onNodeWithContentDescription(TAG_6).performClick()
         waitForText("100%")
@@ -182,6 +201,7 @@ class ViewerEndToEndTest {
         }
         onNodeWithText("Close").performClick()
         waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(TAG_6).fetchSemanticsNodes().size == 1 }
+        assertSaveRecorded(state, TAG_6, hashBefore)
 
         val pixels = card(TAG_6)
         assertTrue("after the save, the red left side is on top", pixels.at(0.5, 0.25).isRed())
@@ -193,7 +213,8 @@ class ViewerEndToEndTest {
 
     @Test
     fun `saving a turn into a png writes it and the card looks the same afterwards`() = runComposeUiTest {
-        openTrash()
+        val state = openTrash()
+        val hashBefore = sha256(dedupeFolder().resolve(PLAIN_PNG))
 
         onNodeWithContentDescription(PLAIN_PNG).performClick()
         waitForText("100%")
@@ -207,6 +228,7 @@ class ViewerEndToEndTest {
         onNodeWithText("Close").performClick()
         waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(PLAIN_PNG).fetchSemanticsNodes().size == 1 }
 
+        assertSaveRecorded(state, PLAIN_PNG, hashBefore)
         val pixels = card(PLAIN_PNG)
         assertTrue("after the save, the red left side is on top", pixels.at(0.5, 0.25).isRed())
         assertTrue("after the save, the blue right side is at the bottom", pixels.at(0.5, 0.75).isBlue())
