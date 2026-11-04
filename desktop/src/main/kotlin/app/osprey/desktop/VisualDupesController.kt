@@ -12,6 +12,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.scopedName
+import app.osprey.jobs.underFolder
 import app.osprey.jobs.withStoppedNote
 import app.osprey.media.MediaMetadataReader
 
@@ -65,19 +66,24 @@ class VisualDupesController(
                 val trash = trashLocation()
                 val label = scopedName("Visual Dupes", scannedScope)
                 jobs.enqueue("$label group #${group.index}", onDone = { group.moving = false }) { control ->
-                    val result = moveUncheckedToTrash(fs, trash, yearDir, group.members, kept, control)
+                    val placed = control.underFolder(scannedScope)
+                    val result = moveUncheckedToTrash(fs, trash, yearDir, group.members, kept, placed)
                     val stopped = control.shouldStop()
-                    group.done = !stopped
+                    group.done = !stopped && result.failed.isEmpty()
                     group.status = moveStatus(result, stopped)
-                    val summary = "$label group #${group.index}: moved ${result.moved.size}"
-                    JobOutcome(withStoppedNote(summary, stopped), stopped = stopped)
+                    val failures = result.failed.size
+                    val counts = "$label group #${group.index}: moved ${result.moved.size}"
+                    val summary = if (failures > 0) "$counts, $failures failed" else counts
+                    JobOutcome(withStoppedNote(summary, stopped), stopped = stopped, failures = failures)
                 }
             }
         }
     }
 
     private fun moveStatus(result: MoveDupsResult, stopped: Boolean): String {
+        val failed = result.failed.takeIf { it.isNotEmpty() }?.let { ", failed ${it.size} (${it.joinToString(", ")})" }
         val skipped = result.skipped.takeIf { it.isNotEmpty() }?.let { " (skipped: ${it.joinToString(", ")})" }
-        return (if (stopped) "Stopped after moving " else "Moved ") + result.moved.size + skipped.orEmpty()
+        return (if (stopped) "Stopped after moving " else "Moved ") + result.moved.size + failed.orEmpty() +
+            skipped.orEmpty()
     }
 }

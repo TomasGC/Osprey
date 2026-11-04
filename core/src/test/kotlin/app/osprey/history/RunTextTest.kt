@@ -102,6 +102,37 @@ class RunTextTest {
     }
 
     @Test
+    fun `a run page groups its files with the failures first`() {
+        val files = listOf(
+            FileRecord("1.jpg", FileResult.Done),
+            FileRecord("2.jpg", FileResult.Failed, "locked"),
+            FileRecord("3.jpg", FileResult.Skipped),
+            FileRecord("4.jpg", FileResult.Done),
+            FileRecord("5.jpg", FileResult.Failed),
+        )
+
+        val groups = runFileGroups(run(RunState.Failed, files = files))
+
+        assertEquals(listOf(FileResult.Failed, FileResult.Skipped, FileResult.Done), groups.map { it.result })
+        assertEquals(listOf("2.jpg", "5.jpg"), groups[0].files.map { it.path })
+        assertEquals(listOf("3.jpg"), groups[1].files.map { it.path })
+        assertEquals(listOf("1.jpg", "4.jpg"), groups[2].files.map { it.path })
+        assertEquals(listOf("Failed (2)", "Skipped (1)", "Done (2)"), groups.map { it.title })
+    }
+
+    @Test
+    fun `a result no file ended with has no group`() {
+        val groups = runFileGroups(run(RunState.Done, files = listOf(file(FileResult.Done))))
+
+        assertEquals(listOf(FileResult.Done), groups.map { it.result })
+    }
+
+    @Test
+    fun `a run with no file has no group`() {
+        assertEquals(emptyList<RunFileGroup>(), runFileGroups(run(RunState.Done)))
+    }
+
+    @Test
     fun `a file line is its path then how it went`() {
         assertEquals("a.jpg: moved to b", fileLine(FileRecord("a.jpg", FileResult.Done, "moved to b")))
         assertEquals("a.jpg", fileLine(FileRecord("a.jpg", FileResult.Done)))

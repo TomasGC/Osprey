@@ -3,13 +3,11 @@ package app.osprey.actions.trash
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
-import app.osprey.filesystem.MoveFails
+import app.osprey.filesystem.FirstMoveFails
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
-import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -264,13 +262,17 @@ class TrashMigrationPlannerTest {
     }
 
     @Test
-    fun `apply records the file that could not be moved and still fails the run`() {
-        fs.addFile(fs.addFolder(yearFolder("2019"), "TODELETE"), "a.jpg", byteArrayOf(1))
+    fun `a file that could not be moved is recorded as failed and the others still move`() {
+        val old = fs.addFolder(yearFolder("2019"), "TODELETE")
+        listOf("a", "b", "c").forEach { fs.addFile(old, "$it.jpg", byteArrayOf(1)) }
         val plan = planner.plan(fs.root)
         val control = RecordingJobControl()
 
-        assertThrows(IOException::class.java) { TrashMigrationPlanner(MoveFails(fs)).apply(plan, fs.root, control) {} }
+        val moved = TrashMigrationPlanner(FirstMoveFails(fs)).apply(plan, fs.root, control) {}
 
-        assertEquals(listOf(FileRecord(plan.moves.single().sourcePath, FileResult.Failed, "locked")), control.files)
+        assertEquals(2, moved)
+        assertEquals(listOf(FileResult.Failed, FileResult.Done, FileResult.Done), control.files.map { it.result })
+        assertEquals("locked", control.files.first().message)
+        assertEquals(1, control.failedFiles)
     }
 }

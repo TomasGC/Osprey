@@ -3,6 +3,7 @@ package app.osprey.desktop
 import app.osprey.filesystem.FileHandle
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
+import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.JobState
 import java.util.concurrent.CountDownLatch
@@ -23,7 +24,8 @@ object FakeHandle : FileHandle
 
 class SimpleActionControllerTest {
 
-    private val jobs = immediateJobQueue()
+    private val history = InMemoryJobHistoryStore()
+    private val jobs = immediateJobQueue(history)
 
     private fun controller(
         scan: (FileHandle, JobControl) -> ScanResult<Int> = { _, _ -> ScanResult(5, "count=5", listOf("a"), 5) },
@@ -131,6 +133,26 @@ class SimpleActionControllerTest {
         assertEquals(emptyList<String>(), controller.state.lines)
         assertFalse(controller.state.applyEnabled)
         assertEquals("", controller.state.appliedSuffix)
+    }
+
+    private fun recordedPaths(scope: String?): List<String> {
+        val controller = controller(apply = { _, plan, control ->
+            control.record(FileRecord("sub/b.jpg", FileResult.Done, "moved up"))
+            plan
+        })
+        controller.onScan(FakeHandle, scope)
+        controller.onApply(FakeHandle, scope)
+        return history.runs().first { it.action.endsWith("apply") }.files.map { it.path }
+    }
+
+    @Test
+    fun `the files of an apply on a year are recorded under that year`() {
+        assertEquals(listOf("2021/sub/b.jpg"), recordedPaths("2021"))
+    }
+
+    @Test
+    fun `without a year the files of an apply are recorded as they are`() {
+        assertEquals(listOf("sub/b.jpg"), recordedPaths(null))
     }
 
     @Test

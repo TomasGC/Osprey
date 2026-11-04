@@ -3,10 +3,13 @@ package app.osprey.android
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.jobs.JobState
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaMetadataReader
 import app.osprey.media.PixelBuffer
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,7 +22,8 @@ class VisualDupesControllerTest {
     private val reader = FakeMediaMetadataReader()
     private val year = fs.addFolder(fs.root, "2019")
     private lateinit var controller: VisualDupesController
-    private val jobs = immediateJobQueue()
+    private val history = InMemoryJobHistoryStore()
+    private val jobs = immediateJobQueue(history)
 
     @Before
     fun setUp() {
@@ -37,6 +41,40 @@ class VisualDupesControllerTest {
         picture("bb.jpg")
         controller.onScan(year)
         return controller.groupsIn(year).single()
+    }
+
+    /** A file system whose first move fails like a locked file, and later ones work. */
+    private class FirstMoveFails(private val inner: FileSystemRepository) : FileSystemRepository by inner {
+        private var failed = false
+
+        override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
+            if (!failed) {
+                failed = true
+                throw IOException("locked")
+            }
+            return inner.move(entry, destFolder, newName)
+        }
+    }
+
+    @Test
+    fun `a member that could not be moved is reported, the others move and the group can be tried again`() {
+        picture("a.jpg")
+        picture("bb.jpg")
+        picture("ccc.jpg")
+        val flaky = VisualDupesController(FirstMoveFails(fs), reader, jobs) { TrashLocation(fs.root, "2019") }
+        flaky.onScan(year)
+        val group = flaky.groupsIn(year).single()
+        group.keep["a.jpg"] = true
+        group.keep["bb.jpg"] = false
+        group.keep["ccc.jpg"] = false
+
+        flaky.moveUnchecked(year, group)
+
+        assertTrue(group.status.startsWith("Moved 1, failed 1 ("))
+        assertFalse(group.done)
+        val outcome = (jobs.entries.value.last().state as JobState.Finished).outcome
+        assertEquals("Visual Dupes group #${group.index}: moved 1, 1 failed", outcome.summary)
+        assertEquals(1, outcome.failures)
     }
 
     private fun names(folder: FileHandle) = fs.list(folder).map { it.name }.toSet()
@@ -95,6 +133,24 @@ class VisualDupesControllerTest {
 
         val job = jobs.entries.value.last().state as JobState.Finished
         assertEquals("Visual Dupes 2019 scan: stopped", job.outcome.summary)
+    }
+
+    @Test
+    fun `the files of a group move are recorded under the year that was scanned`() {
+        scanAndMoveSecond("2019")
+
+        val run = history.runs().first { "group" in it.action }
+
+        assertEquals(listOf("2019/bb.jpg"), run.files.map { it.path })
+    }
+
+    @Test
+    fun `without a scope the files of a group move are recorded as they are`() {
+        scanAndMoveSecond(null)
+
+        val run = history.runs().first { "group" in it.action }
+
+        assertEquals(listOf("bb.jpg"), run.files.map { it.path })
     }
 
     @Test

@@ -122,7 +122,9 @@ class HistoryScreenInstrumentedTest {
         composeRule.onNodeWithText("before: a.jpg, 1 KB, modified 2019-05-04 12:00:00").assertExists()
         composeRule.onNodeWithText("after: a.jpg, 1 KB, modified 2019-05-04 12:01:00").assertExists()
         composeRule.onNodeWithText("/b.jpg: FAILED: boom").assertExists()
-        composeRule.onNodeWithText("Failed (1)").assertDoesNotExist()
+        composeRule.onNodeWithText("Failed (1)").assertExists()
+        composeRule.onNodeWithText("Done (1)").assertExists()
+        composeRule.onNodeWithText("Clear history").assertDoesNotExist()
     }
 
     @Test

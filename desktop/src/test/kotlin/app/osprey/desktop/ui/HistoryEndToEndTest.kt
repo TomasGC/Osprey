@@ -94,7 +94,7 @@ class HistoryEndToEndTest {
         onNodeWithText("Done (2)").assertExists()
         onNode(hasText("Flatten 2021 apply") and hasClickAction()).performClick()
         waitForIdle()
-        onNodeWithText("sub/a.jpg: moved up as a.jpg").assertExists()
+        onNodeWithText("2021/sub/a.jpg: moved up as a.jpg").assertExists()
         click("Back")
         onNodeWithText("Done (2)").assertExists()
     }

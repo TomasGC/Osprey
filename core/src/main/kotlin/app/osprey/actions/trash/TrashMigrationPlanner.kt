@@ -7,7 +7,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
-import app.osprey.jobs.recordingFile
+import app.osprey.jobs.tryFile
 
 private val YEAR_FOLDER_NAME = Regex("""\d{4}""")
 
@@ -100,10 +100,10 @@ class TrashMigrationPlanner(private val fs: FileSystemRepository) {
                 trashFolders.ensure(TrashLocation(libraryRoot, move.year), move.action)
             }
             val where = "${move.year}/${move.action.folderName}/${move.destName}"
-            control.recordingFile(move.sourcePath, "moved to Trash/$where") {
+            val worked = control.tryFile(move.sourcePath, "moved to Trash/$where") {
                 fs.move(move.source, destination, move.destName)
             }
-            moved++
+            if (worked) moved++
         }
         if (!finished) return moved
         for (folder in plan.folders) {

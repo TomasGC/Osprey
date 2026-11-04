@@ -38,6 +38,7 @@ import app.osprey.history.fileChangeLines
 import app.osprey.history.fileLine
 import app.osprey.history.runCounts
 import app.osprey.history.runDurationText
+import app.osprey.history.runFileGroups
 import app.osprey.history.runSubtitle
 import app.osprey.history.runWhenText
 import java.time.ZoneId
@@ -122,9 +123,9 @@ private fun RunPage(run: RunRecord, zone: ZoneId, onBack: () -> Unit) {
             item { Text("Log", fontWeight = FontWeight.Bold) }
             items(run.log) { Text(it, fontSize = 12.sp) }
         }
-        if (run.files.isNotEmpty()) {
-            item { Text("Files", fontWeight = FontWeight.Bold) }
-            items(run.files) { FileEntry(it, zone) }
+        runFileGroups(run).forEach { group ->
+            item(key = "group-${group.result}") { Text(group.title, fontWeight = FontWeight.Bold) }
+            items(group.files) { FileEntry(it, zone) }
         }
     }
 }

@@ -124,7 +124,7 @@ class HistoryEndToEndInstrumentedTest {
         composeRule.onNodeWithText("Done (2)").assertExists()
         composeRule.onNode(hasText("Flatten 2021 apply") and hasClickAction()).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("sub/a.jpg: moved up as a.jpg").assertExists()
+        composeRule.onNodeWithText("2021/sub/a.jpg: moved up as a.jpg").assertExists()
         composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Done (2)").assertExists()

@@ -7,6 +7,7 @@ import app.osprey.jobs.JobQueue
 import app.osprey.jobs.appliedSuffix
 import app.osprey.jobs.applyOutcome
 import app.osprey.jobs.scopedName
+import app.osprey.jobs.underFolder
 
 /**
  * Scan-then-apply bookkeeping shared by the simple action tabs: queue [scan] as a job, cache its plan, and
@@ -56,7 +57,7 @@ class SimpleActionController<Plan>(
         cachedPlan = null
         state.applyEnabled = false
         jobs.enqueue("$label apply", onDone = { state.busy = false; onApplied() }) { control ->
-            val applied = apply(yearDir, plan, control)
+            val applied = apply(yearDir, plan, control.underFolder(scope))
             val stopped = control.shouldStop()
             val failed = control.failedFiles
             state.appliedSuffix = appliedSuffix(applied, failed, stopped)

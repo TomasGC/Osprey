@@ -6,7 +6,6 @@ import app.osprey.history.FileState
 import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,32 +63,27 @@ class FileChangeTest {
     }
 
     @Test
-    fun `a recorded file that works is recorded as done and gives back the result`() {
-        val result = control.recordingFile("a.jpg", "moved to b.jpg") { 42 }
+    fun `a file that is tried and works is recorded as done with what was done`() {
+        val worked = control.tryFile("a.jpg", "moved to b.jpg") {}
 
-        assertEquals(42, result)
+        assertTrue(worked)
         assertEquals(listOf(FileRecord("a.jpg", FileResult.Done, "moved to b.jpg")), control.files)
     }
 
     @Test
-    fun `a recorded file that fails is recorded as failed and the failure goes on`() {
-        val failure = IOException("locked")
+    fun `a file that is tried and fails is recorded as failed and the run goes on`() {
+        val worked = control.tryFile("a.jpg", "moved to b.jpg") { throw IOException("locked") }
 
-        val thrown = assertThrows(IOException::class.java) {
-            control.recordingFile("a.jpg", "moved to b.jpg") { throw failure }
-        }
-
-        assertSame(failure, thrown)
+        assertFalse(worked)
         assertEquals(listOf(FileRecord("a.jpg", FileResult.Failed, "locked")), control.files)
         assertEquals(1, control.failedFiles)
     }
 
     @Test
-    fun `a recorded file that fails without a message is recorded with the kind of failure`() {
-        assertThrows(IllegalStateException::class.java) {
-            control.recordingFile("a.jpg", "moved to b.jpg") { throw IllegalStateException() }
+    fun `a bug in a tried file is not a file failure and still propagates`() {
+        assertThrows(UnsupportedOperationException::class.java) {
+            control.tryFile("a.jpg", "moved to b.jpg") { throw UnsupportedOperationException("bug") }
         }
-
-        assertEquals(listOf(FileRecord("a.jpg", FileResult.Failed, "IllegalStateException")), control.files)
+        assertEquals(emptyList<FileRecord>(), control.files)
     }
 }

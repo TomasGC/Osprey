@@ -39,16 +39,13 @@ fun JobControl.recordResult(path: String, failure: String?, doneMessage: String)
 }
 
 /**
- * Runs [change] on the file called [path] and records it: done with [doneMessage], or failed with the reason. A failure
- * is rethrown, so the job still ends as failed, but its History now names the file that broke it (#79).
+ * Runs [change] on the file called [path] and records how it went (#79): done with [doneMessage], or failed with the
+ * reason. A file that fails does not stop the run: it is recorded and the next file goes on, so the History lists what
+ * worked and what did not. Returns true when it worked. Only what a file system can throw at a file counts as a
+ * failure (see [failureReason]); a bug still propagates.
  */
-fun <T> JobControl.recordingFile(path: String, doneMessage: String, change: () -> T): T {
-    val result = try {
-        change()
-    } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-        recordResult(path, e.message ?: e.javaClass.simpleName, doneMessage)
-        throw e
-    }
-    recordResult(path, null, doneMessage)
-    return result
+fun JobControl.tryFile(path: String, doneMessage: String, change: () -> Unit): Boolean {
+    val failure = failureReason(change)
+    recordResult(path, failure, doneMessage)
+    return failure == null
 }

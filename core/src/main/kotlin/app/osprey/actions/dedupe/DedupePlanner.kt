@@ -10,7 +10,7 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
-import app.osprey.jobs.recordingFile
+import app.osprey.jobs.tryFile
 
 /**
  * Finds byte-identical duplicates among the files directly inside `root` and plans moving all
@@ -76,10 +76,13 @@ class DedupePlanner(private val fs: FileSystemRepository) {
         var moved = 0
         control.forEachUntilStopped(plan.moves, DedupeMove::sourceName) { move ->
             val where = "${TrashAction.DEDUPE.folderName}/${move.destName}"
-            control.recordingFile(move.sourceName, "moved to Trash/${trash.year}/$where (same as ${move.keepName})") {
+            val worked = control.tryFile(
+                move.sourceName,
+                "moved to Trash/${trash.year}/$where (same as ${move.keepName})",
+            ) {
                 fs.move(move.source, destination, move.destName)
             }
-            moved++
+            if (worked) moved++
         }
         return moved
     }
