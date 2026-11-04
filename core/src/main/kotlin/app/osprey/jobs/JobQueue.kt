@@ -55,7 +55,8 @@ class JobQueue(
 
     /**
      * Queues [work] under [name]; it starts once the jobs before it are over. [onDone] is told the outcome
-     * as soon as the job is over, also when it was removed before it started, whatever screen is showing.
+     * as soon as the job is over, also when it was removed before it started, whatever screen is showing. It runs
+     * before the job shows as finished, so a finished job always means its screen is up to date.
      * A job that [writes] nothing (a scan) is passed as `false`; it is the default because a job wrongly
      * left as writing only asks once too often when the window closes, never the reverse.
      */
@@ -92,13 +93,13 @@ class JobQueue(
         if (!started) return
         val outcome = execute(job)
         job.run.end(outcome)
+        notifyDone(job, outcome)
         synchronized(lock) {
             active.remove(job.id)
             setState(job.id, JobState.Finished(outcome))
             keepLastFinished()
         }
         job.outcome.complete(outcome)
-        notifyDone(job, outcome)
     }
 
     @Suppress("TooGenericExceptionCaught") // A job is arbitrary planner code: whatever it throws ends that job only.
