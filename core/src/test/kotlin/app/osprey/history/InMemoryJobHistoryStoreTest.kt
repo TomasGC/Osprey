@@ -152,4 +152,25 @@ class InMemoryJobHistoryStoreTest {
 
         assertEquals(listOf(2L, 3L), runsToDrop(runs, max = 2))
     }
+
+    @Test
+    fun `every write raises the revision`() {
+        assertEquals(0L, store.revision.value)
+        val id = store.begin("A", T0)
+        val writes: List<() -> Unit> = listOf(
+            { store.start(id, T0) },
+            { store.appendLog(id, "x") },
+            { store.appendFile(id, FileRecord("a", FileResult.Done)) },
+            { store.finish(id, RunState.Done, "s", T1) },
+            { store.closeInterrupted(T1) },
+            { store.clear() },
+            { store.begin("B", T0) },
+        )
+
+        for (write in writes) {
+            val before = store.revision.value
+            write()
+            assertTrue(store.revision.value > before)
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package app.osprey.history
 
 import java.time.Instant
+import kotlinx.coroutines.flow.StateFlow
 
 /** Most runs kept (#79); the oldest ended run goes first. */
 const val MAX_RUNS = 10
@@ -11,7 +12,7 @@ const val MAX_RUNS = 10
  */
 interface JobHistoryStore {
 
-    /** Records a new queued run and returns its id; ids grow, also across restarts. */
+    /** Records a new queued run and returns its id: unique among the runs kept, and higher than every one of them. */
     fun begin(action: String, at: Instant): Long
 
     fun start(id: Long, at: Instant)
@@ -24,6 +25,9 @@ interface JobHistoryStore {
 
     /** Every kept run, newest first. */
     fun runs(): List<RunRecord>
+
+    /** Rises on every write, so a screen showing the history knows when to read it again. */
+    val revision: StateFlow<Long>
 
     /** Marks every run still queued or running as [RunState.Interrupted]: called once when the app starts. */
     fun closeInterrupted(at: Instant)

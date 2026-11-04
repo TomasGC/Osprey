@@ -20,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private const val WAIT_MS = 5_000L
@@ -52,6 +53,23 @@ class JobQueueHistoryTest {
         assertEquals(T0, run.queuedAt)
         assertEquals(T0.plusSeconds(1), run.startedAt)
         assertEquals(T0.plusSeconds(2), run.endedAt)
+    }
+
+    @Test
+    fun `the run ends in the history before the job shows as finished`() {
+        lateinit var watched: JobQueue
+        var shownAtEnd: JobState? = null
+        val watching = object : JobHistoryStore by history {
+            override fun finish(id: Long, state: RunState, summary: String, at: Instant) {
+                shownAtEnd = watched.entries.value.single().state
+                history.finish(id, state, summary, at)
+            }
+        }
+        watched = JobQueue(scope, RunRecorder(watching) { T0 })
+
+        await(watched.enqueue("Reorg") { JobOutcome("Reorg: done") })
+
+        assertTrue(shownAtEnd is JobState.Running)
     }
 
     @Test

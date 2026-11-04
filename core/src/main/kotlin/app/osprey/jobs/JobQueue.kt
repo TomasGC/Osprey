@@ -91,12 +91,12 @@ class JobQueue(
         }
         if (!started) return
         val outcome = execute(job)
+        job.run.end(outcome)
         synchronized(lock) {
             active.remove(job.id)
             setState(job.id, JobState.Finished(outcome))
             keepLastFinished()
         }
-        job.run.end(outcome)
         job.outcome.complete(outcome)
         notifyDone(job, outcome)
     }

@@ -1,17 +1,31 @@
 package app.osprey.history
 
 import java.time.Instant
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
-/** A [JobHistoryStore] in memory: the fake for tests, and the store of a platform with no persistence yet. */
-class InMemoryJobHistoryStore : JobHistoryStore {
+/**
+ * A [JobHistoryStore] in memory: the fake for tests, and the logic [FileJobHistoryStore] builds on. [restored] are the
+ * runs a previous launch left: those past [MAX_RUNS] are dropped, and new ids go on after the highest one.
+ */
+class InMemoryJobHistoryStore(restored: List<RunRecord> = emptyList()) : JobHistoryStore {
     private val lock = Any()
-    private var nextId = 1L
-    private var kept = emptyList<RunRecord>() // oldest first
+
+    private val revisionState = MutableStateFlow(0L)
+
+    override val revision: StateFlow<Long> = revisionState.asStateFlow()
+
+    private var nextId = (restored.maxOfOrNull { it.id } ?: 0L) + 1
+    private var kept: List<RunRecord> = restored.sortedBy { it.id }.let { sorted -> // oldest first
+        val drop = runsToDrop(sorted).toSet()
+        sorted.filterNot { it.id in drop }
+    }
 
     override fun begin(action: String, at: Instant): Long = synchronized(lock) {
         val id = nextId++
-        kept = kept + RunRecord(id, action, RunState.Queued, queuedAt = at)
-        prune()
+        commit(kept + RunRecord(id, action, RunState.Queued, queuedAt = at))
         id
     }
 
@@ -22,27 +36,25 @@ class InMemoryJobHistoryStore : JobHistoryStore {
 
     override fun appendFile(id: Long, record: FileRecord) = change(id) { it.copy(files = it.files + record) }
 
-    override fun finish(id: Long, state: RunState, summary: String, at: Instant) {
+    override fun finish(id: Long, state: RunState, summary: String, at: Instant) =
         change(id) { it.copy(state = state, summary = summary, endedAt = at) }
-        synchronized(lock) { prune() }
-    }
 
     override fun runs(): List<RunRecord> = synchronized(lock) { kept.reversed() }
 
     override fun closeInterrupted(at: Instant) = synchronized(lock) {
-        kept = kept.map {
-            if (it.state.isActive) it.copy(state = RunState.Interrupted, endedAt = at) else it
-        }
+        commit(kept.map { if (it.state.isActive) it.copy(state = RunState.Interrupted, endedAt = at) else it })
     }
 
-    override fun clear() = synchronized(lock) { kept = kept.filter { it.state.isActive } }
+    override fun clear() = synchronized(lock) { commit(kept.filter { it.state.isActive }) }
 
     private fun change(id: Long, edit: (RunRecord) -> RunRecord) = synchronized(lock) {
-        kept = kept.map { if (it.id == id) edit(it) else it }
+        commit(kept.map { if (it.id == id) edit(it) else it })
     }
 
-    private fun prune() {
-        val drop = runsToDrop(kept).toSet()
-        kept = kept.filterNot { it.id in drop }
+    /** Keeps [next] minus the runs past [MAX_RUNS], and tells the screens something changed. */
+    private fun commit(next: List<RunRecord>) {
+        val drop = runsToDrop(next).toSet()
+        kept = next.filterNot { it.id in drop }
+        revisionState.update { it + 1 }
     }
 }
