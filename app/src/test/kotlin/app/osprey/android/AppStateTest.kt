@@ -1,9 +1,11 @@
 package app.osprey.android
 
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsStore
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -110,6 +112,60 @@ class AppStateTest {
         state.toggleTrash()
 
         assertFalse(state.showsTrash)
+    }
+
+    private fun stateWith(history: InMemoryJobHistoryStore) =
+        AndroidAppState(fs, FakeMediaMetadataReader(), store, immediateJobQueue(), { null }, {}, history)
+            .also { it.openLibrary(fs.root) }
+
+    @Test
+    fun `the History screen opens on its list and closes on the second tap`() {
+        val history = InMemoryJobHistoryStore()
+        val id = history.begin("Reorg", Instant.EPOCH)
+        val state = stateWith(history)
+
+        state.toggleHistory()
+        state.historyScreen.open(id)
+        assertTrue(state.showsHistory)
+        state.toggleHistory()
+        assertFalse(state.showsHistory)
+        state.toggleHistory()
+
+        assertTrue(state.showsHistory)
+        assertNull(state.historyScreen.view.value.selected)
+    }
+
+    @Test
+    fun `the History screen does not open before a library is chosen`() {
+        state.toggleHistory()
+
+        assertFalse(state.showsHistory)
+    }
+
+    @Test
+    fun `the History screen shows the runs of the history it was given`() {
+        val history = InMemoryJobHistoryStore().also { it.begin("Reorg", Instant.EPOCH) }
+        val state = stateWith(history)
+
+        state.toggleHistory()
+
+        assertEquals("Reorg", state.historyScreen.view.value.sections.single().runs.single().action)
+    }
+
+    @Test
+    fun `opening the History closes the Trash and Settings, and opening the Trash closes the History`() {
+        val state = stateWith(InMemoryJobHistoryStore())
+        state.toggleTrash()
+        state.settingsState.showing = true
+
+        state.toggleHistory()
+        assertTrue(state.showsHistory)
+        assertFalse(state.showsTrash)
+        assertFalse(state.settingsState.showing)
+        state.toggleTrash()
+
+        assertTrue(state.showsTrash)
+        assertFalse(state.showsHistory)
     }
 
     @Test

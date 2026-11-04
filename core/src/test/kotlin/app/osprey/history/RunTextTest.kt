@@ -63,6 +63,22 @@ class RunTextTest {
     }
 
     @Test
+    fun `a run that started says when it started, in the given zone`() {
+        val started = run(RunState.Running, startedAt = T0.plusSeconds(5))
+
+        assertEquals("2019-05-04 12:00:05", runWhenText(started, ZoneOffset.UTC))
+        assertEquals("2019-05-04 14:00:05", runWhenText(started, ZoneOffset.ofHours(2)))
+    }
+
+    @Test
+    fun `a run that never started says when it was queued`() {
+        val interrupted = run(RunState.Interrupted, endedAt = T0.plusSeconds(9))
+
+        assertEquals("2019-05-04 12:00:00", runWhenText(run(RunState.Queued), ZoneOffset.UTC))
+        assertEquals("2019-05-04 12:00:00", runWhenText(interrupted, ZoneOffset.UTC))
+    }
+
+    @Test
     fun `a run with no file says so`() {
         assertEquals("No files recorded", runCounts(run(RunState.Done)))
     }

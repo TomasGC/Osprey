@@ -1,6 +1,8 @@
 package app.osprey.desktop
 
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.FileRecord
+import app.osprey.history.FileResult
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.JobState
 import java.util.concurrent.CountDownLatch
@@ -104,6 +106,21 @@ class SimpleActionControllerTest {
     }
 
     @Test
+    fun `with a scope the jobs and their summaries name it`() {
+        val controller = controller()
+
+        controller.onScan(FakeHandle, "2021")
+        controller.onApply(FakeHandle, "2021")
+
+        val finished = jobs.entries.value.map { it.name to (it.state as JobState.Finished).outcome.summary }
+        val expected = listOf(
+            "Test 2021 scan" to "Test 2021 scan: count=5",
+            "Test 2021 apply" to "Test 2021 apply: 5 done",
+        )
+        assertEquals(expected, finished)
+    }
+
+    @Test
     fun `a stopped scan keeps no plan and says so`() {
         val controller = controller(scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) })
 
@@ -117,6 +134,16 @@ class SimpleActionControllerTest {
     }
 
     @Test
+    fun `a stopped scan with a scope names it in its summary`() {
+        val controller = controller(scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) })
+
+        controller.onScan(FakeHandle, "2021")
+
+        val job = jobs.entries.value.last().state as JobState.Finished
+        assertEquals("Test 2021 scan: stopped", job.outcome.summary)
+    }
+
+    @Test
     fun `a stopped apply is marked as stopped`() {
         val controller = controller(apply = { _, _, control -> stopAsked(control); 2 })
 
@@ -126,6 +153,22 @@ class SimpleActionControllerTest {
         assertEquals("  -- APPLIED (2) -- STOPPED", controller.state.appliedSuffix)
         val applyJob = jobs.entries.value.last().state as JobState.Finished
         assertEquals("Test apply: 2 done (stopped)", applyJob.outcome.summary)
+    }
+
+    @Test
+    fun `a file that failed is counted in the suffix, the summary and the outcome`() {
+        val controller = controller(apply = { _, plan, control ->
+            control.record(FileRecord("b.jpg", FileResult.Failed, "boom"))
+            plan - 1
+        })
+
+        controller.onScan(FakeHandle)
+        controller.onApply(FakeHandle)
+
+        assertEquals("  -- APPLIED (4), failed 1", controller.state.appliedSuffix)
+        val outcome = (jobs.entries.value.last().state as JobState.Finished).outcome
+        assertEquals("Test apply: 4 done, 1 failed", outcome.summary)
+        assertEquals(1, outcome.failures)
     }
 
     @Test

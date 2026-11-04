@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import java.io.File
 import java.nio.file.Path
 import java.nio.file.Paths
 import org.json.JSONException
@@ -23,6 +24,9 @@ object OspreyConfig {
     private fun configPath(): Path =
         System.getProperty(CONFIG_PATH_OVERRIDE_PROPERTY)?.let { Paths.get(it) }
             ?: Paths.get(System.getProperty("user.home"), ".osprey", "config.json")
+
+    /** The folder of the run history, beside the config file. */
+    internal fun historyDir(): File = configPath().parent.resolve("history").toFile()
 
     @Suppress("SwallowedException") // A missing/corrupt config file means "nothing saved yet", never a crash.
     internal fun loadConfig(): JSONObject {

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,6 +64,7 @@ fun OspreyApp(state: AndroidAppState) {
                         state = state,
                         onOpenSettings = {
                             state.showsTrash = false
+                            state.showsHistory = false
                             state.settingsState.showing = true
                             scope.launch { drawerState.close() }
                         },
@@ -69,9 +72,14 @@ fun OspreyApp(state: AndroidAppState) {
                             state.toggleTrash()
                             scope.launch { drawerState.close() }
                         },
+                        onOpenHistory = {
+                            state.toggleHistory()
+                            scope.launch { drawerState.close() }
+                        },
                         onTabSelected = { tab ->
                             state.selectedTab = tab
                             state.showsTrash = false
+                            state.showsHistory = false
                             state.settingsState.showing = false
                             scope.launch { drawerState.close() }
                         },
@@ -109,16 +117,22 @@ private fun OspreyContent(state: AndroidAppState) {
         return
     }
     val libraryRoot = state.libraryRoot ?: return
-    if (state.showsTrash) {
-        TrashScreen(state, libraryRoot)
-        return
+    when {
+        state.showsTrash -> TrashScreen(state, libraryRoot)
+        state.showsHistory -> HistoryScreen(state.historyScreen)
+        else -> ActionContent(state, libraryRoot)
     }
+}
+
+/** The selected action: on the library root when it runs there, else on the selected year. */
+@Composable
+private fun ActionContent(state: AndroidAppState, libraryRoot: FileHandle) {
     val rootAction = rootActionFor(state, state.selectedTab, libraryRoot)
     if (rootAction != null) {
         ActionPane(rootAction.ui, rootAction.scan, rootAction.apply)
-        return
+    } else {
+        YearContent(state)
     }
-    YearContent(state)
 }
 
 /** The selected action on the selected year folder. */
@@ -133,13 +147,14 @@ private fun YearContent(state: AndroidAppState) {
         ActionTab.VISUAL -> VisualDupesScreen(state, yearDir)
         ActionTab.DATES -> ActionPane(
             state.dates.state,
-            { state.dates.onScan(yearDir) },
-            { state.dates.onApply(yearDir) },
+            { state.dates.onScan(yearDir, state.selectedYear) },
+            { state.dates.onApply(yearDir, state.selectedYear) },
             applyBlockedReason = DATES_LIMITATION,
         )
         else -> {
             val controller = controllerFor(state, state.selectedTab)
-            ActionPane(controller.state, { controller.onScan(yearDir) }, { controller.onApply(yearDir) })
+            val year = state.selectedYear
+            ActionPane(controller.state, { controller.onScan(yearDir, year) }, { controller.onApply(yearDir, year) })
         }
     }
 }
@@ -177,14 +192,16 @@ private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionC
     ActionTab.VISUAL -> error("Visual Dupes is handled separately above")
 }
 
+/** The menu behind the top bar's ☰: library, year, the actions, then Settings, Trash and History. */
 @Composable
-private fun DrawerContent(
+fun DrawerContent(
     state: AndroidAppState,
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
+    onOpenHistory: () -> Unit,
     onTabSelected: (ActionTab) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text("Osprey", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(16.dp))
         Text(libraryLabel(state.libraryRoot), fontSize = 12.sp)
@@ -200,7 +217,8 @@ private fun DrawerContent(
         state.visibleTabs.forEach { tab ->
             NavigationDrawerItem(
                 label = { Text(tab.label) },
-                selected = state.selectedTab == tab && !state.showsSettings && !state.showsTrash,
+                selected = state.selectedTab == tab && !state.showsSettings && !state.showsTrash &&
+                    !state.showsHistory,
                 onClick = { onTabSelected(tab) },
                 modifier = Modifier.padding(vertical = 2.dp),
             )
@@ -220,12 +238,19 @@ private fun DrawerContent(
                 modifier = Modifier.weight(1f).padding(vertical = 2.dp),
             )
         }
+        NavigationDrawerItem(
+            label = { Text("🕘 History") },
+            selected = state.showsHistory && !state.showsSettings,
+            onClick = onOpenHistory,
+            modifier = Modifier.padding(vertical = 2.dp),
+        )
     }
 }
 
 private fun screenTitle(state: AndroidAppState): String = when {
     state.showsSettings -> "Settings"
     state.showsTrash -> "Trash"
+    state.showsHistory -> "History"
     else -> state.selectedTab.label
 }
 

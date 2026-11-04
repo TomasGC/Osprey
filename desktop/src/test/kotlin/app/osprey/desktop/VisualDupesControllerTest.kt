@@ -4,6 +4,7 @@ import app.osprey.actions.trash.TrashLocation
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
+import app.osprey.jobs.JobState
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
 import app.osprey.media.PixelBuffer
@@ -29,6 +30,7 @@ class VisualDupesControllerTest {
     private lateinit var library: Path
     private lateinit var year: Path
     private lateinit var controller: VisualDupesController
+    private val jobs = immediateJobQueue()
 
     private val yearDir get() = PathHandle(year)
 
@@ -39,7 +41,7 @@ class VisualDupesControllerTest {
         controller = VisualDupesController(
             DesktopFileSystemRepository(),
             SamePictureReader,
-            immediateJobQueue(),
+            jobs,
         ) { TrashLocation(PathHandle(library), "2019") }
     }
 
@@ -61,6 +63,58 @@ class VisualDupesControllerTest {
 
         assertEquals(setOf("a.jpg", "b.jpg"), group.members.map { it.name }.toSet())
         assertFalse(controller.scanning)
+    }
+
+    private fun scanAndMoveB(scope: String?): VisualDupeGroupUi {
+        Files.writeString(year.resolve("a.jpg"), "aaaa")
+        Files.writeString(year.resolve("b.jpg"), "bb")
+        controller.onScan(yearDir, scope)
+        val group = controller.groupsIn(yearDir).single()
+        group.keep["a.jpg"] = true
+        group.keep["b.jpg"] = false
+        controller.moveUnchecked(yearDir, group)
+        return group
+    }
+
+    @Test
+    fun `with a scope the scan and a group move are named after it`() {
+        val group = scanAndMoveB("2019")
+
+        val names = listOf("Visual Dupes 2019 scan", "Visual Dupes 2019 group #${group.index}")
+        assertEquals(names, jobs.entries.value.map { it.name })
+        val summaries = jobs.entries.value.map { (it.state as JobState.Finished).outcome.summary }
+        assertEquals(
+            listOf("Visual Dupes 2019 scan: 1 groups", "Visual Dupes 2019 group #${group.index}: moved 1"),
+            summaries,
+        )
+    }
+
+    @Test
+    fun `a stopped scan with a scope names it in its summary`() {
+        val stopping = object : MediaMetadataReader by SamePictureReader {
+            override fun decodeFrame(entry: FileHandle, maxSide: Int?): PixelBuffer {
+                jobs.stop(jobs.entries.value.last { it.state is JobState.Running }.id)
+                return SamePictureReader.decodeFrame(entry, maxSide)
+            }
+        }
+        val stopped = VisualDupesController(DesktopFileSystemRepository(), stopping, jobs) {
+            TrashLocation(PathHandle(library), "2019")
+        }
+        Files.writeString(year.resolve("a.jpg"), "aaaa")
+        Files.writeString(year.resolve("b.jpg"), "bb")
+
+        stopped.onScan(yearDir, "2019")
+
+        val job = jobs.entries.value.last().state as JobState.Finished
+        assertEquals("Visual Dupes 2019 scan: stopped", job.outcome.summary)
+    }
+
+    @Test
+    fun `without a scope the jobs keep their plain names`() {
+        val group = scanAndMoveB(null)
+
+        val names = listOf("Visual Dupes scan", "Visual Dupes group #${group.index}")
+        assertEquals(names, jobs.entries.value.map { it.name })
     }
 
     @Test

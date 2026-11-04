@@ -1,6 +1,8 @@
 package app.osprey.jobs
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class JobTextTest {
@@ -55,5 +57,42 @@ class JobTextTest {
     @Test
     fun `a summary of a job that ran to the end is left as it is`() {
         assertEquals("Reorg: 5 done, 0 failed", withStoppedNote("Reorg: 5 done, 0 failed", stopped = false))
+    }
+
+    @Test
+    fun `a name is followed by the scope it ran on, when there is one`() {
+        assertEquals("Dates 2021", scopedName("Dates", "2021"))
+        assertEquals("Dates", scopedName("Dates", null))
+        assertEquals("Dates", scopedName("Dates", " "))
+    }
+
+    @Test
+    fun `an apply summary names what was done and what failed`() {
+        assertEquals("Dates apply: 3 done", applyOutcome("Dates", 3, 0, false).summary)
+        assertEquals("Dates apply: 3 done, 2 failed", applyOutcome("Dates", 3, 2, false).summary)
+    }
+
+    @Test
+    fun `an apply that stopped says so after its counts`() {
+        assertEquals("Dates apply: 3 done, 1 failed (stopped)", applyOutcome("Dates", 3, 1, true).summary)
+    }
+
+    @Test
+    fun `an apply outcome carries the failures and the stop`() {
+        val hurt = applyOutcome("Dates", 3, 2, true)
+        val clean = applyOutcome("Dates", 3, 0, false)
+
+        assertEquals(2, hurt.failures)
+        assertTrue(hurt.stopped)
+        assertEquals(0, clean.failures)
+        assertFalse(clean.stopped)
+    }
+
+    @Test
+    fun `the suffix after an apply counts what was done, what failed and a stop`() {
+        assertEquals("  -- APPLIED (5)", appliedSuffix(5, 0, false))
+        assertEquals("  -- APPLIED (5), failed 2", appliedSuffix(5, 2, false))
+        assertEquals("  -- APPLIED (5) -- STOPPED", appliedSuffix(5, 0, true))
+        assertEquals("  -- APPLIED (5), failed 2 -- STOPPED", appliedSuffix(5, 2, true))
     }
 }

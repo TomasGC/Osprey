@@ -25,6 +25,9 @@ fun runDurationText(run: RunRecord): String? {
     return durationText(Duration.between(start, end).seconds)
 }
 
+/** When the run began, in [zone]: its start, or the moment it was queued while it has not started. */
+fun runWhenText(run: RunRecord, zone: ZoneId): String = dateText(run.startedAt ?: run.queuedAt, zone)
+
 private fun durationText(seconds: Long): String = when {
     seconds < 1 -> "under 1 s"
     seconds < SECONDS_IN_MINUTE -> "$seconds s"

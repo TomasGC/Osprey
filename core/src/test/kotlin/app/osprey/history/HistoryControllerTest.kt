@@ -59,6 +59,26 @@ class HistoryControllerTest {
     }
 
     @Test
+    fun `the ended runs are counted, a waiting or running one is not`() {
+        ended("Done")
+        ended("Also done")
+        store.begin("Failed", T0).also { store.finish(it, RunState.Failed, "x", T0) }
+        store.begin("Stopped", T0).also { store.finish(it, RunState.Stopped, "x", T0) }
+        store.begin("Waiting", T0)
+        store.begin("Running", T0).also { store.start(it, T0) }
+
+        assertEquals(4, HistoryController(store).view.value.endedCount)
+    }
+
+    @Test
+    fun `an empty history, or one that has only active runs, has none ended`() {
+        assertEquals(0, HistoryController(store).view.value.endedCount)
+        store.begin("Waiting", T0)
+
+        assertEquals(0, HistoryController(store).view.value.endedCount)
+    }
+
+    @Test
     fun `back closes the page`() {
         val id = ended("Reorg")
         val controller = HistoryController(store)

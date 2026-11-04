@@ -14,8 +14,12 @@ import app.osprey.android.filesystem.AndroidFileSystemRepository
 import app.osprey.android.jobs.JobService
 import app.osprey.android.media.uprightAndroidMediaMetadataReader
 import app.osprey.android.releaseGrant
+import app.osprey.history.JobHistoryStore
+import app.osprey.history.RunRecorder
+import app.osprey.history.openHistory
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.JobState
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +37,11 @@ class OspreyApplication : Application() {
     private var serviceStarted = false
 
     /** Jobs are blocking file work, so they get the threads made for that, not the ones that compute. */
-    val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO))
+    val history: JobHistoryStore by lazy { openHistory(File(filesDir, "history")) }
+
+    val jobs: JobQueue by lazy {
+        JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO), RunRecorder(history))
+    }
 
     /** True while one of the app's screens is on show, so a finished job needs no notification. */
     val isVisible: Boolean get() = startedActivities > 0
@@ -50,6 +58,7 @@ class OspreyApplication : Application() {
                     ?.let(::AndroidFileHandle)
             },
             releaseGrant = { releaseGrant(this, it) },
+            history = history,
         )
     }
 

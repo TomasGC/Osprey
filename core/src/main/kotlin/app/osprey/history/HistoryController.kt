@@ -10,6 +10,9 @@ private const val FOLLOW_INTERVAL_MS = 500L
 /** What the History screen shows: the runs by state, and the run whose page is open, if any. */
 data class HistoryView(val sections: List<RunSection>, val selected: RunRecord?) {
     val isEmpty: Boolean get() = sections.isEmpty()
+
+    /** How many runs have ended: the ones Clear history forgets. */
+    val endedCount: Int get() = sections.filterNot { it.state.isActive }.sumOf { it.runs.size }
 }
 
 /** The logic of the History screen (#79), shared by both platforms: they only draw [view]. */
