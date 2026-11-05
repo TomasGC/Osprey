@@ -25,14 +25,14 @@ dependencies {
 
     constraints {
         // ui-test-junit4 brings Truth, which asks for Guava 28.1-android (two known CVEs, flagged by the dependency
-        // scan); this one is already verified for the build and is only on the test classpath.
-        testImplementation("com.google.guava:guava:32.0.1-jre")
+        // scan); this one is the latest stable and is only on the test classpath.
+        testImplementation("com.google.guava:guava:33.8.0-jre")
     }
 }
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class) {
+        val test = getByName<JvmTestSuite>("test").apply {
             useJUnit()
         }
     }
@@ -88,8 +88,10 @@ tasks.register<Test>("e2e") {
 }
 
 kover {
-    excludeTests {
-        tasks("e2e")
+    currentProject {
+        instrumentation {
+            disabledForTestTasks.add("e2e")
+        }
     }
 }
 

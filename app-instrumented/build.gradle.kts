@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.test)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -21,16 +20,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     testOptions {
         // Not the AVD the tests actually run on (Condor's instrumented workflow creates that one with avdmanager):
         // this declaration only makes `./gradlew pixel4api30Setup` a real task, so CI can download and cache the
         // system image first. The same declaration as in Anglerfish.
         managedDevices {
-            devices {
+            allDevices {
                 maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("pixel4api30").apply {
                     device = "Pixel 4"
                     apiLevel = 30
@@ -57,4 +52,10 @@ dependencies {
     // Newer than the 3.5.0 the Compose BOM brings in: that one calls InputManager.getInstance, gone on API 37 (#75).
     implementation(libs.androidx.test.espresso.core)
     implementation(libs.compose.ui.test.junit4)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
