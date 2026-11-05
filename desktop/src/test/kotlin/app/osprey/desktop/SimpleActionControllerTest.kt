@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
@@ -22,7 +23,7 @@ import org.junit.Test
 /** Shared no-op [FileHandle] stub, reused by other desktop unit tests that don't touch the filesystem. */
 object FakeHandle : FileHandle
 
-class SimpleActionControllerTest {
+class SimpleActionControllerTest : TimedTest() {
 
     private val history = InMemoryJobHistoryStore()
     private val jobs = immediateJobQueue(history)

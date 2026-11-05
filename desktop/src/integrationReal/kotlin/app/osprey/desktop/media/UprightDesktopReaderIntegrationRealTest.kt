@@ -1,6 +1,7 @@
 package app.osprey.desktop.media
 
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
 import java.awt.image.BufferedImage
 import java.nio.file.Files
@@ -24,7 +25,7 @@ private const val BYTE_MASK = 0xFF
 private fun isRed(argb: Int): Boolean = (argb shr RED_SHIFT and BYTE_MASK) > RED_MIN && (argb and BYTE_MASK) < OTHER_MAX
 
 /** The reader the app uses, on real files: a photo stored sideways comes out upright (#51). */
-class UprightDesktopReaderIntegrationRealTest {
+class UprightDesktopReaderIntegrationRealTest : TimedTest() {
 
     private lateinit var tempDir: Path
     private val reader = uprightDesktopMediaMetadataReader()

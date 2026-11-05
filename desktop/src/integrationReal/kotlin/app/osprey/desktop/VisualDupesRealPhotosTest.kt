@@ -4,6 +4,7 @@ import app.osprey.actions.visual.VisualDupePlanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
 import java.nio.file.Files
 import java.nio.file.Path
@@ -17,7 +18,7 @@ import org.junit.Test
  * 64 bits, against a threshold of 2), so they must never group; the same capture as a HEIC, a JPEG, a PNG and a JPEG
  * stored sideways under an Exif tag must group, and two different subjects must stay apart however they are stored.
  */
-class VisualDupesRealPhotosTest {
+class VisualDupesRealPhotosTest : TimedTest() {
 
     private val planner = VisualDupePlanner(DesktopFileSystemRepository(), uprightDesktopMediaMetadataReader())
     private lateinit var folder: Path

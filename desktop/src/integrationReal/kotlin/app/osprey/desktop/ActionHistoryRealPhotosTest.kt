@@ -1,6 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
 import app.osprey.history.FileResult
 import java.nio.file.Files
@@ -20,7 +21,7 @@ import org.junit.Test
  * is the bytes: an action that changes a name or a date must leave them as they were, and the sizes in the History
  * must be the files' own.
  */
-class ActionHistoryRealPhotosTest {
+class ActionHistoryRealPhotosTest : TimedTest() {
 
     private lateinit var harness: ActionHarness
     private lateinit var photos: Path

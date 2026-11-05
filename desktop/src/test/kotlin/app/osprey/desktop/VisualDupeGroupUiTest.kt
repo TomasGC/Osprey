@@ -1,6 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.actions.visual.VisualDupeMember
+import app.osprey.desktop.testing.TimedTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -8,7 +9,7 @@ import org.junit.Test
 
 private fun member(name: String, sizeBytes: Long) = VisualDupeMember(FakeHandle, name, sizeBytes)
 
-class VisualDupeGroupUiTest {
+class VisualDupeGroupUiTest : TimedTest() {
 
     @Test
     fun `a non-burst group keeps only its heaviest -- first -- member`() {

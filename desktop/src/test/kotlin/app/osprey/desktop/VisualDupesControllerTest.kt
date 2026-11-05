@@ -3,6 +3,7 @@ package app.osprey.desktop
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.history.InMemoryJobHistoryStore
@@ -20,7 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class VisualDupesControllerTest {
+class VisualDupesControllerTest : TimedTest() {
 
     /** Every file decodes to the same small picture, so any two images are visual duplicates. */
     private object SamePictureReader : MediaMetadataReader {

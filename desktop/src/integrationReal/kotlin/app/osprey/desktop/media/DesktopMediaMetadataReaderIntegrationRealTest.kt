@@ -3,6 +3,7 @@ package app.osprey.desktop.media
 import app.osprey.actions.dates.DatesPlanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.media.MediaDateSource
 import app.osprey.media.utcToLocal
 import java.awt.image.BufferedImage
@@ -40,7 +41,7 @@ private val EXIF_HEADER = "Exif\u0000\u0000".toByteArray(Charsets.US_ASCII)
  * `test_visual.py`'s mocked subprocess/PIL tests always stopped short of — the gap this issue's
  * own DoD calls out as the point of putting these implementations behind an integrationReal tier.
  */
-class DesktopMediaMetadataReaderIntegrationRealTest {
+class DesktopMediaMetadataReaderIntegrationRealTest : TimedTest() {
 
     private val reader = DesktopMediaMetadataReader()
     private lateinit var tempDir: Path

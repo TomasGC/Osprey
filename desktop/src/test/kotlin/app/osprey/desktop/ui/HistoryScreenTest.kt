@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
 import app.osprey.history.FileState
@@ -24,7 +25,7 @@ import org.junit.Test
 private val T0: Instant = Instant.parse("2019-05-04T12:00:00Z")
 
 @OptIn(ExperimentalTestApi::class)
-class HistoryScreenTest {
+class HistoryScreenTest : TimedTest() {
 
     private val store = InMemoryJobHistoryStore()
     private val controller = HistoryController(store)

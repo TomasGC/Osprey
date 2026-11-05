@@ -1,6 +1,7 @@
 package app.osprey.desktop.media
 
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.testing.toPng
 import app.osprey.media.ExifOrientation
@@ -12,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-class DesktopOrientationSourceTest {
+class DesktopOrientationSourceTest : TimedTest() {
 
     private lateinit var tempDir: Path
     private val source = DesktopOrientationSource()

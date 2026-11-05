@@ -6,6 +6,7 @@ import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import java.awt.Color
 import java.awt.image.BufferedImage
 import kotlin.random.Random
@@ -29,7 +30,7 @@ private const val IMAGE_SIZE = 256
  * burst-set case (a real camera burst, e.g. the POC's zoo-bears set) needs the real library on a
  * real machine, same limitation #11 already flagged for manual UI validation.
  */
-class VisualDupeEndToEndRealTest {
+class VisualDupeEndToEndRealTest : TimedTest() {
 
     private val fs = DesktopFileSystemRepository()
     private val mediaMetadataReader = DesktopMediaMetadataReader()

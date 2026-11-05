@@ -9,6 +9,7 @@ import app.osprey.desktop.media.parseHeicGrid
 import app.osprey.desktop.media.probeHeicGroups
 import app.osprey.desktop.media.runFfmpeg
 import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
 import app.osprey.media.HeicRotation
 import java.nio.file.Files
@@ -26,7 +27,7 @@ private const val STORED_HEIGHT = 3000
  * of an odd number of quarter turns shows it as 3000 x 4000. A distro ffmpeg before 8.1 decodes only the first tile
  * of such a file, so the app must compose the grid itself; a newer one composes it, and then both must agree.
  */
-class HeicGridRealPhotosTest {
+class HeicGridRealPhotosTest : TimedTest() {
 
     private fun firstOfEachSubject(): List<Path> {
         val fixtures = Photos.need()

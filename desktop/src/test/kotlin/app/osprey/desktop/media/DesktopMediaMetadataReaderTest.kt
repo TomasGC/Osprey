@@ -1,6 +1,7 @@
 package app.osprey.desktop.media
 
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
@@ -12,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
-class DesktopMediaMetadataReaderTest {
+class DesktopMediaMetadataReaderTest : TimedTest() {
 
     private lateinit var tempDir: Path
     private val reader = DesktopMediaMetadataReader()

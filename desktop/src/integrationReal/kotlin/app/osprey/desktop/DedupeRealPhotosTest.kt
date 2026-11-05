@@ -4,6 +4,7 @@ import app.osprey.actions.dedupe.DedupePlanner
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,7 +23,7 @@ private const val COPY_SUFFIX = "_copy"
  * look-alikes (bursts of one scene, some with nearly the same size) differ in their bytes, so none of them may be
  * taken for a duplicate; that is what the grouping by size and then by hash has to get right.
  */
-class DedupeRealPhotosTest {
+class DedupeRealPhotosTest : TimedTest() {
 
     private val fs = DesktopFileSystemRepository()
     private lateinit var libraryDir: Path

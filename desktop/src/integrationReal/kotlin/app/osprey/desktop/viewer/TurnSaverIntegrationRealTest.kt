@@ -4,6 +4,7 @@ import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopOrientationSource
 import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.desktop.testing.toPng
 import app.osprey.history.FileRecord
@@ -48,7 +49,7 @@ private const val IROT_BOX_AND_ASSOCIATION = 10
 private fun isRed(argb: Int): Boolean = (argb shr RED_SHIFT and BYTE_MASK) > RED_MIN && (argb and BYTE_MASK) < OTHER_MAX
 
 /** Saving a turn into real files with the real repository, then reading them back the way the app does (#61). */
-class TurnSaverIntegrationRealTest {
+class TurnSaverIntegrationRealTest : TimedTest() {
 
     private lateinit var tempDir: Path
     private val files = DesktopFileSystemRepository()

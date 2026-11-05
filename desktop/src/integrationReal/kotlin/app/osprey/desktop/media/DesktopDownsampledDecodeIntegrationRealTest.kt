@@ -4,6 +4,7 @@ import app.osprey.actions.visual.HASH_DECODE_MAX_SIDE
 import app.osprey.actions.visual.VISUAL_HAMMING_THRESHOLD
 import app.osprey.actions.visual.phash
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import java.awt.Color
 import java.awt.GradientPaint
 import java.awt.image.BufferedImage
@@ -23,7 +24,7 @@ private const val PHOTO_HEIGHT = 3000
 private const val SHAPE_COUNT = 40
 
 /** Decoding at a bounded size (#49): small enough to hash, close enough to the full decode to hash alike. */
-class DesktopDownsampledDecodeIntegrationRealTest {
+class DesktopDownsampledDecodeIntegrationRealTest : TimedTest() {
 
     private val reader = DesktopMediaMetadataReader()
     private lateinit var tempDir: Path

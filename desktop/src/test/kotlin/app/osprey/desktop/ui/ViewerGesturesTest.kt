@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaMetadataReader
@@ -34,7 +35,7 @@ private val ONE_PIXEL = PixelBuffer(1, 1, intArrayOf(0xFF336699.toInt()))
 
 /** The viewer's zoom, pan, turn and close behaviour (#51), on a photo that is shown at fit inside the window. */
 @OptIn(ExperimentalTestApi::class)
-class ViewerGesturesTest {
+class ViewerGesturesTest : TimedTest() {
 
     private val handle: FileHandle = PathHandle(Path.of("IMG_0001.jpg"))
     private val turns = ViewTurns()

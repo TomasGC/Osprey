@@ -1,11 +1,12 @@
 package app.osprey.desktop.media
 
+import app.osprey.desktop.testing.TimedTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** The grid of a phone HEIC as `ffprobe -show_stream_groups -of json` reports it. */
-class HeicGridTest {
+class HeicGridTest : TimedTest() {
 
     private val tiles = """, "subcomponents": [
         {"stream_index": 4, "tile_horizontal_offset": 0, "tile_vertical_offset": 0},

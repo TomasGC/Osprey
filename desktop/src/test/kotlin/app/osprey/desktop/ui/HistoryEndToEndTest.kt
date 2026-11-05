@@ -12,6 +12,7 @@ import app.osprey.desktop.FakeSettingsStore
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.history.FileResult
 import app.osprey.history.openHistory
@@ -38,7 +39,7 @@ private const val WAIT_MS = 10_000L
  * [AppState] over the same folder. Jobs are awaited on the queue's own state, never by polling the screen.
  */
 @OptIn(ExperimentalTestApi::class)
-class HistoryEndToEndTest {
+class HistoryEndToEndTest : TimedTest() {
 
     private lateinit var root: Path
     private val library get() = root.resolve("library")

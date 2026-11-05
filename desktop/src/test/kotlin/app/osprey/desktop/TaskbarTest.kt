@@ -1,11 +1,12 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.jobs.TaskbarState
 import java.awt.Taskbar
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class TaskbarTest {
+class TaskbarTest : TimedTest() {
 
     @Test
     fun `every taskbar state has its AWT counterpart`() {
