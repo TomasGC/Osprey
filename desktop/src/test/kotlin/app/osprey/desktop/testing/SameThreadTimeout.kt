@@ -1,5 +1,6 @@
 package app.osprey.desktop.testing
 
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -28,18 +29,29 @@ private val watchdogs: ScheduledExecutorService = Executors.newSingleThreadSched
  * A test that ignores the interrupt for [GRACE_SECONDS] more is named on stderr and the worker is halted, so a
  * hang can never block a run.
  */
-class SameThreadTimeout(private val limit: Long, private val unit: TimeUnit) : TestRule {
+class SameThreadTimeout(
+    private val limit: Long,
+    private val unit: TimeUnit,
+    private val graceSeconds: Long = GRACE_SECONDS,
+    private val onGiveUp: (Description, Array<StackTraceElement>) -> Unit = ::halt,
+) : TestRule {
+
+    val limitMillis: Long get() = unit.toMillis(limit)
 
     override fun apply(base: Statement, description: Description): Statement = object : Statement() {
         override fun evaluate() {
             val testThread = Thread.currentThread()
             val state = AtomicInteger(RUNNING)
             val stuckAt = AtomicReference<Array<StackTraceElement>>(emptyArray())
+            val delivered = CountDownLatch(1)
             val watchdog = watchdogs.schedule({
                 if (state.compareAndSet(RUNNING, FIRED)) {
                     stuckAt.set(testThread.stackTrace)
                     testThread.interrupt()
-                    watchdogs.schedule({ giveUp(state, description, stuckAt.get()) }, GRACE_SECONDS, TimeUnit.SECONDS)
+                    delivered.countDown()
+                    watchdogs.schedule({
+                        if (state.get() == FIRED) onGiveUp(description, stuckAt.get())
+                    }, graceSeconds, TimeUnit.SECONDS)
                 }
             }, limit, unit)
             var failure: Throwable? = null
@@ -54,7 +66,7 @@ class SameThreadTimeout(private val limit: Long, private val unit: TimeUnit) : T
                 failure?.let { throw it }
                 return
             }
-            Thread.interrupted()
+            delivered.awaitUninterruptibly()
             state.set(DONE)
             throw TestTimedOutException(limit, unit).apply {
                 stackTrace = stuckAt.get()
@@ -62,11 +74,25 @@ class SameThreadTimeout(private val limit: Long, private val unit: TimeUnit) : T
             }
         }
     }
+}
 
-    private fun giveUp(state: AtomicInteger, description: Description, stuckAt: Array<StackTraceElement>) {
-        if (state.get() != FIRED) return
-        System.err.println("${description.displayName} ignored the interrupt for $GRACE_SECONDS s after its limit; halting")
-        stuckAt.forEach { System.err.println("\tat $it") }
-        Runtime.getRuntime().halt(HALT_STATUS)
+/**
+ * Waits for the watchdog's interrupt to have been delivered, so it cannot reach the next test. `await` throws when the
+ * interrupt flag is set and clears it as it does: that is how the timeout's own interrupt is cleared from the thread.
+ */
+private fun CountDownLatch.awaitUninterruptibly() {
+    while (true) {
+        try {
+            await()
+            return
+        } catch (_: InterruptedException) {
+            // the timeout's own interrupt, now cleared: wait again until the watchdog has counted down
+        }
     }
+}
+
+private fun halt(description: Description, stuckAt: Array<StackTraceElement>) {
+    System.err.println("${description.displayName} ignored the interrupt for $GRACE_SECONDS s after its limit; halting")
+    stuckAt.forEach { System.err.println("\tat $it") }
+    Runtime.getRuntime().halt(HALT_STATUS)
 }

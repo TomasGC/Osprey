@@ -1,7 +1,10 @@
 package app.osprey.desktop.testing
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -57,6 +60,38 @@ class SameThreadTimeoutTest : TimedTest() {
         assertThrows(TestTimedOutException::class.java) {
             runWithLimit(LIMIT_MS) { try { Thread.sleep(SLOW_MS / 5) } catch (_: InterruptedException) { } }
         }
+    }
+
+    @Test
+    fun `a test that ignores the interrupt is given up on after the grace time, by name`() {
+        val given = AtomicReference<Description?>()
+        val rule = SameThreadTimeout(LIMIT_MS, TimeUnit.MILLISECONDS, graceSeconds = 1) { d, _ -> given.set(d) }
+        val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        assertThrows(TestTimedOutException::class.java) {
+            rule.apply(object : Statement() {
+                override fun evaluate() {
+                    while (given.get() == null && System.nanoTime() < end) Thread.onSpinWait()
+                }
+            }, description).evaluate()
+        }
+        assertSame(description, given.get())
+    }
+
+    @Test
+    fun `a test that ended after its timeout is not given up on`() {
+        val given = AtomicReference<Description?>()
+        val rule = SameThreadTimeout(LIMIT_MS, TimeUnit.MILLISECONDS, graceSeconds = 2) { d, _ -> given.set(d) }
+        assertThrows(TestTimedOutException::class.java) {
+            rule.apply(object : Statement() { override fun evaluate() = Thread.sleep(SLOW_MS) }, description).evaluate()
+        }
+        Thread.sleep(2_500)
+        assertNull(given.get())
+    }
+
+    @Test
+    fun `TimedTest takes its limit from its argument, 120 s by default`() {
+        assertEquals(7_000L, TimedTest(limitSeconds = 7).timeout.limitMillis)
+        assertEquals(120_000L, TimedTest().timeout.limitMillis)
     }
 
     @Test
