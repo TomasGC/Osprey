@@ -46,10 +46,11 @@ testing {
 sourceSets {
     create("integrationMock") {
         kotlin.srcDir("src/integrationMock/kotlin")
-        compileClasspath += sourceSets.test.get().compileClasspath
+        compileClasspath += sourceSets.test.get().compileClasspath + sourceSets.test.get().output
         runtimeClasspath += sourceSets.test.get().runtimeClasspath + output
     }
-    // integrationReal and e2e also see `test`'s own classes, for the shared test photos (`app.osprey.desktop.testing`).
+    // Every tier sees `test`'s own classes: `TimedTest`, the base of every test class (#89); integrationReal and e2e
+    // also use it for the shared test photos (`app.osprey.desktop.testing`).
     // integrationReal also sees integrationMock's output: the harness that runs an action over a temp library (#79).
     create("integrationReal") {
         kotlin.srcDir("src/integrationReal/kotlin")
