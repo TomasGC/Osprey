@@ -3,6 +3,7 @@ package app.osprey.desktop
 import androidx.compose.runtime.snapshots.Snapshot
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsResult
 import java.nio.file.Files
@@ -17,7 +18,7 @@ import org.junit.Test
  * composing scope to it, so a state built and started inside `application { }` made that scope recompose, and
  * build a second state, when a job ended and wrote `years`.
  */
-class AppStateStartupTest {
+class AppStateStartupTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

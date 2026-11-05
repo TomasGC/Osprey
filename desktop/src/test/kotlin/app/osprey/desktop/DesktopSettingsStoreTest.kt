@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.settings.InputMode
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsResult
@@ -13,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class DesktopSettingsStoreTest {
+class DesktopSettingsStoreTest : TimedTest() {
 
     private lateinit var tempDir: Path
     private val store = DesktopSettingsStore()

@@ -4,6 +4,7 @@ import app.osprey.actions.reorg.ReorgPlanner
 import app.osprey.actions.reorg.ReorgSource
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
@@ -29,7 +30,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class ReorgControllerTest {
+class ReorgControllerTest : TimedTest() {
 
     /** No metadata at all: the year comes from the file names. */
     private object NameOnlyReader : MediaMetadataReader {

@@ -2,6 +2,7 @@ package app.osprey.desktop
 
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.RunState
 import app.osprey.jobs.JobOutcome
@@ -18,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class AppStateTest {
+class AppStateTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

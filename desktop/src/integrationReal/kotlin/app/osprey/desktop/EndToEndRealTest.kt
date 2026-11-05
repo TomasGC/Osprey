@@ -11,6 +11,7 @@ import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.settings.InputMode
 import java.nio.file.Files
 import java.nio.file.Path
@@ -26,7 +27,7 @@ import org.junit.Test
  * [DesktopMediaMetadataReader] on a real, messy year folder -- the spot-check #10's DoD asks
  * for, beyond each planner's own unit-level tests against the in-memory fake.
  */
-class EndToEndRealTest {
+class EndToEndRealTest : TimedTest() {
 
     private val fs = DesktopFileSystemRepository()
     private val mediaMetadataReader = DesktopMediaMetadataReader()

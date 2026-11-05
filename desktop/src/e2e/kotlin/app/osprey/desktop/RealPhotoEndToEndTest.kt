@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import app.osprey.desktop.media.decodeHeicPixelBuffer
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.ui.OspreyApp
 import app.osprey.fixtures.Photos
 import app.osprey.media.PixelBuffer
@@ -38,7 +39,7 @@ private const val WITHOUT_ROTATION_PROPERTY = "sun_1.heic"
  * picture, so these are the only desktop tests that see a save change what a decoder shows.
  */
 @OptIn(ExperimentalTestApi::class)
-class RealPhotoEndToEndTest {
+class RealPhotoEndToEndTest : TimedTest() {
 
     private lateinit var root: Path
 

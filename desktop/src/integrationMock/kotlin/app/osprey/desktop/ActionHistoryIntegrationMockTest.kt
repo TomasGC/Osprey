@@ -2,6 +2,7 @@ package app.osprey.desktop
 
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.FileResult
 import app.osprey.history.RunState
 import java.io.File
@@ -19,7 +20,7 @@ import org.junit.Test
  * Every action through its real controller, real job queue, real files and a real history on disk (#79). Each test
  * reads the run back the way a new launch would, so what the History shows is what was written to disk.
  */
-class ActionHistoryIntegrationMockTest {
+class ActionHistoryIntegrationMockTest : TimedTest() {
 
     private val harness = ActionHarness()
 

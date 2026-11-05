@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.jobs.JobOutcome
 import java.nio.file.Files
 import java.nio.file.Path
@@ -12,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class OspreyConfigTest {
+class OspreyConfigTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

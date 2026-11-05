@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsRejection
 import app.osprey.settings.SettingsResult
@@ -12,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class FolderSettingTest {
+class FolderSettingTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

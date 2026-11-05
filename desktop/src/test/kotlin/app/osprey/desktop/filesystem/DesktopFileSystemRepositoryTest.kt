@@ -1,5 +1,6 @@
 package app.osprey.desktop.filesystem
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
@@ -20,7 +21,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 
-class DesktopFileSystemRepositoryTest {
+class DesktopFileSystemRepositoryTest : TimedTest() {
 
     private val repo = DesktopFileSystemRepository()
     private lateinit var tempDir: Path

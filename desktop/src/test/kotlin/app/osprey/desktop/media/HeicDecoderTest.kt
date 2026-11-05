@@ -1,5 +1,6 @@
 package app.osprey.desktop.media
 
+import app.osprey.desktop.testing.TimedTest
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
@@ -15,7 +16,7 @@ private const val GREEN = OPAQUE or 0x00FF00
 private const val BLUE = OPAQUE or 0x0000FF
 private const val WHITE = OPAQUE or 0xFFFFFF
 
-class HeicDecoderTest {
+class HeicDecoderTest : TimedTest() {
 
     private val photo = Path.of("photo.heic")
 

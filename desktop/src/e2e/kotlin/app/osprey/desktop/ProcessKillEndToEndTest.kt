@@ -1,5 +1,6 @@
 package app.osprey.desktop
 
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.FileResult
 import app.osprey.history.RunState
 import app.osprey.history.openHistory
@@ -20,7 +21,7 @@ private const val START_TIMEOUT_SECONDS = 90L
  * A real process killed in the middle of a run (#79): the History written to disk by a child JVM must show the run as
  * Interrupted when the next launch opens it, with the file the run had finished and none it had not.
  */
-class ProcessKillEndToEndTest {
+class ProcessKillEndToEndTest : TimedTest() {
 
     private lateinit var root: Path
     private val library get() = root.resolve("library")

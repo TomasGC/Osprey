@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.JobState
@@ -25,7 +26,7 @@ private const val POLL_MS = 5L
 private const val STOPPING = "Stopping after the file it is on..."
 
 @OptIn(ExperimentalTestApi::class)
-class CloseGuardTest {
+class CloseGuardTest : TimedTest() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = JobQueue(scope)

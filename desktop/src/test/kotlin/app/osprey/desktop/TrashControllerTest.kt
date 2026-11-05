@@ -4,6 +4,7 @@ import app.osprey.actions.trash.ConflictChoice
 import app.osprey.actions.trash.TrashAction
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.testing.TimedTest
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
@@ -15,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class TrashControllerTest {
+class TrashControllerTest : TimedTest() {
 
     private lateinit var library: Path
     private lateinit var controller: TrashController

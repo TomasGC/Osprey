@@ -1,5 +1,6 @@
 package app.osprey.desktop.media
 
+import app.osprey.desktop.testing.TimedTest
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.After
@@ -8,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
-class FfmpegHeicRendererTest {
+class FfmpegHeicRendererTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

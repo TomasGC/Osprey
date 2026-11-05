@@ -8,6 +8,7 @@ import app.osprey.desktop.AppState
 import app.osprey.desktop.FakeSettingsStore
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.After
@@ -18,7 +19,7 @@ import org.junit.Test
 
 /** The sidebar's History and Settings: the word beside the icon opens the screen just like the icon does (#79). */
 @OptIn(ExperimentalTestApi::class)
-class SidebarTest {
+class SidebarTest : TimedTest() {
 
     private lateinit var library: Path
 

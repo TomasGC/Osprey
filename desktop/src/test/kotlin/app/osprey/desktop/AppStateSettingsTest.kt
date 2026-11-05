@@ -2,6 +2,7 @@ package app.osprey.desktop
 
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.media.DesktopMediaMetadataReader
+import app.osprey.desktop.testing.TimedTest
 import app.osprey.settings.InputMode
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsResult
@@ -28,7 +29,7 @@ class FakeSettingsStore(var stored: MediaSettings = MediaSettings(), var saved: 
     override fun hasSavedSettings(): Boolean = saved
 }
 
-class AppStateSettingsTest {
+class AppStateSettingsTest : TimedTest() {
 
     private lateinit var tempDir: Path
 

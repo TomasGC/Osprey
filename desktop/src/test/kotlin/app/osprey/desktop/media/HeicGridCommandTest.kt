@@ -1,11 +1,12 @@
 package app.osprey.desktop.media
 
+import app.osprey.desktop.testing.TimedTest
 import java.nio.file.Path
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class HeicGridCommandTest {
+class HeicGridCommandTest : TimedTest() {
 
     private val grid = HeicGrid(
         width = 1000, height = 500, cropX = 0, cropY = 0,

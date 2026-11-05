@@ -1,12 +1,13 @@
 package app.osprey.desktop.media
 
+import app.osprey.desktop.testing.TimedTest
 import java.nio.file.Path
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class GridHeicRendererTest {
+class GridHeicRendererTest : TimedTest() {
 
     private val photo = Path.of("photo.heic")
     private val whole = byteArrayOf(1, 2, 3)
