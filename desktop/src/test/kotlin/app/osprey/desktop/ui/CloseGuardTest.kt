@@ -40,7 +40,10 @@ class CloseGuardTest : TimedTest() {
 
     /** A running apply that ends after the file it is on once it is asked to stop, or when [release] opens. */
     private fun stoppableJob(release: CountDownLatch) = jobs.enqueue("Reorg apply") { control ->
-        while (!control.shouldStop() && !release.await(POLL_MS, TimeUnit.MILLISECONDS)) Unit
+        var released = false
+        while (!control.shouldStop() && !released) {
+            released = release.await(POLL_MS, TimeUnit.MILLISECONDS)
+        }
         JobOutcome("Reorg apply: done", stopped = control.shouldStop())
     }
 
