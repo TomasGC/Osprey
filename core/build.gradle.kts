@@ -86,3 +86,13 @@ detekt {
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
     source.setFrom("$projectDir/src/main/kotlin")
 }
+
+// The report Condor's coverage gate reads merges every module (`merged`, see :app): :core and :desktop add their JVM
+// coverage to it under the same variant name.
+kover {
+    currentProject {
+        createVariant("merged") {
+            add("jvm")
+        }
+    }
+}
