@@ -16,7 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.v2.runComposeUiTest
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle

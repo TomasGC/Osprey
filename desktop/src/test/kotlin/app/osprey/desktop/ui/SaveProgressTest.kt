@@ -10,7 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.v2.runComposeUiTest
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FileHandle

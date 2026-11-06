@@ -6,7 +6,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.v2.runComposeUiTest
 import app.osprey.desktop.AppState
 import app.osprey.desktop.FakeSettingsStore
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
