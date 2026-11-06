@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "app.osprey.instrumented"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26

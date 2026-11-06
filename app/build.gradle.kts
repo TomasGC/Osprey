@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "app.osprey"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.osprey"

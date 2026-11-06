@@ -12,13 +12,6 @@ ignore = true
 reason = "AGP 9.5.1 build tool dependency, not shipped in the APK or the desktop app; the build now resolves Guava 33.8.0-jre (root build.gradle.kts), this version is only listed in the dependency metadata. GHSA-xxph-c9ww-hj94 (High) is a memory exhaustion when deserializing attacker-controlled streams, which neither the build nor the tests do. Fixed in 33.7.2: look again on 2026-12-05 and drop this entry once the AGP ships a Guava of that version."
 
 [[PackageOverrides]]
-name = "com.google.guava:guava"
-version = "28.1-android"
-ecosystem = "Maven"
-ignore = true
-reason = "Listed in the dependency metadata only: Truth (from the Compose desktop UI test library) asks for it, and the pin in desktop/build.gradle.kts resolves Guava 33.8.0-jre on the test classpath (#56). Look again on 2026-12-05, or when the Compose desktop update (#93 step 3) changes the Truth version."
-
-[[PackageOverrides]]
 name = "org.apache.commons:commons-lang3"
 ecosystem = "Maven"
 ignore = true
