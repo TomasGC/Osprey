@@ -24,7 +24,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -103,8 +102,10 @@ fun MediaPreview(
     // The photo's own size, not the base picture's: zoom and tiles are measured on the full photo. A reader that
     // cannot tell it leaves the base picture's size, and no detail.
     val photo = bitmap?.let { base -> dimensions?.let { it.size ?: PhotoSize(base.width, base.height) } }
-    val transform = photo?.let { transformFor(it, viewSize, stored, pending) }
-    val latest by rememberUpdatedState(transform)
+    // Read when used, not when the screen was last composed: a swipe can deliver several pointer events between two
+    // compositions, and each pan must add to the one before it (otherwise only the last step of the swipe counts).
+    fun currentTransform() = photo?.let { transformFor(it, viewSize, stored, pending) }
+    val transform = currentTransform()
     val tiles = rememberDetailTiles(mediaMetadataReader, handle, revision, transform, PREVIEW_DECODE_MAX_SIDE)
     val save = rememberTurnSaveControls(viewTurns, handle, name, pending)
 
@@ -118,7 +119,7 @@ fun MediaPreview(
                 .fillMaxWidth()
                 .clipToBounds()
                 .onSizeChanged { viewSize = it }
-                .viewerGestures({ latest }, { stored = it }, onClose)
+                .viewerGestures({ currentTransform() }, { stored = it }, onClose)
                 .testTag("viewer"),
             contentAlignment = Alignment.Center,
         ) {
@@ -132,7 +133,7 @@ fun MediaPreview(
             zoom = transform?.zoom ?: FIT_ZOOM,
             onTurn = { quarters ->
                 viewTurns.turn(handle, quarters)
-                stored = if (quarters > 0) latest?.rotateRight() else latest?.rotateLeft()
+                stored = if (quarters > 0) currentTransform()?.rotateRight() else currentTransform()?.rotateLeft()
             },
             save = save,
             checked = checked,
