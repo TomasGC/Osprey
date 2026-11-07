@@ -49,7 +49,8 @@ dependencies {
     implementation(libs.androidx.test.runner)
     implementation(libs.androidx.test.ext.junit)
     implementation(libs.androidx.test.uiautomator)
-    // Newer than the 3.5.0 the Compose BOM brings in: that one calls InputManager.getInstance, gone on API 37 (#75).
+    // Newer than the 3.5.0 that ui-test-junit4 still asks for: that one calls InputManager.getInstance, gone on API 37
+    // (#75). Look again on 2026-12-05, and drop this line once ui-test-junit4 asks for 3.7.0 or later.
     implementation(libs.androidx.test.espresso.core)
     implementation(libs.compose.ui.test.junit4)
 }
