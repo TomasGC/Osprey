@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -96,7 +97,11 @@ private fun TrashHeader(controller: TrashController, onDelete: () -> Unit, onRes
 private fun TrashTabs(controller: TrashController) {
     val years = controller.contents.years
     val year = controller.year ?: return
-    SecondaryScrollableTabRow(selectedTabIndex = years.indexOf(year).coerceAtLeast(0), edgePadding = 0.dp) {
+    SecondaryScrollableTabRow(
+        selectedTabIndex = years.indexOf(year).coerceAtLeast(0),
+        contentColor = MaterialTheme.colorScheme.primary,
+        edgePadding = 0.dp,
+    ) {
         years.forEach { candidate ->
             val count = controller.contents.entries.count { it.year == candidate }
             Tab(
@@ -107,7 +112,10 @@ private fun TrashTabs(controller: TrashController) {
         }
     }
     val actions = controller.contents.actions(year)
-    SecondaryTabRow(selectedTabIndex = actions.indexOf(controller.action).coerceAtLeast(0)) {
+    SecondaryTabRow(
+        selectedTabIndex = actions.indexOf(controller.action).coerceAtLeast(0),
+        contentColor = MaterialTheme.colorScheme.primary,
+    ) {
         actions.forEach { candidate ->
             Tab(
                 selected = candidate == controller.action,
