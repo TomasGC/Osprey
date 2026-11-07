@@ -16,10 +16,10 @@ Everything about what Osprey does and how it is built lives in the [wiki](https:
 
 ## Requirements
 
-- JDK 17 (Gradle toolchain; the wrapper pins Gradle 8.9)
+- JDK 21 (Gradle toolchain; the wrapper pins Gradle 9.9.0)
 - Desktop: `ffmpeg` and `ffprobe` on `PATH`, used to read video dates and extract video frames.
   When missing, video dates and video frames are skipped instead of failing the run.
-- Android: Android SDK (compileSdk 36) and a device or emulator on API 26+
+- Android: Android SDK (compileSdk 37) and a device or emulator on API 26+
 
 ## Build and run
 
