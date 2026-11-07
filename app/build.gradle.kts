@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover)
     alias(libs.plugins.detekt)
@@ -8,7 +7,7 @@ plugins {
 
 android {
     namespace = "app.osprey"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.osprey"
@@ -25,12 +24,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     buildFeatures {
@@ -79,14 +74,33 @@ dependencies {
     kover(project(":desktop"))
 }
 
-// The merged report is the number Condor's coverage gate reads. `koverVerify` is not part of the tasks
+// Condor's coverage gate runs `koverXmlReportDebug` and reads app/build/reports/kover/reportDebug.xml. Kover 0.9 keeps
+// the name `debug` for the Android variant alone, which holds none of :core and :desktop, so the merged report is the
+// `merged` variant: it writes that path, and the `debug` report goes aside. `koverVerify` is not part of the tasks
 // Condor runs, so the :core 100% rule (#46) hangs off the report task it does run.
 tasks.matching { it.name == "koverXmlReportDebug" }.configureEach {
     dependsOn(":core:koverVerify")
+    finalizedBy("koverXmlReportMerged")
 }
 
-koverReport {
-    androidReports("debug") {
+kover {
+    currentProject {
+        createVariant("merged") {
+            add("debug")
+            addWithDependencies("jvm", optional = true)
+        }
+    }
+    reports {
+        variant("debug") {
+            xml {
+                xmlFile = layout.buildDirectory.file("reports/kover/reportDebugOnly.xml")
+            }
+        }
+        variant("merged") {
+            xml {
+                xmlFile = layout.buildDirectory.file("reports/kover/reportDebug.xml")
+            }
+        }
         filters {
             excludes {
                 classes(
@@ -104,5 +118,11 @@ koverReport {
                 classes("MainKt*", "**.ComposableSingletons*")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }

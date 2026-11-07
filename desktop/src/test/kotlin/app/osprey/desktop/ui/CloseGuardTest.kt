@@ -3,7 +3,7 @@ package app.osprey.desktop.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.v2.runComposeUiTest
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
@@ -40,7 +40,10 @@ class CloseGuardTest : TimedTest() {
 
     /** A running apply that ends after the file it is on once it is asked to stop, or when [release] opens. */
     private fun stoppableJob(release: CountDownLatch) = jobs.enqueue("Reorg apply") { control ->
-        while (!control.shouldStop() && !release.await(POLL_MS, TimeUnit.MILLISECONDS)) Unit
+        var released = false
+        while (!control.shouldStop() && !released) {
+            released = release.await(POLL_MS, TimeUnit.MILLISECONDS)
+        }
         JobOutcome("Reorg apply: done", stopped = control.shouldStop())
     }
 

@@ -1,6 +1,7 @@
 package app.osprey.history
 
 import java.time.Instant
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -13,6 +14,7 @@ import org.junit.Test
 
 private val T0: Instant = Instant.parse("2026-11-03T10:00:00Z")
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HistoryControllerTest {
 
     private val store = InMemoryJobHistoryStore()
