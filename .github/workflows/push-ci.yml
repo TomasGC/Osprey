@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   kotlin-pipeline:
-    uses: TomasGC/condor/.github/workflows/kotlin-push-ci.yml@main
+    uses: TomasGC/Condor/.github/workflows/kotlin-push-ci.yml@main
     secrets: inherit
     with:
       app-name: osprey
@@ -25,6 +25,9 @@ jobs:
       # Merged line coverage of :core, :desktop and :app without the Compose screens (#46). :core is held
       # at 100% line and branch by `:core:koverVerify`, which the coverage report task depends on.
       coverage-threshold: 75
+      # The merged report, named instead of bridged (Condor#27, #99). The XML path follows the variant name.
+      coverage-report-tasks: '["koverXmlReportMerged", "koverHtmlReportMerged"]'
+      coverage-xml-path: app/build/reports/kover/reportMerged.xml
       # The real photos of the private Osprey-fixtures repository (#76, Condor#25): read with a deploy key held by the
       # `fixtures` environment, which only feature/**, bugfix/** and main can use. A missing folder fails the run.
       # ffmpeg decodes the HEIC photos and the video frames the desktop tests read.

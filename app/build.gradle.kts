@@ -74,13 +74,11 @@ dependencies {
     kover(project(":desktop"))
 }
 
-// Condor's coverage gate runs `koverXmlReportDebug` and reads app/build/reports/kover/reportDebug.xml. Kover 0.9 keeps
-// the name `debug` for the Android variant alone, which holds none of :core and :desktop, so the merged report is the
-// `merged` variant: it writes that path, and the `debug` report goes aside. `koverVerify` is not part of the tasks
-// Condor runs, so the :core 100% rule (#46) hangs off the report task it does run.
-tasks.matching { it.name == "koverXmlReportDebug" }.configureEach {
+// Condor's coverage gate runs the tasks named by `coverage-report-tasks` in push-ci.yml and reads the report named by
+// `coverage-xml-path`: the `merged` variant, which holds :core, :desktop and the Android debug classes. `koverVerify`
+// is not among those tasks, so the :core 100% rule (#46) hangs off the report task Condor runs.
+tasks.matching { it.name == "koverXmlReportMerged" }.configureEach {
     dependsOn(":core:koverVerify")
-    finalizedBy("koverXmlReportMerged")
 }
 
 kover {
@@ -91,16 +89,6 @@ kover {
         }
     }
     reports {
-        variant("debug") {
-            xml {
-                xmlFile = layout.buildDirectory.file("reports/kover/reportDebugOnly.xml")
-            }
-        }
-        variant("merged") {
-            xml {
-                xmlFile = layout.buildDirectory.file("reports/kover/reportDebug.xml")
-            }
-        }
         filters {
             excludes {
                 classes(
