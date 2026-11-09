@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   kotlin-pipeline:
-    uses: TomasGC/Condor/.github/workflows/kotlin-push-ci.yml@feature/27-pinned-test
+    uses: TomasGC/Condor/.github/workflows/kotlin-push-ci.yml@main
     secrets: inherit
     with:
       app-name: osprey
