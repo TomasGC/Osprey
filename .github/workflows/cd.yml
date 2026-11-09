@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    uses: TomasGC/condor/.github/workflows/kotlin-cd.yml@main
+    uses: TomasGC/condor/.github/workflows/kotlin-cd.yml@v1
     secrets: inherit
     with:
       app-name: osprey
