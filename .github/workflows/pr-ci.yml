@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   pr-checks:
-    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@main
+    uses: TomasGC/condor/.github/workflows/common-pr-ci.yml@v1
     with:
       # Osprey's context lives in the wiki: there is no contexts/ folder to check.
       context-check: false
