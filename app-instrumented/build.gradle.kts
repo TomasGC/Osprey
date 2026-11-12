@@ -10,7 +10,7 @@ android {
     defaultConfig {
         minSdk = 26
         targetSdk = 36
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "app.osprey.android.OspreyInstrumentationRunner"
     }
 
     targetProjectPath = ":app"
