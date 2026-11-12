@@ -136,13 +136,13 @@ object SafGrant {
 
     private fun click(device: UiDevice, selector: BySelector) {
         repeat(STALE_RETRIES) {
-            val node = find(device, selector)
-                ?: error("nothing matched $selector; on screen: ${onScreen(device)}")
             try {
+                val node = find(device, selector)
+                    ?: error("nothing matched $selector; on screen: ${onScreen(device)}")
                 node.click()
                 return
             } catch (ignored: StaleObjectException) {
-                // The screen redrew between finding the node and clicking it: find it again.
+                // The screen redrew while looking for the node or before clicking it: look again.
             }
         }
         error("$selector went stale $STALE_RETRIES times; on screen: ${onScreen(device)}")
