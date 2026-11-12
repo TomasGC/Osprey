@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.UriPermission
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -20,11 +21,22 @@ private const val WAIT_MS = 10_000L
 private const val GRANT_POLL_MS = 250L
 private const val STALE_RETRIES = 3
 
+// The picker's own ids, the same in Google's and AOSP's DocumentsUI; only the package prefix differs.
+private const val NEW_FOLDER_ID = "option_menu_create_dir"
+private const val DIALOG_TITLE_ID = "alertTitle"
+private const val BREADCRUMB_ID = "breadcrumb_text"
+
+private const val FOLDER_PREFIX = "osprey_instrumented_"
+private const val STORAGE_ROOT = "/sdcard"
+
+// Positive button of the picker's bottom bar (USE THIS FOLDER) and of its dialogs (OK, ALLOW), whatever the language.
+private const val POSITIVE_BUTTON = "android:id/button1"
+
 /**
  * The folder the SAF tests work in. A persisted read+write grant already on the device is reused (a phone's
  * one-time manual grant). With none, `-e grantViaPicker 1` makes the app ask for one: menu -> Settings -> Add folder ->
  * the system picker -> New folder -> Use this folder -> Allow, the way a person does it. With neither, null
- * (the tests skip). The picker's labels are those of the English AOSP and Google images.
+ * (the tests skip). The picker is driven by resource ids, never by labels, so the phone's language does not matter.
  */
 object SafGrant {
     const val PICKER_ARGUMENT = "grantViaPicker"
@@ -51,11 +63,10 @@ object SafGrant {
 
     /** Takes a new grant from the system picker, through the app's own Add folder button; fails loudly if it can't. */
     fun grantFromPicker(context: Context): UriPermission {
+        cleanUp(context) // a run that died leaves its folder and grant behind
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val picker = pickerPackage(context)
+        val picker = pickerPackage(device)
         val before = context.contentResolver.persistedUriPermissions.map { it.uri }.toSet()
-        // The picker opens where it was last left, which would nest the new folder in the previous grant's tree.
-        device.executeShellCommand("pm clear $picker")
         context.startActivity(
             context.packageManager.getLaunchIntentForPackage(context.packageName)!!
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
@@ -64,26 +75,59 @@ object SafGrant {
         click(device, By.text("⚙ Settings"))
         click(device, By.text("Add folder"))
         device.wait(Until.hasObject(By.pkg(picker)), WAIT_MS)
-        val name = "osprey_instrumented_${System.currentTimeMillis()}"
-        click(device, By.desc("New folder"))
+        // The picker opens where it was last left: go to the storage root, the first crumb, so the folder is made there.
+        click(device, By.res(picker, BREADCRUMB_ID))
+        val name = "$FOLDER_PREFIX${System.currentTimeMillis()}"
+        click(device, By.res(picker, NEW_FOLDER_ID))
         device.wait(Until.findObject(By.clazz("android.widget.EditText")), WAIT_MS).text = name
-        click(device, By.text(Pattern.compile("OK", Pattern.CASE_INSENSITIVE)))
+        click(device, By.res(POSITIVE_BUTTON))
+        device.wait(Until.gone(By.res(picker, DIALOG_TITLE_ID)), WAIT_MS)
         click(device, By.text(name))
-        click(device, By.text(Pattern.compile("USE THIS FOLDER", Pattern.CASE_INSENSITIVE)))
-        click(device, By.text(Pattern.compile("ALLOW", Pattern.CASE_INSENSITIVE)))
+        click(device, By.res(POSITIVE_BUTTON))
+        device.wait(Until.hasObject(By.res(picker, DIALOG_TITLE_ID)), WAIT_MS)
+        click(device, By.res(POSITIVE_BUTTON))
         val deadline = System.currentTimeMillis() + WAIT_MS
         while (newGrant(context, before) == null && System.currentTimeMillis() < deadline) Thread.sleep(GRANT_POLL_MS)
         return newGrant(context, before)
             ?: error("the picker flow ended without a grant; on screen: ${onScreen(device)}")
     }
 
+    /**
+     * Removes what the picker flow leaves behind: its grants (read from the tree id, `primary:osprey_instrumented_<ms>`)
+     * and its folders at the root of the shared storage. Another grant or folder is never touched, so a phone's own
+     * grant stays. Runs before each picker flow and when the run ends (`OspreyInstrumentationRunner`).
+     */
+    fun cleanUp(context: Context) {
+        val resolver = context.contentResolver
+        resolver.persistedUriPermissions
+            .filter { DocumentsContract.isTreeUri(it.uri) }
+            .filter { DocumentsContract.getTreeDocumentId(it.uri).substringAfter(':').startsWith(FOLDER_PREFIX) }
+            .forEach {
+                resolver.releasePersistableUriPermission(
+                    it.uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+        // No shell expands a glob here, so each folder is listed and removed by name.
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.executeShellCommand("ls $STORAGE_ROOT").lines().map { it.trim() }
+            .filter { it.startsWith(FOLDER_PREFIX) }
+            .forEach { device.executeShellCommand("rm -rf $STORAGE_ROOT/$it") }
+    }
+
     private fun newGrant(context: Context, before: Set<Uri>): UriPermission? =
         context.contentResolver.persistedUriPermissions
             .firstOrNull { it.isReadPermission && it.isWritePermission && it.uri !in before }
 
-    /** The app that answers the folder picker: Google's on the Google images, AOSP's on the plain ones. */
-    private fun pickerPackage(context: Context): String =
-        context.packageManager.resolveActivity(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 0)!!.activityInfo.packageName
+    /**
+     * The app that answers the folder picker: Google's on the Google images, AOSP's on the plain ones. Asked of the
+     * shell, which sees every package: the app's own package manager hides it on newer Android (package visibility),
+     * and a `<queries>` entry would put a test-only declaration in the shipped manifest.
+     */
+    private fun pickerPackage(device: UiDevice): String =
+        device.executeShellCommand("cmd package resolve-activity --brief -a ${Intent.ACTION_OPEN_DOCUMENT_TREE}")
+            .lineSequence().map { it.trim() }.firstOrNull { '/' in it }?.substringBefore('/')
+            ?: error("no app answers ${Intent.ACTION_OPEN_DOCUMENT_TREE}")
 
     private fun find(device: UiDevice, selector: BySelector): UiObject2? =
         device.wait(Until.findObject(selector), QUICK_MS)
