@@ -22,7 +22,7 @@ private const val FULL_PERCENT = 100
  * Turns the words and numbers `:core` decided ([JobNotification]) into Android notifications: one ongoing
  * notification with a progress bar and a Stop button while jobs run, and one result per finished job.
  */
-internal class JobNotifications(private val context: Context) {
+class JobNotifications(private val context: Context) {
 
     private val manager = context.getSystemService(NotificationManager::class.java)
 
@@ -63,6 +63,13 @@ internal class JobNotifications(private val context: Context) {
             .setCategory(if (model.failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
             .build()
         manager.notify(RESULT_ID_BASE + jobId.toInt(), notification)
+    }
+
+    /** Removes the result notifications of earlier jobs (#94), so the running one has nothing to stack with. */
+    fun clearResults() {
+        manager.activeNotifications
+            .filter { it.notification.channelId == CHANNEL_RESULT }
+            .forEach { manager.cancel(it.id) }
     }
 
     fun showOngoing(model: JobNotification) = manager.notify(ONGOING_ID, ongoing(model))

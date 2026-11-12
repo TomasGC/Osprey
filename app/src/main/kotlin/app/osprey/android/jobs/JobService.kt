@@ -6,12 +6,14 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 import app.osprey.OspreyApplication
+import app.osprey.jobs.JobEntry
 import app.osprey.jobs.JobNotification
 import app.osprey.jobs.JobState
 import app.osprey.jobs.backgroundLimitNotification
 import app.osprey.jobs.newlyFinished
 import app.osprey.jobs.ongoingNotification
 import app.osprey.jobs.resultNotification
+import app.osprey.jobs.startedNewJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -72,7 +74,10 @@ class JobService : Service() {
 
     private suspend fun watch() {
         var seen = app.jobs.entries.value
+        var known = emptyList<JobEntry>()
         app.jobs.entries.collect { entries ->
+            if (startedNewJob(known, entries)) notifications.clearResults()
+            known = entries
             if (!app.isVisible) {
                 newlyFinished(seen, entries).forEach { entry ->
                     resultNotification(entry)?.let { notifications.showResult(entry.id, it) }
