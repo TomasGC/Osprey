@@ -1,5 +1,6 @@
 package app.osprey.history
 
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -25,5 +26,16 @@ class InMemoryJobHistoryStoreRestoreTest {
         store.appendLog(4, "more")
 
         assertEquals(listOf("more"), store.runs().single().log)
+    }
+
+    @Test
+    fun `restored runs that ended over a day ago are dropped, the newest three stay, ids go on after the highest`() {
+        val now = t0.plus(Duration.ofDays(3))
+        val runs = (1L..5L).map { RunRecord(it, "R$it", RunState.Done, queuedAt = t0, endedAt = t0) }
+
+        val store = InMemoryJobHistoryStore(runs, now)
+
+        assertEquals(listOf(5L, 4L, 3L), store.runs().map { it.id })
+        assertEquals(6L, store.begin("New", now))
     }
 }

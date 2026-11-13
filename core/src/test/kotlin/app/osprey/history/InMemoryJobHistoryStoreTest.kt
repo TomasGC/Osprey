@@ -1,5 +1,6 @@
 package app.osprey.history
 
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -8,6 +9,15 @@ import org.junit.Test
 
 private val T0: Instant = Instant.parse("2026-11-02T10:00:00Z")
 private val T1: Instant = T0.plusSeconds(60)
+private val NOW: Instant = Instant.parse("2026-11-05T10:00:00Z")
+
+private fun endedRun(id: Long, endedAt: Instant?, state: RunState = RunState.Done) =
+    RunRecord(id, "R$id", state, queuedAt = T0, endedAt = endedAt)
+
+private fun runWithFiles(id: Long, files: Int, state: RunState = RunState.Done) = RunRecord(
+    id, "R$id", state, queuedAt = T0, endedAt = if (state.isActive) null else NOW,
+    files = List(files) { FileRecord("f$it", FileResult.Done) },
+)
 
 class InMemoryJobHistoryStoreTest {
 
@@ -84,20 +94,10 @@ class InMemoryJobHistoryStoreTest {
     }
 
     @Test
-    fun `only the newest ten runs are kept`() {
+    fun `no run is dropped while the app runs`() {
         val ids = (1..12).map { ended("Run $it") }
 
-        assertEquals(ids.takeLast(MAX_RUNS).reversed(), store.runs().map { it.id })
-    }
-
-    @Test
-    fun `a running run is never dropped to make room`() {
-        val running = store.begin("Long", T0).also { store.start(it, T0) }
-        repeat(11) { ended("Run $it") }
-
-        val kept = store.runs()
-        assertEquals(MAX_RUNS, kept.size)
-        assertTrue(kept.any { it.id == running && it.state == RunState.Running })
+        assertEquals(ids.reversed(), store.runs().map { it.id })
     }
 
     @Test
@@ -135,22 +135,110 @@ class InMemoryJobHistoryStoreTest {
     }
 
     @Test
-    fun `nothing is dropped while the history fits`() {
-        val runs = (1L..3L).map { RunRecord(it, "A", RunState.Done, T0) }
+    fun `nothing is dropped while every run ended within a day`() {
+        val runs = (1L..5L).map { endedRun(it, NOW.minus(Duration.ofHours(1))) }
 
-        assertEquals(emptyList<Long>(), runsToDrop(runs, max = 3))
+        assertEquals(emptyList<Long>(), runsToDrop(runs, NOW))
     }
 
     @Test
-    fun `the oldest ended runs are dropped first and active ones never`() {
+    fun `a run is dropped once a day has passed since it ended, not before`() {
         val runs = listOf(
-            RunRecord(1, "A", RunState.Running, T0),
-            RunRecord(2, "B", RunState.Done, T0),
-            RunRecord(3, "C", RunState.Failed, T0),
-            RunRecord(4, "D", RunState.Done, T0),
+            endedRun(1, NOW.minus(Duration.ofHours(24))),
+            endedRun(2, NOW.minus(Duration.ofHours(24)).plusMillis(1)),
+            endedRun(3, NOW),
+            endedRun(4, NOW),
+            endedRun(5, NOW),
         )
 
-        assertEquals(listOf(2L, 3L), runsToDrop(runs, max = 2))
+        assertEquals(listOf(1L), runsToDrop(runs, NOW))
+    }
+
+    @Test
+    fun `the three newest ended runs stay whatever their age`() {
+        val old = NOW.minus(Duration.ofDays(10))
+        val runs = (5L downTo 1L).map { endedRun(it, old) }
+
+        assertEquals(listOf(1L, 2L), runsToDrop(runs, NOW).sorted())
+    }
+
+    @Test
+    fun `fewer than three ended runs are all kept`() {
+        val runs = listOf(endedRun(1, NOW.minus(Duration.ofDays(9))), endedRun(2, NOW.minus(Duration.ofDays(9))))
+
+        assertEquals(emptyList<Long>(), runsToDrop(runs, NOW))
+    }
+
+    @Test
+    fun `a queued or running run is never dropped and is not counted among the newest three`() {
+        val old = NOW.minus(Duration.ofDays(10))
+        val runs = listOf(
+            RunRecord(1, "Running", RunState.Running, queuedAt = old),
+            RunRecord(2, "Queued", RunState.Queued, queuedAt = old),
+            endedRun(3, old),
+            endedRun(4, old),
+            endedRun(5, old),
+            endedRun(6, old),
+        )
+
+        assertEquals(listOf(3L), runsToDrop(runs, NOW))
+    }
+
+    @Test
+    fun `an ended run with no end time counts from when it was queued`() {
+        val runs = listOf(endedRun(1, null), endedRun(2, NOW), endedRun(3, NOW), endedRun(4, NOW))
+
+        assertEquals(listOf(1L), runsToDrop(runs, NOW))
+    }
+
+    @Test
+    fun `nothing is dropped while the file records fit the cap`() {
+        val runs = (1L..5L).map { runWithFiles(it, 10) }
+
+        assertEquals(emptyList<Long>(), runsOverFileCap(runs, maxRecords = 50))
+    }
+
+    @Test
+    fun `the oldest ended runs are dropped until the file records fit the cap`() {
+        val runs = listOf(runWithFiles(1, 10), runWithFiles(2, 10)) + (3L..5L).map { runWithFiles(it, 5) }
+
+        assertEquals(listOf(1L), runsOverFileCap(runs, maxRecords = 25))
+    }
+
+    @Test
+    fun `the three newest ended runs stay even when they alone exceed the cap`() {
+        val runs = (1L..4L).map { runWithFiles(it, 10) }
+
+        assertEquals(listOf(1L), runsOverFileCap(runs, maxRecords = 5))
+    }
+
+    @Test
+    fun `a running run is not counted against the cap and never dropped`() {
+        val runs = listOf(runWithFiles(1, 100, RunState.Running)) + (2L..5L).map { runWithFiles(it, 10) }
+
+        assertEquals(emptyList<Long>(), runsOverFileCap(runs, maxRecords = 45))
+        assertEquals(listOf(2L), runsOverFileCap(runs, maxRecords = 35))
+    }
+
+    @Test
+    fun `at the start the age rule applies first and the cap counts what is left`() {
+        val old = RunRecord(1, "R1", RunState.Done, queuedAt = T0, endedAt = NOW.minus(Duration.ofDays(2)))
+        val runs = listOf(old) + (2L..5L).map { runWithFiles(it, 10) }
+
+        assertEquals(listOf(1L, 2L), runsToDrop(runs, NOW, maxRecords = 25))
+    }
+
+    @Test
+    fun `a run that ends over the file cap drops the oldest ended run, and no age rule applies`() {
+        val capped = InMemoryJobHistoryStore(maxFileRecords = 25)
+        val ids = (1..4).map { n ->
+            val id = capped.begin("R$n", T0)
+            repeat(10) { capped.appendFile(id, FileRecord("f$it", FileResult.Done)) }
+            capped.finish(id, RunState.Done, "ok", T1)
+            id
+        }
+
+        assertEquals(ids.drop(1).reversed(), capped.runs().map { it.id })
     }
 
     @Test

@@ -8,9 +8,14 @@ import kotlinx.coroutines.flow.update
 
 /**
  * A [JobHistoryStore] in memory: the fake for tests, and the logic [FileJobHistoryStore] builds on. [restored] are the
- * runs a previous launch left: those past [MAX_RUNS] are dropped, and new ids go on after the highest one.
+ * runs a previous launch left: those [runsToDrop] lists at [now] are dropped, and new ids go on after the highest one.
+ * After that only the cap on file records ([runsOverFileCap], [maxFileRecords]) drops a run while the app runs (#109).
  */
-class InMemoryJobHistoryStore(restored: List<RunRecord> = emptyList()) : JobHistoryStore {
+class InMemoryJobHistoryStore(
+    restored: List<RunRecord> = emptyList(),
+    now: Instant = Instant.now(),
+    private val maxFileRecords: Int = MAX_FILE_RECORDS,
+) : JobHistoryStore {
     private val lock = Any()
 
     private val revisionState = MutableStateFlow(0L)
@@ -19,7 +24,7 @@ class InMemoryJobHistoryStore(restored: List<RunRecord> = emptyList()) : JobHist
 
     private var nextId = (restored.maxOfOrNull { it.id } ?: 0L) + 1
     private var kept: List<RunRecord> = restored.sortedBy { it.id }.let { sorted -> // oldest first
-        val drop = runsToDrop(sorted).toSet()
+        val drop = runsToDrop(sorted, now, maxFileRecords).toSet()
         sorted.filterNot { it.id in drop }
     }
 
@@ -51,9 +56,9 @@ class InMemoryJobHistoryStore(restored: List<RunRecord> = emptyList()) : JobHist
         commit(kept.map { if (it.id == id) edit(it) else it })
     }
 
-    /** Keeps [next] minus the runs past [MAX_RUNS], and tells the screens something changed. */
+    /** Keeps [next] minus the runs over the cap on file records, and tells the screens something changed. */
     private fun commit(next: List<RunRecord>) {
-        val drop = runsToDrop(next).toSet()
+        val drop = runsOverFileCap(next, maxFileRecords).toSet()
         kept = next.filterNot { it.id in drop }
         revisionState.update { it + 1 }
     }
