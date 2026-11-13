@@ -1,6 +1,7 @@
 package app.osprey.history
 
 import java.io.File
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +19,7 @@ class FileJobHistoryStoreTest {
 
     private val dir by lazy { File(tmp.root, "history") }
 
-    private fun store() = FileJobHistoryStore(dir)
+    private fun store() = FileJobHistoryStore(dir, at(10))
 
     private fun file(id: Long) = File(dir, "$id.jsonl")
 
@@ -139,27 +140,13 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `only ten runs are kept and the oldest file goes`() {
+    fun `no file goes while the app runs`() {
         val store = store()
 
-        repeat(11) { ended(store, "R$it") }
+        repeat(12) { ended(store, "R$it") }
 
-        assertEquals((11L downTo 2L).toList(), store.runs().map { it.id })
-        assertEquals(10, names().size)
-        assertFalse(file(1).exists())
-    }
-
-    @Test
-    fun `a run that ends while the history is over the limit goes with its file`() {
-        val store = store()
-        val ids = (1..11).map { store.begin("R$it", at(1)) }
-        assertEquals(11, names().size)
-
-        store.finish(ids[0], RunState.Done, "x", at(2))
-
-        assertFalse(file(ids[0]).exists())
-        assertEquals(10, names().size)
-        assertEquals(10, store.runs().size)
+        assertEquals(12, store.runs().size)
+        assertEquals(12, names().size)
     }
 
     @Test
@@ -192,22 +179,55 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `runs found past the limit at start are removed`() {
+    fun `runs that ended over a day before the start are removed with their files, the newest three stay`() {
         dir.mkdirs()
-        (1L..12L).forEach {
+        (1L..6L).forEach {
             file(it).writeText(
                 RunLines.encode(RunLine.Header(it, "R$it", at(it))) + "\n" +
                     RunLines.encode(RunLine.Ended(RunState.Done, "ok", at(it + 1))) + "\n",
             )
         }
 
-        val store = store()
+        val store = FileJobHistoryStore(dir, at(0).plus(Duration.ofHours(25)))
 
-        assertEquals(10, store.runs().size)
+        assertEquals(listOf(6L, 5L, 4L), store.runs().map { it.id })
+        assertFalse(file(1).exists() || file(2).exists() || file(3).exists())
+        assertTrue(file(4).exists())
+        assertEquals(7L, store.begin("New", at(99)))
+    }
+
+    @Test
+    fun `at the start the cap on file records drops the oldest ended runs and their files`() {
+        dir.mkdirs()
+        (1L..5L).forEach { id ->
+            val filed = (1..10).joinToString("") {
+                RunLines.encode(RunLine.Filed(FileRecord("f$it", FileResult.Done))) + "\n"
+            }
+            file(id).writeText(
+                RunLines.encode(RunLine.Header(id, "R$id", at(id))) + "\n" + filed +
+                    RunLines.encode(RunLine.Ended(RunState.Done, "ok", at(id + 1))) + "\n",
+            )
+        }
+
+        val store = FileJobHistoryStore(dir, at(10), maxFileRecords = 25)
+
+        assertEquals(listOf(5L, 4L, 3L), store.runs().map { it.id })
+        assertEquals(listOf("3.jsonl", "4.jsonl", "5.jsonl"), names())
+    }
+
+    @Test
+    fun `a run that ends over the cap goes with the oldest file`() {
+        val store = FileJobHistoryStore(dir, at(10), maxFileRecords = 25)
+
+        repeat(4) {
+            val id = store.begin("R$it", at(1))
+            repeat(10) { n -> store.appendFile(id, FileRecord("f$n", FileResult.Done)) }
+            store.finish(id, RunState.Done, "ok", at(2))
+        }
+
+        assertEquals(listOf(4L, 3L, 2L), store.runs().map { it.id })
         assertFalse(file(1).exists())
-        assertFalse(file(2).exists())
-        assertTrue(file(3).exists())
-        assertEquals(13L, store.begin("New", at(99)))
+        assertEquals(3, names().size)
     }
 
     @Test
@@ -268,17 +288,6 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `begin alone drops the oldest file once there are too many`() {
-        val store = store()
-        repeat(10) { ended(store, "R$it") }
-
-        store.begin("New", at(5))
-
-        assertFalse(file(1).exists())
-        assertEquals(10, names().size)
-    }
-
-    @Test
     fun `a cut line is closed once, not before every later line`() {
         val first = store()
         val id = first.begin("A", at(1))
@@ -295,7 +304,7 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `interrupting runs while there are too many drops the oldest file`() {
+    fun `interrupted runs keep their files, since nothing is dropped after the start`() {
         dir.mkdirs()
         (1L..11L).forEach { file(it).writeText(RunLines.encode(RunLine.Header(it, "R$it", at(it))) + "\n") }
         val store = store()
@@ -303,8 +312,8 @@ class FileJobHistoryStoreTest {
 
         store.closeInterrupted(at(50))
 
-        assertEquals(10, store.runs().size)
-        assertFalse(file(1).exists())
+        assertEquals(11, store.runs().size)
+        assertTrue(file(1).exists())
     }
 
     @Test

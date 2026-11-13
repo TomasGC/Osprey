@@ -1,6 +1,7 @@
 package app.osprey.history
 
 import java.io.File
+import java.time.Duration
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -31,6 +32,20 @@ class OpenHistoryTest {
         assertEquals(Instant.ofEpochMilli(9), byId.getValue(running).endedAt)
         assertEquals(RunState.Done, byId.getValue(done).state)
         assertEquals(history.runs(), FileJobHistoryStore(dir).runs())
+    }
+
+    @Test
+    fun `runs that ended a day before the launch are removed, the newest three stay`() {
+        val earlier = FileJobHistoryStore(dir, Instant.ofEpochMilli(0))
+        repeat(5) {
+            val id = earlier.begin("R$it", Instant.ofEpochMilli(1))
+            earlier.finish(id, RunState.Done, "ok", Instant.ofEpochMilli(2))
+        }
+
+        val history = openHistory(dir, Instant.ofEpochMilli(0).plus(Duration.ofHours(25)))
+
+        assertEquals(listOf(5L, 4L, 3L), history.runs().map { it.id })
+        assertEquals(listOf("3.jsonl", "4.jsonl", "5.jsonl"), dir.list().orEmpty().sorted())
     }
 
     @Test

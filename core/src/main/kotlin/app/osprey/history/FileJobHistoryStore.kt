@@ -9,10 +9,14 @@ import kotlinx.coroutines.flow.StateFlow
  * a crash leaves a readable file. The logic is [InMemoryJobHistoryStore]'s; this class adds the files. A write that
  * fails loses that line, never the run: the screens read the runs from memory.
  */
-class FileJobHistoryStore(dir: File) : JobHistoryStore {
+class FileJobHistoryStore(
+    dir: File,
+    now: Instant = Instant.now(),
+    maxFileRecords: Int = MAX_FILE_RECORDS,
+) : JobHistoryStore {
     private val lock = Any()
     private val files = RunFiles(dir)
-    private val memory = InMemoryJobHistoryStore(files.load())
+    private val memory = InMemoryJobHistoryStore(files.load(), now, maxFileRecords)
 
     init {
         settle()
@@ -59,6 +63,6 @@ class FileJobHistoryStore(dir: File) : JobHistoryStore {
         }
     }
 
-    /** Deletes the files of the runs the memory store no longer keeps (past the limit, or cleared). */
+    /** Deletes the files of the runs the memory store no longer keeps: too old, over the file cap, or cleared. */
     private fun settle() = files.keepOnly(memory.runs().map { it.id }.toSet())
 }
