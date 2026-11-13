@@ -101,13 +101,23 @@ class InMemoryJobHistoryStoreTest {
     }
 
     @Test
-    fun `clear forgets ended runs and keeps active ones`() {
-        ended("Old")
+    fun `remove forgets the ended runs named and keeps the others`() {
+        val old = ended("Old")
+        val kept = ended("Kept")
+
+        store.remove(setOf(old, 99L))
+
+        assertEquals(listOf(kept), store.runs().map { it.id })
+    }
+
+    @Test
+    fun `remove keeps a queued or running run even when it is named`() {
         val waiting = store.begin("Waiting", T0)
+        val running = store.begin("Running", T0).also { store.start(it, T0) }
 
-        store.clear()
+        store.remove(setOf(waiting, running))
 
-        assertEquals(listOf(waiting), store.runs().map { it.id })
+        assertEquals(listOf(running, waiting), store.runs().map { it.id })
     }
 
     @Test
@@ -251,7 +261,7 @@ class InMemoryJobHistoryStoreTest {
             { store.appendFile(id, FileRecord("a", FileResult.Done)) },
             { store.finish(id, RunState.Done, "s", T1) },
             { store.closeInterrupted(T1) },
-            { store.clear() },
+            { store.remove(setOf(id)) },
             { store.begin("B", T0) },
         )
 

@@ -72,21 +72,21 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `ids are not reused after Clear history while the app keeps running`() {
+    fun `ids are not reused after every run is removed while the app keeps running`() {
         val store = store()
         ended(store, "A")
         ended(store, "B")
-        store.clear()
+        store.remove(store.runs().map { it.id }.toSet())
 
         assertEquals(3L, store.begin("C", at(5)))
     }
 
     @Test
-    fun `ids start again at one after Clear history and a restart, since no file is left to count from`() {
+    fun `ids start again at one after every run is removed and a restart, since no file is left to count from`() {
         val first = store()
         ended(first, "A")
         ended(first, "B")
-        first.clear()
+        first.remove(first.runs().map { it.id }.toSet())
 
         assertEquals(1L, store().begin("C", at(5)))
     }
@@ -150,12 +150,26 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
-    fun `clear deletes the files of ended runs and keeps an active one`() {
+    fun `remove deletes the files of the ended runs named and keeps the others`() {
+        val store = store()
+        val old = ended(store, "Old")
+        val kept = ended(store, "Kept")
+        val active = store.begin("Waiting", at(3))
+
+        store.remove(setOf(old, active))
+
+        assertEquals(listOf("$kept.jsonl", "$active.jsonl"), names())
+        assertEquals(listOf(active, kept), store.runs().map { it.id })
+        assertEquals(store.runs(), store().runs())
+    }
+
+    @Test
+    fun `remove with every run named deletes every ended file and keeps an active one`() {
         val store = store()
         ended(store, "Old")
         val active = store.begin("Waiting", at(3))
 
-        store.clear()
+        store.remove(store.runs().map { it.id }.toSet())
 
         assertEquals(listOf("$active.jsonl"), names())
         assertEquals(listOf(active), store.runs().map { it.id })
@@ -173,7 +187,7 @@ class FileJobHistoryStoreTest {
 
         ended(store, "A")
         assertEquals(1, store.runs().size)
-        store.clear()
+        store.remove(store.runs().map { it.id }.toSet())
 
         assertEquals(listOf("empty.jsonl", "folder.jsonl", "junk.jsonl", "notes.txt"), names())
     }

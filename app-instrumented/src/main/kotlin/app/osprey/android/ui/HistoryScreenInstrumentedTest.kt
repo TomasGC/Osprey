@@ -6,10 +6,16 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
@@ -17,6 +23,7 @@ import app.osprey.history.FileState
 import app.osprey.history.HistoryController
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.RunState
+import app.osprey.history.UNDO_WINDOW_MS
 import java.time.Instant
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
@@ -94,17 +101,17 @@ class HistoryScreenInstrumentedTest {
         screen()
 
         composeRule.onNodeWithText("No runs yet.").assertExists()
-        composeRule.onNodeWithText("Clear history").assertIsNotEnabled()
+        composeRule.onNodeWithText("Clear successful").assertIsNotEnabled()
     }
 
     @Test
-    fun aWaitingRunAloneLeavesClearHistoryDisabled() {
+    fun aWaitingRunAloneLeavesClearSuccessfulDisabled() {
         store.begin("Dates", T0)
 
         screen()
 
         composeRule.onNodeWithText("Waiting (1)").assertExists()
-        composeRule.onNodeWithText("Clear history").assertIsNotEnabled()
+        composeRule.onNodeWithText("Clear successful").assertIsNotEnabled()
     }
 
     @Test
@@ -127,7 +134,7 @@ class HistoryScreenInstrumentedTest {
         composeRule.onNodeWithText("Failed (1)").assertExists()
         composeRule.onNodeWithText("Done (1)").assertExists()
         composeRule.onNodeWithText("Skipped (0)").assertDoesNotExist()
-        composeRule.onNodeWithText("Clear history").assertDoesNotExist()
+        composeRule.onNodeWithText("Clear successful").assertDoesNotExist()
     }
 
     @Test
@@ -168,36 +175,165 @@ class HistoryScreenInstrumentedTest {
         assertNull(controller.view.value.selected)
     }
 
+    private fun startSelecting(action: String) {
+        composeRule.onNodeWithText(action).performTouchInput { longClick() }
+        composeRule.waitForIdle()
+    }
+
+    private fun back() {
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.waitForIdle()
+    }
+
     @Test
-    fun clearHistoryAsksFirstAndCancelKeepsEveryRun() {
+    fun aFailedRunAloneLeavesClearSuccessfulDisabled() {
+        ended("Dates", RunState.Failed, "Dates apply: 1 failed")
+
+        screen()
+
+        composeRule.onNodeWithText("Clear successful").assertIsNotEnabled()
+    }
+
+    @Test
+    fun clearSuccessfulHidesTheDoneRunsKeepsTheOthersAndOffersAnUndo() {
         threeRuns()
         screen()
 
-        composeRule.onNodeWithText("Clear history").assertIsEnabled()
-        click("Clear history")
+        composeRule.onNodeWithText("Clear successful").assertIsEnabled()
+        click("Clear successful")
 
-        val question = "Forget 3 ended runs? A run that is waiting or running stays."
-        composeRule.onNodeWithText(question).assertExists()
-        assertEquals(3, store.runs().size)
-        click("Cancel")
-
-        composeRule.onNodeWithText(question).assertDoesNotExist()
+        composeRule.onNodeWithText("2 runs removed").assertExists()
+        composeRule.onNodeWithText("Undo").assertExists()
+        composeRule.onNodeWithText("Done (2)").assertDoesNotExist()
+        composeRule.onNodeWithText("Failed (1)").assertExists()
         assertEquals(3, store.runs().size)
     }
 
     @Test
-    fun forgetClearsTheEndedRunsAndLeavesAWaitingOne() {
-        ended("Old", RunState.Done, "Old apply: 1 done")
+    fun undoBringsTheRunsBackAndTheStoreKeepsThem() {
+        threeRuns()
+        screen()
+        click("Clear successful")
+
+        click("Undo")
+
+        composeRule.onNodeWithText("Done (2)").assertExists()
+        composeRule.onNodeWithText("Undo").assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(UNDO_WINDOW_MS + 1000)
+        assertEquals(3, store.runs().size)
+    }
+
+    @Test
+    fun theStoreForgetsTheRunsOnceTheUndoWindowHasPassed() {
+        threeRuns()
+        screen()
+        click("Clear successful")
+
+        composeRule.mainClock.advanceTimeBy(UNDO_WINDOW_MS - 1000)
+        assertEquals(3, store.runs().size)
+        composeRule.mainClock.advanceTimeBy(2000)
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("Dates"), store.runs().map { it.action })
+        composeRule.onNodeWithText("Undo").assertDoesNotExist()
+    }
+
+    @Test
+    fun aLongPressChecksARunAndTheButtonCountsTheCheckedOnes() {
+        threeRuns()
+        screen()
+
+        composeRule.onNodeWithText("Reorg").performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Clear selected (1)").assertIsEnabled()
+        composeRule.onNodeWithContentDescription("Select Reorg").assertIsOn()
+        composeRule.onNodeWithContentDescription("Select Rename").assertIsOff()
+        assertNull(controller.view.value.selected)
+    }
+
+    @Test
+    fun aTapChecksOrUnchecksWhileARunIsCheckedAndOpensOtherwise() {
+        threeRuns()
+        screen()
+        composeRule.onNodeWithText("Reorg").performTouchInput { longClick() }
+        composeRule.waitForIdle()
+
+        click("Rename")
+        composeRule.onNodeWithText("Clear selected (2)").assertExists()
+        click("Reorg")
+        click("Rename")
+
+        composeRule.onNodeWithText("Clear successful").assertExists()
+        click("Rename")
+        assertEquals("Rename", controller.view.value.selected?.action)
+    }
+
+    @Test
+    fun clearSelectedRemovesTheCheckedRunsOnlyEvenAFailedOne() {
+        threeRuns()
+        screen()
+        startSelecting("Dates")
+
+        click("Clear selected (1)")
+
+        composeRule.onNodeWithText("Run removed").assertExists()
+        composeRule.onNodeWithText("Failed (1)").assertDoesNotExist()
+        composeRule.onNodeWithText("Done (2)").assertExists()
+        composeRule.mainClock.advanceTimeBy(UNDO_WINDOW_MS + 1000)
+        assertEquals(listOf("Rename", "Reorg"), store.runs().map { it.action }.sorted())
+    }
+
+    @Test
+    fun backEndsTheSelectionBeforeAnythingElse() {
+        threeRuns()
+        screen()
+        startSelecting("Reorg")
+
+        back()
+
+        composeRule.onNodeWithText("Clear successful").assertExists()
+        composeRule.onNodeWithContentDescription("Select Reorg").assertDoesNotExist()
+    }
+
+    @Test
+    fun aSwipeToTheRightRemovesARunWithAnUndo() {
+        threeRuns()
+        screen()
+
+        composeRule.onNodeWithText("Reorg").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Run removed").assertExists()
+        composeRule.onNodeWithText("Reorg").assertDoesNotExist()
+        assertEquals(3, store.runs().size)
+        click("Undo")
+        composeRule.onNodeWithText("Reorg").assertExists()
+    }
+
+    @Test
+    fun aWaitingRunDoesNotSwipeAwayAndHasNoCheckbox() {
         store.begin("Waiting job", T0)
         screen()
 
-        click("Clear history")
-        composeRule.onNodeWithText("Forget 1 ended run? A run that is waiting or running stays.").assertExists()
-        click("Forget")
+        composeRule.onNodeWithText("Waiting job").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
 
-        assertEquals(listOf("Waiting job"), store.runs().map { it.action })
-        composeRule.onNodeWithText("Waiting (1)").assertExists()
-        composeRule.onNodeWithText("Done (1)").assertDoesNotExist()
-        composeRule.onNodeWithText("Clear history?").assertDoesNotExist()
+        composeRule.onNodeWithText("Waiting job").assertExists()
+        composeRule.onNodeWithText("Undo").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Select Waiting job").assertDoesNotExist()
+    }
+
+    @Test
+    fun swipingTheNoticeAwayMakesTheRemovalFinalAtOnce() {
+        threeRuns()
+        screen()
+        click("Clear successful")
+
+        composeRule.onNodeWithText("2 runs removed").performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("Dates"), store.runs().map { it.action })
+        composeRule.onNodeWithText("Undo").assertDoesNotExist()
     }
 }

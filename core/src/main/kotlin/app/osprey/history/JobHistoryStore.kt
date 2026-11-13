@@ -44,8 +44,8 @@ interface JobHistoryStore {
     /** Marks every run still queued or running as [RunState.Interrupted]: called once when the app starts. */
     fun closeInterrupted(at: Instant)
 
-    /** Forgets every run that has ended; a queued or running one stays. */
-    fun clear()
+    /** Forgets the runs in [ids] that have ended, with their files; a queued or running one stays (#110). */
+    fun remove(ids: Set<Long>)
 }
 
 /**

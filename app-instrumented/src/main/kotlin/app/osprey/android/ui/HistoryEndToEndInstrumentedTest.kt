@@ -14,6 +14,7 @@ import app.osprey.android.AndroidAppState
 import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.history.FileResult
 import app.osprey.history.RunRecorder
+import app.osprey.history.UNDO_WINDOW_MS
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.JobState
@@ -134,18 +135,20 @@ class HistoryEndToEndInstrumentedTest {
     }
 
     @Test
-    fun clearHistoryAsksFirstKeepsTheRunsOnCancelAndRemovesThemAndTheirFilesOnForget() {
+    fun clearSuccessfulRemovesTheRunsAndTheirFilesOnceTheUndoWindowHasPassedAndUndoKeepsThem() {
         val state = launch()
         composeRule.setContent { OspreyApp(state) }
         flattenThroughTheScreen(state)
         openHistoryFromTheDrawer()
 
-        click("Clear history")
-        composeRule.onNodeWithText("Forget 2 ended runs? A run that is waiting or running stays.").assertExists()
-        click("Cancel")
+        click("Clear successful")
+        composeRule.onNodeWithText("2 runs removed").assertExists()
+        click("Undo")
+        composeRule.onNodeWithText("Done (2)").assertExists()
         assertEquals(2, historyDir.list()!!.size)
-        click("Clear history")
-        click("Forget")
+        click("Clear successful")
+        composeRule.mainClock.advanceTimeBy(UNDO_WINDOW_MS + 1000)
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithText("No runs yet.").assertExists()
         assertEquals(0, historyDir.list()!!.size)

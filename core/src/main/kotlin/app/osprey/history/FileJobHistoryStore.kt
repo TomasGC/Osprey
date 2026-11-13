@@ -50,8 +50,8 @@ class FileJobHistoryStore(
         settle()
     }
 
-    override fun clear() = synchronized(lock) {
-        memory.clear()
+    override fun remove(ids: Set<Long>) = synchronized(lock) {
+        memory.remove(ids)
         settle()
     }
 
@@ -63,6 +63,6 @@ class FileJobHistoryStore(
         }
     }
 
-    /** Deletes the files of the runs the memory store no longer keeps: too old, over the file cap, or cleared. */
+    /** Deletes the files of the runs the memory store no longer keeps: too old, over the file cap, or removed. */
     private fun settle() = files.keepOnly(memory.runs().map { it.id }.toSet())
 }
