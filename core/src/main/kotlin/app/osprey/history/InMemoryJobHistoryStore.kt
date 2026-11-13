@@ -50,7 +50,9 @@ class InMemoryJobHistoryStore(
         commit(kept.map { if (it.state.isActive) it.copy(state = RunState.Interrupted, endedAt = at) else it })
     }
 
-    override fun clear() = synchronized(lock) { commit(kept.filter { it.state.isActive }) }
+    override fun remove(ids: Set<Long>) = synchronized(lock) {
+        commit(kept.filterNot { it.id in ids && !it.state.isActive })
+    }
 
     private fun change(id: Long, edit: (RunRecord) -> RunRecord) = synchronized(lock) {
         commit(kept.map { if (it.id == id) edit(it) else it })
