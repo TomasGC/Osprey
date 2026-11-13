@@ -10,6 +10,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private const val SWEEP_MS = 700L
+private const val SWEEP_STEP_MS = 10L
+
 /**
  * The job service with the app's real queue and the app out of sight (#94). Each test uses names of its own, so the
  * jobs earlier tests left in the queue never match. A [HeldJob] stays running until the test lets it end.
@@ -69,6 +72,28 @@ class JobServiceInstrumentedTest {
 
         probe.waitFor("the first result beside the second job") {
             "First" in probe.resultTitles() && "Second" in probe.ongoingTitles()
+        }
+    }
+
+    /**
+     * The window is a few milliseconds wide and sits a little after the job ends (the job notices at its next poll, the
+     * service posts its result, then stops), so the next job is queued at every delay across it (#111). A job that gets
+     * no service shows no running notification, or kills the app with `ForegroundServiceDidNotStartInTimeException`,
+     * which ends the whole run.
+     */
+    @Test
+    fun aJobQueuedWhileTheServiceStopsGetsAService() {
+        for (delayMs in 0L..SWEEP_MS step SWEEP_STEP_MS) {
+            probe.prepare()
+            val last = held("Last $delayMs")
+            last.waitUntilWatched()
+            last.end()
+            Thread.sleep(delayMs)
+
+            val next = held("Next $delayMs", proveWatched = false)
+
+            probe.waitFor("the running notification of Next $delayMs") { "Next $delayMs" in probe.ongoingTitles() }
+            next.end()
         }
     }
 
