@@ -17,8 +17,9 @@ import app.osprey.android.releaseGrant
 import app.osprey.history.JobHistoryStore
 import app.osprey.history.RunRecorder
 import app.osprey.history.openHistory
+import app.osprey.jobs.JobEntry
 import app.osprey.jobs.JobQueue
-import app.osprey.jobs.JobState
+import app.osprey.jobs.startedNewJob
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,6 @@ class OspreyApplication : Application() {
 
     private val watcher = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var startedActivities = 0
-    private var serviceStarted = false
 
     /** Jobs are blocking file work, so they get the threads made for that, not the ones that compute. */
     val history: JobHistoryStore by lazy { openHistory(File(filesDir, "history")) }
@@ -66,23 +66,16 @@ class OspreyApplication : Application() {
         super.onCreate()
         registerActivityLifecycleCallbacks(visibility)
         watcher.launch {
+            var known = emptyList<JobEntry>()
             jobs.entries.collect { entries ->
-                if (entries.any { it.state !is JobState.Finished }) startService()
+                if (startedNewJob(known, entries)) startService()
+                known = entries
             }
         }
     }
 
-    /** Called by the service when it ends, so the next job starts a new one. */
-    fun jobServiceStopped() {
-        serviceStarted = false
-    }
-
-    @Synchronized
-    private fun startService() {
-        if (serviceStarted) return
-        serviceStarted = true
-        ContextCompat.startForegroundService(this, Intent(this, JobService::class.java))
-    }
+    /** Every new job asks for the service: a running one answers the command, a stopping one is kept (#111). */
+    private fun startService() = ContextCompat.startForegroundService(this, Intent(this, JobService::class.java))
 
     private val visibility = object : ActivityLifecycleCallbacks {
         override fun onActivityStarted(activity: Activity) {
