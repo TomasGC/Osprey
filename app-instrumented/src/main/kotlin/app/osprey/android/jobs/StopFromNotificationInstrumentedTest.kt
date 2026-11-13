@@ -48,14 +48,16 @@ class StopFromNotificationInstrumentedTest {
         probe.waitFor("the running notification") { "Stop me" in probe.ongoingTitles() }
 
         shade.open()
-        val stop = checkNotNull(shade.stopOf("Stop me")) { "No Stop on the collapsed notification" }
+        val stop = checkNotNull(shade.stopOf("Stop me")) {
+            "No Stop on the collapsed notification; on screen: ${shade.texts()}"
+        }
         stop.click()
 
         probe.waitFor("the job to end stopped") { finishedStopped("Stop me") }
         probe.waitFor("its result") { "Stop me" in probe.resultTitles() }
     }
 
-    @Ignore("#112: Android drops the update that follows a job ending; the test returns with the pacing")
+    @Ignore("#114: One UI sometimes ranks the result card above the running card, hiding Stop")
     @Test
     fun theRunningJobKeepsItsStopWithAResultStackedBehindIt() {
         val first = held("Chain first")
@@ -67,7 +69,9 @@ class StopFromNotificationInstrumentedTest {
         }
 
         shade.open()
-        val stop = checkNotNull(shade.stopOf("Chain second")) { "No Stop on the running job's card" }
+        val stop = checkNotNull(shade.stopOf("Chain second")) {
+            "No Stop on the running job's card; on screen: ${shade.texts()}"
+        }
         stop.click()
 
         probe.waitFor("the second job to end stopped") { finishedStopped("Chain second") }

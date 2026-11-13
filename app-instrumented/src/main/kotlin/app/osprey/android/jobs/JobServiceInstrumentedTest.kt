@@ -7,7 +7,6 @@ import app.osprey.jobs.JobState
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -60,7 +59,6 @@ class JobServiceInstrumentedTest {
         }
     }
 
-    @Ignore("#112: Android drops the update that follows a job ending; the test returns with the pacing")
     @Test
     fun aResultStaysWhileAJobThatWasAlreadyWaitingRuns() {
         val first = held("First")

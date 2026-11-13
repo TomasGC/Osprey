@@ -12,15 +12,12 @@ private const val WATCHED_FILE = "watched.jpg"
 private const val REPORT_EVERY_MS = 500L
 private const val REPORT_TOTAL = 1_000
 
-/** Android drops a package's notification updates above about 5 a second; a second of quiet restores the quota. */
-private const val RATE_LIMIT_RECOVERY_MS = 1_200L
-
 /**
  * A job that stays running until the test ends it (or Stop does). With [proveWatched] it first proves the job service
  * is watching the queue: the service posts its first notification before it starts to watch, and only the watcher
  * writes a job's progress into it, so a notification that shows the progress means the watcher is running (#94, #108).
  * Without that proof a job can end before the watcher starts, and its result is never posted. The progress repeats
- * while the job is held, because Android may drop one update (#112) and the next one then replaces it.
+ * while the job is held, so the proof does not hang on one update.
  */
 class HeldJob(
     private val app: OspreyApplication,
@@ -43,15 +40,8 @@ class HeldJob(
         probe.waitFor("the service to watch $name") { probe.ongoingTexts().any { it?.contains(WATCHED_FILE) == true } }
     }
 
-    /**
-     * Lets the job end, after a pause: ending it makes the service post several updates at once (the result, the next
-     * running notification), and Android drops those above its rate, which leaves a stale notification (#112). The pause
-     * goes once the service paces its updates.
-     */
-    fun end() {
-        Thread.sleep(RATE_LIMIT_RECOVERY_MS)
-        release.countDown()
-    }
+    /** Lets the job end. */
+    fun end() = release.countDown()
 
     /** Lets the job end at once, for a test's cleanup. */
     fun abandon() = release.countDown()
