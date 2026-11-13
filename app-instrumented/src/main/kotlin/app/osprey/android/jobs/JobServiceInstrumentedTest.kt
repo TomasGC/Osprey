@@ -3,8 +3,10 @@ package app.osprey.android.jobs
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.OspreyApplication
+import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobState
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
@@ -73,6 +75,27 @@ class JobServiceInstrumentedTest {
         probe.waitFor("the first result beside the second job") {
             "First" in probe.resultTitles() && "Second" in probe.ongoingTitles()
         }
+    }
+
+    /** A job that returns at once ends before the service has begun to watch the queue (#108). */
+    @Test
+    fun aJobThatEndsAtOnceStillLeavesItsResult() {
+        app.jobs.enqueue("Quick") { JobOutcome("done") }
+
+        probe.waitFor("its result") { "Quick" in probe.resultTitles() }
+    }
+
+    @Test
+    fun aResultAlreadyAnnouncedIsNotAnnouncedAgain() {
+        app.jobs.enqueue("Announced") { JobOutcome("done") }
+        probe.waitFor("the first result") { "Announced" in probe.resultTitles() }
+        probe.waitFor("the service to stop") { !probe.jobServiceRunning() }
+        probe.clean()
+
+        app.jobs.enqueue("Later quick") { JobOutcome("done") }
+
+        probe.waitFor("the second result") { "Later quick" in probe.resultTitles() }
+        assertEquals(listOf<String?>("Later quick"), probe.resultTitles())
     }
 
     /**
