@@ -6,6 +6,16 @@ fun newlyFinished(before: List<JobEntry>, after: List<JobEntry>): List<JobEntry>
     return after.filter { it.state is JobState.Finished && it.id !in alreadyFinished }
 }
 
+/**
+ * True when [after] holds a job that [before] did not know, in whatever state: what asks for the job service. A queue
+ * that conflates its states can show a job that returns at once already finished, and it still needs the service to
+ * announce it (#108).
+ */
+fun newJobAppeared(before: List<JobEntry>, after: List<JobEntry>): Boolean {
+    val known = before.map { it.id }.toSet()
+    return after.any { it.id !in known }
+}
+
 /** True when [after] holds a waiting or running job that [before] did not know: what clears the old results. */
 fun startedNewJob(before: List<JobEntry>, after: List<JobEntry>): Boolean {
     val known = before.map { it.id }.toSet()

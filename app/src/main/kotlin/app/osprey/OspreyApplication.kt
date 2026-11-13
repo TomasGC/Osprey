@@ -19,7 +19,7 @@ import app.osprey.history.RunRecorder
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobEntry
 import app.osprey.jobs.JobQueue
-import app.osprey.jobs.startedNewJob
+import app.osprey.jobs.newJobAppeared
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +42,10 @@ class OspreyApplication : Application() {
     val jobs: JobQueue by lazy {
         JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO), RunRecorder(history))
     }
+
+    /** What the screens and the service have already shown: the baseline for the next result notifications (#108). */
+    @Volatile
+    var announced: List<JobEntry> = emptyList()
 
     /** True while one of the app's screens is on show, so a finished job needs no notification. */
     val isVisible: Boolean get() = startedActivities > 0
@@ -68,7 +72,7 @@ class OspreyApplication : Application() {
         watcher.launch {
             var known = emptyList<JobEntry>()
             jobs.entries.collect { entries ->
-                if (startedNewJob(known, entries)) startService()
+                if (newJobAppeared(known, entries)) startService()
                 known = entries
             }
         }
@@ -84,6 +88,7 @@ class OspreyApplication : Application() {
 
         override fun onActivityStopped(activity: Activity) {
             startedActivities--
+            announced = jobs.entries.value
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

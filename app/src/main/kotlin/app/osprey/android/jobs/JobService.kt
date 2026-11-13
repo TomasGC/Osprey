@@ -113,7 +113,7 @@ class JobService : Service() {
     }
 
     private suspend fun watch() {
-        var seen = app.jobs.entries.value
+        var seen = app.announced
         var known = emptyList<JobEntry>()
         app.jobs.entries.collect { entries ->
             if (startedNewJob(known, entries)) notifications.clearResults()
@@ -124,6 +124,7 @@ class JobService : Service() {
                 }
             }
             seen = entries
+            app.announced = entries
             if (ongoingNotification(entries) == null && stopIfIdle()) return@collect
             paced { ongoingNotification(app.jobs.entries.value)?.let { notifications.showOngoing(it) } }
         }

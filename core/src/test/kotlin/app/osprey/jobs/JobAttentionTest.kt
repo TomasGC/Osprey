@@ -31,6 +31,15 @@ class JobAttentionTest {
         assertEquals(listOf(entry(2, done)), newlyFinished(listOf(entry(1, done)), listOf(entry(1, done), entry(2, done))))
     }
 
+    /** What the service holds when it starts late (#108): the last state it announced, not the queue as it is now. */
+    @Test
+    fun `a job that ended before the watcher began is announced and the ones announced earlier are not`() {
+        val announced = listOf(entry(1, done), entry(2, done))
+        val now = listOf(entry(1, done), entry(2, done), entry(3, done))
+
+        assertEquals(listOf(entry(3, done)), newlyFinished(announced, now))
+    }
+
     @Test
     fun `jobs still waiting or running are not finished`() {
         val after = listOf(entry(1, JobState.Queued), entry(2, JobState.Running()))
@@ -55,6 +64,27 @@ class JobAttentionTest {
     @Test
     fun `a job that appeared already finished is not a start`() {
         assertFalse(startedNewJob(emptyList(), listOf(entry(1, done))))
+    }
+
+    /** The queue conflates: a job that returns at once can reach the watcher already finished (#108). */
+    @Test
+    fun `a job that appeared already finished is a new job`() {
+        assertTrue(newJobAppeared(emptyList(), listOf(entry(1, done))))
+        assertTrue(newJobAppeared(listOf(entry(1, done)), listOf(entry(1, done), entry(2, done))))
+    }
+
+    @Test
+    fun `a job that appeared waiting or running is a new job`() {
+        assertTrue(newJobAppeared(emptyList(), listOf(entry(1, JobState.Queued))))
+    }
+
+    @Test
+    fun `jobs that were all known are not a new job whatever their state`() {
+        val before = listOf(entry(1, JobState.Running()), entry(2, done))
+        val after = listOf(entry(1, done), entry(2, done))
+
+        assertFalse(newJobAppeared(before, after))
+        assertFalse(newJobAppeared(emptyList(), emptyList()))
     }
 
     @Test
