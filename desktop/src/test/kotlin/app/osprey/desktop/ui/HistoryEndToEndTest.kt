@@ -15,6 +15,7 @@ import app.osprey.desktop.media.DesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
 import app.osprey.history.FileResult
+import app.osprey.history.UNDO_WINDOW_MS
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobState
 import java.awt.image.BufferedImage
@@ -105,19 +106,21 @@ class HistoryEndToEndTest : TimedTest() {
     }
 
     @Test
-    fun `Clear history asks first, keeps the runs on Cancel and removes them and their files on Forget`() =
+    fun `Clear successful removes the runs and their files once the undo window has passed, and Undo keeps them`() =
         runComposeUiTest {
             val state = launch()
             setContent { OspreyApp(state) }
             flattenThroughTheScreen(state)
             click("🕘")
 
-            click("Clear history")
-            onNodeWithText("Forget 2 ended runs? A run that is waiting or running stays.").assertExists()
-            click("Cancel")
+            click("Clear successful")
+            onNodeWithText("2 runs removed").assertExists()
+            click("Undo")
+            onNodeWithText("Done (2)").assertExists()
             assertEquals(2, historyDir.list()!!.size)
-            click("Clear history")
-            click("Forget")
+            click("Clear successful")
+            mainClock.advanceTimeBy(UNDO_WINDOW_MS + 1)
+            waitForIdle()
 
             onNodeWithText("No runs yet.").assertExists()
             assertEquals(0, historyDir.list()!!.size)
