@@ -36,6 +36,9 @@ class JobService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val app get() = application as OspreyApplication
     private lateinit var notifications: JobNotifications
+    private val lock = Any()
+    private var foreground = false
+    private var lastStartId = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,18 +46,40 @@ class JobService : Service() {
         super.onCreate()
         notifications = JobNotifications(this)
         notifications.createChannels()
-        // Android wants the service in the foreground within seconds of starting it, whatever the queue holds.
-        val first = ongoingNotification(app.jobs.entries.value)
-            ?: JobNotification("Osprey", "Working...", indeterminate = true)
-        val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        ServiceCompat.startForeground(this, ONGOING_ID, notifications.ongoing(first), type)
-        lastPostMs = SystemClock.elapsedRealtime()
+        enterForeground()
         scope.launch { watch() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) app.jobs.stop(intent.getLongExtra(EXTRA_JOB_ID, NO_JOB))
+        synchronized(lock) {
+            lastStartId = startId
+            if (intent?.action != ACTION_STOP && !foreground) enterForeground()
+        }
         return START_NOT_STICKY
+    }
+
+    /** Android wants the service in the foreground within seconds of each start command, on any instance (#111). */
+    private fun enterForeground() {
+        val first = ongoingNotification(app.jobs.entries.value)
+            ?: JobNotification("Osprey", "Working...", indeterminate = true)
+        val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        ServiceCompat.startForeground(this, ONGOING_ID, notifications.ongoing(first), type)
+        foreground = true
+        lastPostMs = SystemClock.elapsedRealtime()
+    }
+
+    /**
+     * Ends the service if the queue is empty right now. The queue is read under the lock that start commands also
+     * take: a job queued after the check sends a command with a newer id, which Android answers by ignoring this stop,
+     * and the command finds the foreground state already dropped and enters it again (#111).
+     */
+    private fun stopIfIdle(): Boolean = synchronized(lock) {
+        if (ongoingNotification(app.jobs.entries.value) != null) return false
+        foreground = false
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf(lastStartId)
+        true
     }
 
     /**
@@ -66,13 +91,11 @@ class JobService : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) {
         app.jobs.entries.value.filter { it.state !is JobState.Finished }.forEach { app.jobs.stop(it.id) }
         notifications.showResult(NO_JOB_ID, backgroundLimitNotification())
-        app.jobServiceStopped()
         stopSelf()
     }
 
     override fun onDestroy() {
         scope.cancel()
-        app.jobServiceStopped()
         super.onDestroy()
     }
 
@@ -101,14 +124,8 @@ class JobService : Service() {
                 }
             }
             seen = entries
-            val ongoing = ongoingNotification(entries)
-            if (ongoing == null) {
-                app.jobServiceStopped()
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                stopSelf()
-            } else {
-                paced { notifications.showOngoing(ongoingNotification(app.jobs.entries.value) ?: ongoing) }
-            }
+            if (ongoingNotification(entries) == null && stopIfIdle()) return@collect
+            paced { ongoingNotification(app.jobs.entries.value)?.let { notifications.showOngoing(it) } }
         }
     }
 
