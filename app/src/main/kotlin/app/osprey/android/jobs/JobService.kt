@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.os.SystemClock
 import androidx.core.app.ServiceCompat
 import app.osprey.OspreyApplication
 import app.osprey.jobs.JobEntry
@@ -11,6 +12,7 @@ import app.osprey.jobs.JobNotification
 import app.osprey.jobs.JobState
 import app.osprey.jobs.backgroundLimitNotification
 import app.osprey.jobs.newlyFinished
+import app.osprey.jobs.notificationDelayMs
 import app.osprey.jobs.ongoingNotification
 import app.osprey.jobs.resultNotification
 import app.osprey.jobs.startedNewJob
@@ -18,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val NO_JOB = -1L
@@ -45,6 +48,7 @@ class JobService : Service() {
             ?: JobNotification("Osprey", "Working...", indeterminate = true)
         val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         ServiceCompat.startForeground(this, ONGOING_ID, notifications.ongoing(first), type)
+        lastPostMs = SystemClock.elapsedRealtime()
         scope.launch { watch() }
     }
 
@@ -72,6 +76,19 @@ class JobService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Posts one notification, after the pause that keeps the posts under Android's rate (#112). Android drops a post
+     * that comes too soon after another, even one a few milliseconds behind, so every post is spaced on its own: the
+     * result of a job that ended and the running notification of the next one are never back to back. What is posted is
+     * decided by [post] after the wait, so it is never older than its post.
+     */
+    private suspend fun paced(post: () -> Unit) {
+        val wait = notificationDelayMs(lastPostMs, SystemClock.elapsedRealtime())
+        if (wait > 0L) delay(wait)
+        post()
+        lastPostMs = SystemClock.elapsedRealtime()
+    }
+
     private suspend fun watch() {
         var seen = app.jobs.entries.value
         var known = emptyList<JobEntry>()
@@ -80,7 +97,7 @@ class JobService : Service() {
             known = entries
             if (!app.isVisible) {
                 newlyFinished(seen, entries).forEach { entry ->
-                    resultNotification(entry)?.let { notifications.showResult(entry.id, it) }
+                    resultNotification(entry)?.let { paced { notifications.showResult(entry.id, it) } }
                 }
             }
             seen = entries
@@ -90,8 +107,14 @@ class JobService : Service() {
                 ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
                 stopSelf()
             } else {
-                notifications.showOngoing(ongoing)
+                paced { notifications.showOngoing(ongoingNotification(app.jobs.entries.value) ?: ongoing) }
             }
         }
+    }
+
+    private companion object {
+        /** When the process last posted a notification: Android counts posts per package, not per service (#112). */
+        @Volatile
+        var lastPostMs: Long? = null
     }
 }
