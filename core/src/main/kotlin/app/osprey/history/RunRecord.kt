@@ -13,4 +13,5 @@ data class RunRecord(
     val summary: String = "",
     val log: List<String> = emptyList(),
     val files: List<FileRecord> = emptyList(),
+    val origin: RunOrigin? = null,
 )

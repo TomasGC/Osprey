@@ -31,6 +31,10 @@ fun applyOutcome(name: String, applied: Int, failed: Int, stopped: Boolean): Job
     return JobOutcome(withStoppedNote(counts, stopped), stopped = stopped, failures = failed)
 }
 
+/** What a retry says about itself once over (#83): [applied] done, [failed] failed, and a note if it was [stopped]. */
+fun retryCounts(applied: Int, failed: Int, stopped: Boolean): String =
+    withStoppedNote("$applied done" + if (failed > 0) ", $failed failed" else "", stopped)
+
 /** The text after an action's summary on its screen once an apply is over. */
 fun appliedSuffix(applied: Int, failed: Int, stopped: Boolean): String =
     "  -- APPLIED ($applied)" + (if (failed > 0) ", failed $failed" else "") + if (stopped) " -- STOPPED" else ""

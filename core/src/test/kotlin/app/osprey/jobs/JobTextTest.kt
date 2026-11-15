@@ -95,4 +95,15 @@ class JobTextTest {
         assertEquals("  -- APPLIED (5) -- STOPPED", appliedSuffix(5, 0, true))
         assertEquals("  -- APPLIED (5), failed 2 -- STOPPED", appliedSuffix(5, 2, true))
     }
+
+    @Test
+    fun `a retry says how many files it did, and how many failed only when some did`() {
+        assertEquals("1 done", retryCounts(applied = 1, failed = 0, stopped = false))
+        assertEquals("0 done, 2 failed", retryCounts(applied = 0, failed = 2, stopped = false))
+    }
+
+    @Test
+    fun `a retry that stopped says so after its counts`() {
+        assertEquals("3 done, 1 failed (stopped)", retryCounts(applied = 3, failed = 1, stopped = true))
+    }
 }

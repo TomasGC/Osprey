@@ -24,9 +24,9 @@ class FileJobHistoryStore(
 
     override val revision: StateFlow<Long> get() = memory.revision
 
-    override fun begin(action: String, at: Instant): Long = synchronized(lock) {
-        val id = memory.begin(action, at)
-        files.append(id, RunLine.Header(id, action, at))
+    override fun begin(action: String, at: Instant, origin: RunOrigin?): Long = synchronized(lock) {
+        val id = memory.begin(action, at, origin)
+        files.append(id, RunLine.Header(id, action, at, origin))
         settle()
         id
     }

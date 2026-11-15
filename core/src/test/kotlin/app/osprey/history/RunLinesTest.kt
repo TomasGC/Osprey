@@ -24,6 +24,11 @@ class RunLinesTest {
         RunLine.Filed(FULL_FILE) to
             """{"t":"file","path":"/a/b.jpg","result":"Done","message":"",""" +
             """"before":{"size":5,"created":10,"modified":20,"hash":"h","name":"b.jpg"},"after":{"size":6}}""",
+        RunLine.Header(4, "Dedupe apply", at(1000), RunOrigin("dedupe", "D:/Photos", "2021", 2)) to
+            """{"t":"run","id":4,"action":"Dedupe apply","at":1000,"kind":"dedupe",""" +
+            """"library":"D:/Photos","scope":"2021","retryOf":2}""",
+        RunLine.Header(5, "Reorg apply", at(1000), RunOrigin("reorg", "D:/Photos")) to
+            """{"t":"run","id":5,"action":"Reorg apply","at":1000,"kind":"reorg","library":"D:/Photos"}""",
         RunLine.Ended(RunState.Done, "ok", at(3000)) to """{"t":"end","state":"Done","summary":"ok","at":3000}""",
     )
 
@@ -99,6 +104,21 @@ class RunLinesTest {
             RunLine.Logged("x"),
             RunLines.decode("""{"t":"log","line":"x","level":"info"}"""),
         )
+    }
+
+    @Test
+    fun `an origin with a kind but no library is dropped and the run stays readable`() {
+        assertEquals(
+            RunLine.Header(1, "A", at(1)),
+            RunLines.decode("""{"t":"run","id":1,"action":"A","at":1,"kind":"dedupe"}"""),
+        )
+    }
+
+    @Test
+    fun `a run replayed from its lines keeps its origin`() {
+        val origin = RunOrigin("rename", "D:/Photos", "2021")
+
+        assertEquals(origin, replay(RunLine.Header(1, "Rename apply", at(1), origin))!!.origin)
     }
 
     private fun replay(vararg lines: RunLine) = RunLines.replay(lines.map { RunLines.encode(it) })

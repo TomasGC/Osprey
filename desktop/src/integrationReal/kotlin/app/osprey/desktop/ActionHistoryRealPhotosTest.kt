@@ -55,7 +55,7 @@ class ActionHistoryRealPhotosTest : TimedTest() {
         val sizes = listOf(jpeg, heic).associateWith { Files.size(it) }
         val launch = harness.launch()
 
-        launch.scanAndApply(datesController(harness.fs, reader, launch.jobs))
+        launch.scanAndApply(datesController(harness.fs, reader, launch.jobs) { harness.libraryLabel })
 
         val expected = mapOf(
             jpeg.fileName.toString() to LocalDateTime.of(2017, 4, 25, 15, 26, 2),
@@ -85,7 +85,7 @@ class ActionHistoryRealPhotosTest : TimedTest() {
         )
         val launch = harness.launch()
 
-        launch.scanAndApply(standardizeController(harness.fs, reader, launch.jobs))
+        launch.scanAndApply(standardizeController(harness.fs, reader, launch.jobs) { harness.libraryLabel })
 
         val names = applyRecords("Standardize 2021 apply").associate { it.before?.name to it.after?.name }
         assertEquals(
@@ -107,7 +107,7 @@ class ActionHistoryRealPhotosTest : TimedTest() {
         val sizes = listOf(Files.size(jpeg), Files.size(heic))
         val launch = harness.launch()
 
-        launch.scanAndApply(renameController(harness.fs, launch.jobs))
+        launch.scanAndApply(renameController(harness.fs, launch.jobs) { harness.libraryLabel })
 
         val records = applyRecords("Rename 2021 apply").sortedBy { it.after?.name }
         assertEquals(listOf("olive.heic", "olive.jpg"), records.map { it.after?.name })

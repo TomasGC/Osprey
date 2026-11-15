@@ -40,7 +40,10 @@ internal object RunLineReader {
         val id = fields.long("id")
         val action = fields.text("action")
         val at = fields.time("at")
-        return if (id != null && action != null && at != null) RunLine.Header(id, action, at) else null
+        val origin = fields.text("kind")?.let { kind ->
+            fields.text("library")?.let { RunOrigin(kind, it, fields.text("scope"), fields.long("retryOf")) }
+        }
+        return if (id != null && action != null && at != null) RunLine.Header(id, action, at, origin) else null
     }
 
     private fun file(fields: Map<*, *>): RunLine? {

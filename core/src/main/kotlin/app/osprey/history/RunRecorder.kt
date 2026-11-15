@@ -14,7 +14,7 @@ class RunRecorder(
 ) {
 
     /** Records a new queued run; the returned [Run] is safe to use even when the store failed. */
-    fun begin(action: String): Run = Run(recorded { history.begin(action, clock()) })
+    fun begin(action: String, origin: RunOrigin? = null): Run = Run(recorded { history.begin(action, clock(), origin) })
 
     inner class Run internal constructor(private val id: Long?) {
 

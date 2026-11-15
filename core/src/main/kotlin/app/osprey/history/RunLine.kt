@@ -4,7 +4,7 @@ import java.time.Instant
 
 /** One line of a run file (#79): what happened to a run, in the order it happened. */
 sealed interface RunLine {
-    data class Header(val id: Long, val action: String, val at: Instant) : RunLine
+    data class Header(val id: Long, val action: String, val at: Instant, val origin: RunOrigin? = null) : RunLine
 
     data class Started(val at: Instant) : RunLine
 

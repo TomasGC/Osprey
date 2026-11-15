@@ -45,7 +45,7 @@ fun main(args: Array<String>) {
     val year = PathHandle(Path.of(args[0]).resolve(YEAR))
     val history = openHistory(File(args[1]))
     val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.IO), RunRecorder(history))
-    val flatten = flattenController(BlocksOnSecondMove(DesktopFileSystemRepository()), jobs)
+    val flatten = flattenController(BlocksOnSecondMove(DesktopFileSystemRepository()), jobs) { "child-library" }
     flatten.onScan(year, YEAR)
     jobs.awaitJobs()
     flatten.onApply(year, YEAR)

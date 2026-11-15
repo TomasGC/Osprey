@@ -4,6 +4,7 @@ import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.JobHistoryStore
+import app.osprey.history.RunOrigin
 import app.osprey.history.RunRecord
 import app.osprey.history.RunRecorder
 import app.osprey.history.RunState
@@ -53,6 +54,22 @@ class JobQueueHistoryTest {
         assertEquals(T0, run.queuedAt)
         assertEquals(T0.plusSeconds(1), run.startedAt)
         assertEquals(T0.plusSeconds(2), run.endedAt)
+    }
+
+    @Test
+    fun `a job queued with an origin is recorded with it`() {
+        val origin = RunOrigin("standardize", "D:/Photos", "2021")
+
+        await(queue.enqueue("Standardize apply", origin = origin) { JobOutcome("done") })
+
+        assertEquals(origin, only().origin)
+    }
+
+    @Test
+    fun `a job queued without an origin is recorded with none`() {
+        await(queue.enqueue("Reorg") { JobOutcome("done") })
+
+        assertNull(only().origin)
     }
 
     @Test
@@ -156,7 +173,7 @@ class JobQueueHistoryTest {
     @Test
     fun `a history that cannot write never ends the queue`() {
         val broken = object : JobHistoryStore by InMemoryJobHistoryStore() {
-            override fun begin(action: String, at: Instant): Long = error("disk full")
+            override fun begin(action: String, at: Instant, origin: RunOrigin?): Long = error("disk full")
 
             override fun start(id: Long, at: Instant) = error("disk full")
 

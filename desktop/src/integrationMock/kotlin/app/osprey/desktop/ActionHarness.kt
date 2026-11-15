@@ -51,6 +51,9 @@ class ActionHarness(val root: Path = Files.createTempDirectory("osprey-actions-m
 
     fun yearHandle() = PathHandle(year)
 
+    /** Names the library in the History (#83), as the app does: its path. */
+    val libraryLabel: String get() = library.toString()
+
     /** A file under the year folder, with [content]; its parent folders are created. */
     fun file(relative: String, content: String = relative): Path {
         val path = year.resolve(relative)

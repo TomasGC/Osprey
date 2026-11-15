@@ -25,7 +25,7 @@ const val KEEP_NEWEST = 3
 interface JobHistoryStore {
 
     /** Records a new queued run and returns its id: unique among the runs kept, and higher than every one of them. */
-    fun begin(action: String, at: Instant): Long
+    fun begin(action: String, at: Instant, origin: RunOrigin? = null): Long
 
     fun start(id: Long, at: Instant)
 
