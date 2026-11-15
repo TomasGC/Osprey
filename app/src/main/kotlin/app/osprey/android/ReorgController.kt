@@ -1,5 +1,7 @@
 package app.osprey.android
 
+import app.osprey.actions.reorg.DuplicateChoice
+import app.osprey.actions.reorg.DuplicateReview
 import app.osprey.actions.reorg.ReorgPlan
 import app.osprey.actions.reorg.ReorgPlanner
 import app.osprey.actions.reorg.ReorgSource
@@ -22,10 +24,14 @@ class ReorgController(
     private val onApplied: () -> Unit = {},
 ) {
     val state = ActionUiState()
+
+    /** The "Which files do you want to keep?" dialog (#91); the screen draws it while it is open. */
+    val review = DuplicateReview()
     private var cachedPlan: ReorgPlan? = null
 
     fun onScan(output: FileHandle) {
         if (!claim()) return
+        review.cancel()
         state.appliedSuffix = ""
         jobs.enqueue("Reorg scan", onDone = { state.busy = false }, writes = false) { control ->
             val plan = planner.plan(output, sources(), control)
@@ -41,19 +47,37 @@ class ReorgController(
                 cachedPlan = plan
                 state.lines = lines
                 state.summary = reorgSummary(plan)
-                state.applyEnabled = count > 0
+                state.applyEnabled = count + plan.duplicates.size > 0
                 JobOutcome("Reorg scan: ${state.summary.trim()}", lines = lines)
             }
         }
     }
 
+    /** Apply: a plan with duplicates first asks which files to keep (see [review]); otherwise it runs at once. */
     fun onApply(output: FileHandle) {
         val plan = cachedPlan ?: return
+        if (plan.duplicates.isNotEmpty()) review.open(plan.duplicates) else apply(plan, output, emptyList())
+    }
+
+    /** Continue in the review: runs the apply with what the user ticked. */
+    fun onContinue(output: FileHandle) {
+        val plan = cachedPlan ?: return
+        if (state.busy) return
+        val choices = review.confirm() ?: return
+        apply(plan, output, choices)
+    }
+
+    /** Cancel in the review: nothing happens, the plan stays. */
+    fun onCancel() {
+        review.cancel()
+    }
+
+    private fun apply(plan: ReorgPlan, output: FileHandle, choices: List<DuplicateChoice>) {
         if (!claim()) return
         cachedPlan = null
         state.applyEnabled = false
         jobs.enqueue("Reorg apply", onDone = { state.busy = false; onApplied() }) { control ->
-            val result = planner.apply(plan, output, control)
+            val result = planner.apply(plan, output, choices, control)
             val resultLines = reorgResultLines(result)
             state.lines = resultLines + state.lines
             state.appliedSuffix = "  -- APPLIED (${result.done}), failed ${result.failures.size}"
