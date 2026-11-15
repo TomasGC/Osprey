@@ -32,8 +32,22 @@ fun OspreyApp(state: AppState) {
                 }
                 JobStrip(state.jobs)
             }
+            ReorgReviewHost(state)
         }
     }
+}
+
+/** The "Which files do you want to keep?" dialog of Reorg (#91), over the whole window while it is open. */
+@Composable
+private fun ReorgReviewHost(state: AppState) {
+    val root = state.libraryHandle() ?: return
+    DuplicateReviewDialog(
+        review = state.reorg.review,
+        mediaMetadataReader = state.mediaMetadataReader,
+        viewTurns = state.viewTurns,
+        onContinue = { state.reorg.onContinue(root) },
+        onCancel = { state.reorg.onCancel() },
+    )
 }
 
 @Composable

@@ -8,13 +8,13 @@ fun reorgSummary(plan: ReorgPlan): String {
         "${operation.name.lowercase()}=${plan.items.count { it.operation == operation }}"
     }
     return "count=${plan.items.size}  $perOperation  already_in_output=${plan.alreadyInOutput.size}  " +
-        "undated=${plan.undated.size}  unreachable=${plan.unreachable.size}"
+        "duplicates=${plan.duplicates.size}  undated=${plan.undated.size}  unreachable=${plan.unreachable.size}"
 }
 
 /** What a run did, then one line per file it could not finish (each of those still has its source). */
 fun reorgResultLines(result: ReorgResult): List<String> {
     val head = "  APPLIED copied=${result.copied} moved=${result.moved} refiled=${result.refiled} " +
-        "failed=${result.failures.size}"
+        "trashed=${result.trashed} failed=${result.failures.size}"
     val stopped = if (result.cancelled) listOf(STOPPED_LINE) else emptyList()
     return listOf(head) + stopped + result.failures.map { "  FAILED ${it.label}: ${it.reason} (source kept)" }
 }

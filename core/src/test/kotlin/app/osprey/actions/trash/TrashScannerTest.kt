@@ -33,6 +33,16 @@ class TrashScannerTest {
     }
 
     @Test
+    fun `lists the files a Reorg set aside as their own tab`() {
+        lib.trash("2018", TrashAction.REORG, "y.jpg")
+
+        val contents = TrashScanner(lib.fs).scan(lib.root)
+
+        assertEquals(listOf(TrashAction.REORG), contents.actions("2018"))
+        assertEquals("Trash/2018/Reorg/y.jpg", contents.entries("2018", TrashAction.REORG).single().label)
+    }
+
+    @Test
     fun `ignores what is not year slash known action slash file`() {
         lib.trash("2019", TrashAction.DEDUPE, "keep.jpg")
         val trash = lib.fs.createFolder(lib.root, "Trash")

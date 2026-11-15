@@ -106,6 +106,7 @@ fun OspreyApp(state: AndroidAppState) {
                     JobStrip(state.jobs)
                 }
             }
+            ReorgReviewHost(state)
         }
     }
 }

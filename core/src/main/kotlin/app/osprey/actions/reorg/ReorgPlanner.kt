@@ -11,6 +11,7 @@ import app.osprey.jobs.forEachUntilStopped
 import app.osprey.jobs.recordResult
 import app.osprey.media.MediaMetadataReader
 import app.osprey.settings.InputMode
+import java.time.LocalDateTime
 
 /**
  * Gathers the images and videos of the input folders, and the misfiled ones of the output, into
@@ -39,34 +40,49 @@ class ReorgPlanner(
         val visits = outputFiles.map { Visit(it, null) } +
             reachable.flatMap { (source, folder) -> scanMedia(fs, folder).map { Visit(it, source) } }
         val known = ContentIndex(fs).also { index -> outputFiles.forEach { index.add(it.entry) } }
+        val library = outputFiles.associateBy { it.entry.handle }
         val names = DestinationNames(fs, output)
         val items = mutableListOf<ReorgItem>()
         val alreadyInOutput = mutableListOf<String>()
+        val duplicates = mutableListOf<ReorgDuplicate>()
         val undated = mutableListOf<String>()
 
         control.forEachUntilStopped(visits, Visit::label) { visit ->
             val year = yearOf(visit.file.entry)
             val source = visit.source
+            val twin = if (source == null) null else known.firstMatch(visit.file.entry)
+            val moveTwin = source?.takeIf { it.mode == InputMode.MOVE }
+                ?.let { move -> twin?.let { library[it] }?.let { move to it } }
             when {
-                source != null && known.holdsContentOf(visit.file.entry) -> alreadyInOutput += visit.label
+                moveTwin != null ->
+                    duplicates += ReorgDuplicate(
+                        source = moveTwin.first.label,
+                        input = visit.file.asSide(visit.label, year?.toString().orEmpty(), dateOf(visit.file.entry)),
+                        library = moveTwin.second.asSide(
+                            moveTwin.second.relativePath,
+                            moveTwin.second.folders.firstOrNull().orEmpty(),
+                            dateOf(moveTwin.second.entry),
+                        ),
+                    )
+                twin != null -> alreadyInOutput += visit.label
                 year == null -> undated += visit.label
                 source != null -> {
                     known.add(visit.file.entry)
-                    items += item(visit.file, visit.label, operationFor(source.mode), year, names)
+                    val operation = if (source.mode == InputMode.MOVE) ReorgOperation.MOVE else ReorgOperation.COPY
+                    items += item(visit.file, visit.label, operation, year, names)
                 }
                 visit.file.folders != listOf(year.toString()) ->
                     items += item(visit.file, visit.label, ReorgOperation.REFILE, year, names)
             }
         }
         val unreachable = sources.filter { it.folder == null }.map { it.label }
-        return ReorgPlan(items, alreadyInOutput, undated, unreachable)
+        return ReorgPlan(items, alreadyInOutput, duplicates, undated, unreachable)
     }
 
-    private fun yearOf(entry: FileEntry): Int? =
-        resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)?.let { it.dateTime.year }
+    private fun yearOf(entry: FileEntry): Int? = dateOf(entry)?.year
 
-    private fun operationFor(mode: InputMode) =
-        if (mode == InputMode.MOVE) ReorgOperation.MOVE else ReorgOperation.COPY
+    private fun dateOf(entry: FileEntry): LocalDateTime? =
+        resolveMediaDate(entry.handle, entry.name, mediaMetadataReader)?.dateTime
 
     private fun item(
         file: ScannedFile,
@@ -88,6 +104,9 @@ class ReorgPlanner(
         for (item in plan.items) {
             val suffix = if (item.note.isNotEmpty()) "  ${item.note}" else ""
             log("  ${item.operation} ${item.label} -> ${item.year}/${item.destName}$suffix")
+        }
+        plan.duplicates.forEach {
+            log("  DUPLICATE ${it.input.label} == ${it.library.label}  (already in the library, you choose)")
         }
         plan.alreadyInOutput.forEach { log("  SKIP $it  (content already in the output)") }
         plan.undated.forEach { log("  UNDATED $it") }
@@ -114,8 +133,33 @@ class ReorgPlanner(
             copied = counts[ReorgOperation.COPY] ?: 0,
             moved = counts[ReorgOperation.MOVE] ?: 0,
             refiled = counts[ReorgOperation.REFILE] ?: 0,
+            trashed = 0,
             failures = failures,
             cancelled = !finished,
+        )
+    }
+
+    /**
+     * [apply] for [plan], then the Trash side of [choices]: every unticked file of a duplicate pair (#91). A planned
+     * refile of a library file that goes to the Trash is dropped, so it can never fail on a file that moved away.
+     */
+    fun apply(
+        plan: ReorgPlan,
+        output: FileHandle,
+        choices: List<DuplicateChoice>,
+        control: JobControl,
+    ): ReorgResult {
+        val trashedLibrary = choices.filterNot { it.keepLibrary }.map { it.duplicate.library.handle }.toSet()
+        val (dropped, kept) = plan.items.partition {
+            it.operation == ReorgOperation.REFILE && it.source in trashedLibrary
+        }
+        val base = apply(plan.copy(items = kept), output, control)
+        if (base.cancelled) return base
+        val outcome = DuplicateTrasher(fs, output).trash(choices, dropped.map { it.source }.toSet(), control)
+        return base.copy(
+            trashed = outcome.trashed,
+            failures = base.failures + outcome.failures,
+            cancelled = !outcome.finished,
         )
     }
 
@@ -132,20 +176,8 @@ class ReorgPlanner(
         when (item.operation) {
             ReorgOperation.REFILE -> fs.move(item.source, dest, item.destName)
             ReorgOperation.COPY -> fs.copyTo(item.source, dest, item.destName)
-            ReorgOperation.MOVE -> moveVerified(item, dest)
+            ReorgOperation.MOVE -> fs.moveVerified(item.source, item.sizeBytes, dest, item.destName)
         }
-    }
-
-    /** Copy, check size then content, and only then delete the source; a bad copy is discarded. */
-    private fun moveVerified(item: ReorgItem, dest: FileHandle) {
-        val copy = fs.copyTo(item.source, dest, item.destName)
-        val copySize = fs.list(dest).firstOrNull { it.name == item.destName }?.sizeBytes
-        val verified = copySize == item.sizeBytes && fs.contentHash(copy) == fs.contentHash(item.source)
-        if (!verified) {
-            fs.delete(copy)
-            throw VerificationException("the copy differs from the source")
-        }
-        fs.delete(item.source)
     }
 
     private fun attempt(item: ReorgItem, action: () -> Unit): ReorgFailure? =
@@ -155,6 +187,4 @@ class ReorgPlanner(
     private class Visit(val file: ScannedFile, val source: ReorgSource?) {
         val label: String get() = if (source == null) file.relativePath else "${source.label}/${file.relativePath}"
     }
-
-    private class VerificationException(message: String) : IllegalStateException(message)
 }

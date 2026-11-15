@@ -573,4 +573,98 @@ class ReorgPlannerTest {
             control.files,
         )
     }
+
+    @Test
+    fun `a Move input file already in the library becomes a duplicate pair`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", 2018, content = "same")
+
+        val plan = planner.plan(output, listOf(moveFrom(camera)))
+
+        assertEquals(emptyList<ReorgItem>(), plan.items)
+        assertEquals(emptyList<String>(), plan.alreadyInOutput)
+        val pair = plan.duplicates.single()
+        assertEquals("Camera", pair.source)
+        assertEquals("Camera/y.jpg", pair.input.label)
+        assertEquals("y.jpg", pair.input.name)
+        assertEquals("2018", pair.input.year)
+        assertEquals("2018/x.jpg", pair.library.label)
+        assertEquals("x.jpg", pair.library.name)
+        assertEquals("2018", pair.library.year)
+        assertEquals(4L, pair.library.sizeBytes)
+        assertEquals(LocalDateTime.of(2018, 6, 15, 12, 0), pair.library.date)
+        assertEquals(LocalDateTime.of(2018, 6, 15, 12, 0), pair.input.date)
+    }
+
+    @Test
+    fun `a Copy input file already in the library stays a plain skip`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", 2018, content = "same")
+
+        val plan = planner.plan(output, listOf(copyFrom(camera)))
+
+        assertEquals(listOf("Camera/y.jpg"), plan.alreadyInOutput)
+        assertEquals(emptyList<ReorgDuplicate>(), plan.duplicates)
+    }
+
+    @Test
+    fun `a Move input file equal to one planned from an earlier input is skipped, not a pair`() {
+        file(camera, "a.jpg", 2018, content = "same")
+        file(whatsapp, "b.jpg", 2018, content = "same")
+
+        val plan = planner.plan(output, listOf(copyFrom(camera), moveFrom(whatsapp, "WhatsApp")))
+
+        assertEquals(listOf("Camera/a.jpg"), plan.items.map { it.label })
+        assertEquals(listOf("WhatsApp/b.jpg"), plan.alreadyInOutput)
+        assertEquals(emptyList<ReorgDuplicate>(), plan.duplicates)
+    }
+
+    @Test
+    fun `a Move input file equal to a misfiled library file is a pair with the file's own folder`() {
+        file(fs.addFolder(output, "2019"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", 2018, content = "same")
+
+        val plan = planner.plan(output, listOf(moveFrom(camera)))
+
+        val pair = plan.duplicates.single()
+        assertEquals("2019/x.jpg", pair.library.label)
+        assertEquals("2019", pair.library.year)
+        assertEquals("2018", pair.input.year)
+        assertEquals(listOf(ReorgOperation.REFILE), plan.items.map { it.operation })
+    }
+
+    @Test
+    fun `a half copy is never a pair`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "aaaa")
+        file(camera, "y.jpg", 2018, content = "bbbb")
+
+        val plan = planner.plan(output, listOf(moveFrom(camera)))
+
+        assertEquals(emptyList<ReorgDuplicate>(), plan.duplicates)
+        assertEquals(listOf("Camera/y.jpg"), plan.items.map { it.label })
+    }
+
+    @Test
+    fun `an undated Move input file already in the library is still a pair`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", null, content = "same")
+
+        val plan = planner.plan(output, listOf(moveFrom(camera)))
+
+        val pair = plan.duplicates.single()
+        assertEquals(null, pair.input.date)
+        assertEquals("", pair.input.year)
+        assertEquals(emptyList<String>(), plan.undated)
+    }
+
+    @Test
+    fun `describe logs a pair for the user to settle`() {
+        file(fs.addFolder(output, "2018"), "x.jpg", 2018, content = "same")
+        file(camera, "y.jpg", 2018, content = "same")
+        val lines = mutableListOf<String>()
+
+        planner.describe(planner.plan(output, listOf(moveFrom(camera))), lines::add)
+
+        assertEquals(listOf("  DUPLICATE Camera/y.jpg == 2018/x.jpg  (already in the library, you choose)"), lines)
+    }
 }
