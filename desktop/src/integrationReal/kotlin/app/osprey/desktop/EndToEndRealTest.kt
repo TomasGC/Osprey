@@ -2,17 +2,26 @@ package app.osprey.desktop
 
 import app.osprey.actions.dedupe.DedupePlanner
 import app.osprey.actions.flatten.FlattenPlanner
+import app.osprey.actions.reorg.DuplicateChoice
 import app.osprey.actions.reorg.ReorgPlanner
+import app.osprey.actions.reorg.ReorgResult
 import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.rename.RenamePlanner
 import app.osprey.actions.standardize.StandardizePlanner
+import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.trash.TrashMigrationPlanner
+import app.osprey.actions.trash.TrashRestorer
+import app.osprey.actions.trash.TrashScanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
+import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.FileSystemRepository
+import app.osprey.jobs.NoJobControl
 import app.osprey.settings.InputMode
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.After
@@ -127,6 +136,131 @@ class EndToEndRealTest : TimedTest() {
         assertTrue(Files.exists(yearDir.resolve("mystery.jpg")))
         assertTrue(Files.exists(yearDir.resolve("TODELETE").resolve("IMG_20150101_000000.jpg")))
         assertEquals(emptyList<Any>(), planner.plan(output, listOf(sources[0])).items)
+    }
+
+    /** The real file system, except that deleting [name] fails: a Move that stopped after its verified copy. */
+    private class FailsToDelete(private val inner: FileSystemRepository, private val name: String) :
+        FileSystemRepository by inner {
+
+        override fun delete(entry: FileHandle) {
+            if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("interrupted")
+            inner.delete(entry)
+        }
+    }
+
+    private val libraryName = "IMG_20180101_000000.jpg"
+    private val inputName = "IMG_20180101_000001.jpg"
+
+    private fun moveFrom(camera: Path) = listOf(ReorgSource(PathHandle(camera), "Camera", InputMode.MOVE))
+
+    /** A Move input file with the same bytes as a library file, planned for the user to settle. */
+    private fun settled(keepInput: Boolean, keepLibrary: Boolean): Pair<Path, ReorgResult> {
+        val camera = Files.createDirectory(tempInput("Camera"))
+        Files.write(Files.createDirectory(libraryDir.resolve("2018")).resolve(libraryName), "a".toByteArray())
+        Files.write(camera.resolve(inputName), "a".toByteArray())
+        val output = PathHandle(libraryDir)
+        val planner = ReorgPlanner(fs, mediaMetadataReader)
+        val plan = planner.plan(output, moveFrom(camera))
+        val choices = plan.duplicates.map { DuplicateChoice(it, keepInput, keepLibrary) }
+        return camera to planner.apply(plan, output, choices, NoJobControl)
+    }
+
+    private fun reorgTrash(): Path = libraryDir.resolve("Trash").resolve("2018").resolve("Reorg")
+
+    @Test
+    fun `a Move interrupted after the check is offered again and setting the input aside cleans the folder`() {
+        val camera = Files.createDirectory(tempInput("Camera"))
+        Files.write(camera.resolve(inputName), "a".toByteArray())
+        val output = PathHandle(libraryDir)
+        val interrupted = ReorgPlanner(FailsToDelete(fs, inputName), mediaMetadataReader)
+        val first = interrupted.apply(interrupted.plan(output, moveFrom(camera)), output)
+        assertEquals(1, first.failures.size)
+        assertTrue(Files.exists(camera.resolve(inputName)))
+        assertTrue(Files.exists(libraryDir.resolve("2018").resolve(inputName)))
+
+        val planner = ReorgPlanner(fs, mediaMetadataReader)
+        val plan = planner.plan(output, moveFrom(camera))
+        assertEquals(emptyList<Any>(), plan.items)
+        val pair = plan.duplicates.single()
+        assertEquals("Camera/$inputName", pair.input.label)
+        assertEquals("2018/$inputName", pair.library.label)
+        val result = planner.apply(plan, output, listOf(DuplicateChoice(pair, false, true)), NoJobControl)
+
+        assertEquals(1, result.trashed)
+        assertEquals(emptyList<Any>(), result.failures)
+        assertEquals(0, Files.list(camera).use { it.count() }.toInt())
+        assertEquals("a", Files.readString(libraryDir.resolve("2018").resolve(inputName)))
+        assertTrue(Files.exists(reorgTrash().resolve(inputName)))
+        val again = planner.plan(output, moveFrom(camera))
+        assertEquals(emptyList<Any>(), again.items + again.duplicates)
+    }
+
+    @Test
+    fun `both files ticked change nothing on disk`() {
+        val (camera, result) = settled(keepInput = true, keepLibrary = true)
+
+        assertEquals(0, result.trashed)
+        assertTrue(Files.exists(camera.resolve(inputName)))
+        assertTrue(Files.exists(libraryDir.resolve("2018").resolve(libraryName)))
+        assertFalse(Files.exists(libraryDir.resolve("Trash")))
+    }
+
+    @Test
+    fun `an unticked input file goes to the Trash and the library file stays`() {
+        val (camera, result) = settled(keepInput = false, keepLibrary = true)
+
+        assertEquals(1, result.trashed)
+        assertFalse(Files.exists(camera.resolve(inputName)))
+        assertTrue(Files.exists(libraryDir.resolve("2018").resolve(libraryName)))
+        assertTrue(Files.exists(reorgTrash().resolve(inputName)))
+    }
+
+    @Test
+    fun `an unticked library file goes to the Trash and the input file stays`() {
+        val (camera, result) = settled(keepInput = true, keepLibrary = false)
+
+        assertEquals(1, result.trashed)
+        assertTrue(Files.exists(camera.resolve(inputName)))
+        assertFalse(Files.exists(libraryDir.resolve("2018").resolve(libraryName)))
+        assertTrue(Files.exists(reorgTrash().resolve(libraryName)))
+    }
+
+    @Test
+    fun `two unticked files both go to the Trash`() {
+        val (camera, result) = settled(keepInput = false, keepLibrary = false)
+
+        assertEquals(2, result.trashed)
+        assertFalse(Files.exists(camera.resolve(inputName)))
+        assertEquals(setOf(inputName, libraryName), Files.list(reorgTrash()).use { l -> l.map { it.fileName.toString() }.toList().toSet() })
+    }
+
+    @Test
+    fun `a file set aside comes back from the Trash screen byte for byte`() {
+        settled(keepInput = false, keepLibrary = true)
+        val output = PathHandle(libraryDir)
+        val entries = TrashScanner(fs).scan(output).entries("2018", TrashAction.REORG)
+        val restorer = TrashRestorer(fs)
+
+        val restore = restorer.restore(output, restorer.plan(output, entries))
+
+        assertEquals(1, restore.restored)
+        assertEquals("a", Files.readString(libraryDir.resolve("2018").resolve(inputName)))
+        assertTrue(Files.exists(libraryDir.resolve("2018").resolve(libraryName)))
+        assertFalse("the emptied year folder is pruned", Files.exists(libraryDir.resolve("Trash").resolve("2018")))
+    }
+
+    @Test
+    fun `a Copy input with the same content as a library file is still skipped without a question`() {
+        val camera = Files.createDirectory(tempInput("Camera"))
+        Files.write(Files.createDirectory(libraryDir.resolve("2018")).resolve(libraryName), "a".toByteArray())
+        Files.write(camera.resolve(inputName), "a".toByteArray())
+
+        val plan = ReorgPlanner(fs, mediaMetadataReader).plan(
+            PathHandle(libraryDir), listOf(ReorgSource(PathHandle(camera), "Camera", InputMode.COPY)),
+        )
+
+        assertEquals(emptyList<Any>(), plan.duplicates)
+        assertEquals(listOf("Camera/$inputName"), plan.alreadyInOutput)
     }
 
     private fun tempInput(name: String): Path = libraryDir.resolveSibling("${libraryDir.fileName}-$name")
