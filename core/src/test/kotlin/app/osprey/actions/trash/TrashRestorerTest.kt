@@ -229,4 +229,25 @@ class TrashRestorerTest {
             control.files,
         )
     }
+
+    @Test
+    fun `a Reorg file whose identical twin is in the library is a conflict to settle`() {
+        val a = lib.trash("2018", TrashAction.REORG, "y.jpg")
+        lib.library("2018", "y.jpg")
+
+        val plan = restorer.plan(lib.root, listOf(a))
+
+        assertEquals(emptyList<TrashEntry>(), plan.direct)
+        assertEquals(a, plan.conflicts.single().entry)
+    }
+
+    @Test
+    fun `a Reorg file with no twin goes back into its year`() {
+        val a = lib.trash("2018", TrashAction.REORG, "y.jpg")
+
+        val result = restoreAll(a)
+
+        assertEquals(1, result.restored)
+        assertEquals(setOf("y.jpg"), lib.namesIn("2018"))
+    }
 }

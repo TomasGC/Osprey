@@ -29,17 +29,17 @@ class ReorgReportTest {
 
     @Test
     fun `result lines list each failure with its reason`() {
-        val result = ReorgResult(1, 2, 3, listOf(ReorgFailure("Camera/a.jpg", "locked")), cancelled = false)
+        val result = ReorgResult(1, 2, 3, 4, listOf(ReorgFailure("Camera/a.jpg", "locked")), cancelled = false)
 
         val lines = reorgResultLines(result)
 
-        assertEquals("  APPLIED copied=1 moved=2 refiled=3 failed=1", lines.first())
+        assertEquals("  APPLIED copied=1 moved=2 refiled=3 trashed=4 failed=1", lines.first())
         assertTrue(lines.contains("  FAILED Camera/a.jpg: locked (source kept)"))
     }
 
     @Test
     fun `result lines say when the run was stopped early`() {
-        val lines = reorgResultLines(ReorgResult(0, 0, 0, emptyList(), cancelled = true))
+        val lines = reorgResultLines(ReorgResult(0, 0, 0, 0, emptyList(), cancelled = true))
 
         assertTrue(lines.any { it.contains("STOPPED") })
     }

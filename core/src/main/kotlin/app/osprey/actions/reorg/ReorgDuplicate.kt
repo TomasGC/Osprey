@@ -19,5 +19,12 @@ data class DuplicateSide(
     val year: String,
 )
 
+/** This scanned file as one side of a pair, with the [date] the caller resolved for it. */
+internal fun ScannedFile.asSide(label: String, year: String, date: LocalDateTime?) =
+    DuplicateSide(entry.handle, label, entry.name, entry.sizeBytes, date, year)
+
+/** What the user decided for one [duplicate]: a ticked side is kept, an unticked side goes to the Trash. */
+data class DuplicateChoice(val duplicate: ReorgDuplicate, val keepInput: Boolean, val keepLibrary: Boolean)
+
 /** An input file of a Move input whose content, verified identical, is already in the library. */
 data class ReorgDuplicate(val input: DuplicateSide, val library: DuplicateSide)

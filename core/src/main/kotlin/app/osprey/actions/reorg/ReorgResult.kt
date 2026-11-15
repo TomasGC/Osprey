@@ -8,8 +8,9 @@ data class ReorgResult(
     val copied: Int,
     val moved: Int,
     val refiled: Int,
+    val trashed: Int,
     val failures: List<ReorgFailure>,
     val cancelled: Boolean,
 ) {
-    val done: Int get() = copied + moved + refiled
+    val done: Int get() = copied + moved + refiled + trashed
 }
