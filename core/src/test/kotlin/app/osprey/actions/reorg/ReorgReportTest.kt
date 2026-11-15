@@ -47,7 +47,7 @@ class ReorgReportTest {
     @Test
     fun `summary counts the duplicate pairs`() {
         val side = DuplicateSide(handle, "x", "x.jpg", 1, null, "2018")
-        val plan = ReorgPlan(emptyList(), emptyList(), listOf(ReorgDuplicate(side, side)), emptyList(), emptyList())
+        val plan = ReorgPlan(emptyList(), emptyList(), listOf(ReorgDuplicate("Camera", side, side)), emptyList(), emptyList())
 
         assertTrue(reorgSummary(plan).contains("duplicates=1"))
     }

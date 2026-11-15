@@ -26,5 +26,8 @@ internal fun ScannedFile.asSide(label: String, year: String, date: LocalDateTime
 /** What the user decided for one [duplicate]: a ticked side is kept, an unticked side goes to the Trash. */
 data class DuplicateChoice(val duplicate: ReorgDuplicate, val keepInput: Boolean, val keepLibrary: Boolean)
 
-/** An input file of a Move input whose content, verified identical, is already in the library. */
-data class ReorgDuplicate(val input: DuplicateSide, val library: DuplicateSide)
+/**
+ * An input file of a Move input whose content, verified identical, is already in the library. [source] is the
+ * input's label, for the dialog's header.
+ */
+data class ReorgDuplicate(val source: String, val input: DuplicateSide, val library: DuplicateSide)

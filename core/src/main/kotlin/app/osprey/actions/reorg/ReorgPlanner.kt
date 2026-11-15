@@ -51,15 +51,17 @@ class ReorgPlanner(
             val year = yearOf(visit.file.entry)
             val source = visit.source
             val twin = if (source == null) null else known.firstMatch(visit.file.entry)
-            val libraryTwin = if (source?.mode == InputMode.MOVE) twin?.let { library[it] } else null
+            val moveTwin = source?.takeIf { it.mode == InputMode.MOVE }
+                ?.let { move -> twin?.let { library[it] }?.let { move to it } }
             when {
-                libraryTwin != null ->
+                moveTwin != null ->
                     duplicates += ReorgDuplicate(
+                        source = moveTwin.first.label,
                         input = visit.file.asSide(visit.label, year?.toString().orEmpty(), dateOf(visit.file.entry)),
-                        library = libraryTwin.asSide(
-                            libraryTwin.relativePath,
-                            libraryTwin.folders.firstOrNull().orEmpty(),
-                            dateOf(libraryTwin.entry),
+                        library = moveTwin.second.asSide(
+                            moveTwin.second.relativePath,
+                            moveTwin.second.folders.firstOrNull().orEmpty(),
+                            dateOf(moveTwin.second.entry),
                         ),
                     )
                 twin != null -> alreadyInOutput += visit.label

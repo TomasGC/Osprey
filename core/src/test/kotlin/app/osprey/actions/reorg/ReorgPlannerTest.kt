@@ -584,6 +584,7 @@ class ReorgPlannerTest {
         assertEquals(emptyList<ReorgItem>(), plan.items)
         assertEquals(emptyList<String>(), plan.alreadyInOutput)
         val pair = plan.duplicates.single()
+        assertEquals("Camera", pair.source)
         assertEquals("Camera/y.jpg", pair.input.label)
         assertEquals("y.jpg", pair.input.name)
         assertEquals("2018", pair.input.year)
