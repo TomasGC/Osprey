@@ -53,7 +53,8 @@ private val UNCHECKED_TOGGLE_BG = Color(0x80141414)
 /**
  * One file as a card: thumbnail (a video opens in the system player), an optional [badge] chip while
  * [checked], a round toggle, name and size. Shared by Visual Dupes (checked = keep) and the Trash
- * (checked = selected). [showToggle] is off where a card only shows a file.
+ * (checked = selected). [showToggle] is off where a card only shows a file; [showCaption] is off where the caller
+ * writes the name and size itself.
  */
 @Composable
 fun MediaCard(
@@ -67,6 +68,7 @@ fun MediaCard(
     onOpen: () -> Unit,
     badge: String? = null,
     showToggle: Boolean = true,
+    showCaption: Boolean = true,
 ) {
     val context = LocalContext.current
     val isImage = splitStemAndSuffix(name).second.lowercase() in imageExtensions
@@ -106,9 +108,11 @@ fun MediaCard(
             if (checked && badge != null) BadgeChip(badge)
             if (showToggle) CheckToggle(checked, onToggle)
         }
-        Column(Modifier.padding(6.dp, 6.dp, 6.dp, 8.dp)) {
-            Text(name, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(formatSize(sizeBytes), fontSize = 10.sp, color = Color.Gray)
+        if (showCaption) {
+            Column(Modifier.padding(6.dp, 6.dp, 6.dp, 8.dp)) {
+                Text(name, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(formatSize(sizeBytes), fontSize = 10.sp, color = Color.Gray)
+            }
         }
     }
 }
