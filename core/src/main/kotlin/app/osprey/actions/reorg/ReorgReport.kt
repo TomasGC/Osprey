@@ -7,7 +7,7 @@ fun reorgSummary(plan: ReorgPlan): String {
     val perOperation = ReorgOperation.entries.joinToString("  ") { operation ->
         "${operation.name.lowercase()}=${plan.items.count { it.operation == operation }}"
     }
-    return "count=${plan.items.size}  $perOperation  already_in_output=${plan.alreadyInOutput.size}  " +
+    return "count=${plan.items.size}  $perOperation  already_in_output=${plan.alreadyInOutput.size}  duplicates=${plan.duplicates.size}  " +
         "undated=${plan.undated.size}  unreachable=${plan.unreachable.size}"
 }
 

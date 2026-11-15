@@ -6,12 +6,14 @@ package app.osprey.actions.reorg
  * @property items Files to copy, move or refile.
  * @property alreadyInOutput Labels of input files skipped because their content is already in the output
  * (or planned from another input).
+ * @property duplicates Input files of a Move input whose content is already in the library, for the user to settle.
  * @property undated Labels of files with no resolvable capture date; they stay where they are.
  * @property unreachable Labels of input folders that could not be read; the rest still ran.
  */
 data class ReorgPlan(
     val items: List<ReorgItem>,
     val alreadyInOutput: List<String>,
+    val duplicates: List<ReorgDuplicate>,
     val undated: List<String>,
     val unreachable: List<String>,
 )

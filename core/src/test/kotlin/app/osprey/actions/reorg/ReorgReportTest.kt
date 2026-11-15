@@ -16,12 +16,13 @@ class ReorgReportTest {
         val plan = ReorgPlan(
             items = listOf(item(ReorgOperation.COPY), item(ReorgOperation.COPY), item(ReorgOperation.MOVE)),
             alreadyInOutput = listOf("a"),
+            duplicates = emptyList(),
             undated = listOf("b", "c"),
             unreachable = listOf("d"),
         )
 
         assertEquals(
-            "count=3  copy=2  move=1  refile=0  already_in_output=1  undated=2  unreachable=1",
+            "count=3  copy=2  move=1  refile=0  already_in_output=1  duplicates=0  undated=2  unreachable=1",
             reorgSummary(plan),
         )
     }
@@ -41,5 +42,13 @@ class ReorgReportTest {
         val lines = reorgResultLines(ReorgResult(0, 0, 0, emptyList(), cancelled = true))
 
         assertTrue(lines.any { it.contains("STOPPED") })
+    }
+
+    @Test
+    fun `summary counts the duplicate pairs`() {
+        val side = DuplicateSide(handle, "x", "x.jpg", 1, null, "2018")
+        val plan = ReorgPlan(emptyList(), emptyList(), listOf(ReorgDuplicate(side, side)), emptyList(), emptyList())
+
+        assertTrue(reorgSummary(plan).contains("duplicates=1"))
     }
 }

@@ -17,11 +17,11 @@ internal class ContentIndex(private val fs: FileSystemRepository) {
         bySize.getOrPut(entry.sizeBytes) { mutableListOf() } += entry.handle
     }
 
-    /** True if a known file has the same size and the same content as [entry]. */
-    fun holdsContentOf(entry: FileEntry): Boolean {
-        val candidates = bySize[entry.sizeBytes] ?: return false
+    /** The first known file with the same size and the same content as [entry], or null. */
+    fun firstMatch(entry: FileEntry): FileHandle? {
+        val candidates = bySize[entry.sizeBytes] ?: return null
         val hash = hashOf(entry.handle)
-        return candidates.any { hashOf(it) == hash }
+        return candidates.firstOrNull { hashOf(it) == hash }
     }
 
     private fun hashOf(handle: FileHandle): String = hashes.getOrPut(handle) { fs.contentHash(handle) }
