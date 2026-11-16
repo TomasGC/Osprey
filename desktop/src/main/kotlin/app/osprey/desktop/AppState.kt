@@ -87,7 +87,8 @@ class AppState(
     }
     val dates = datesController(fs, mediaMetadataReader, jobs) { libraryLabel }
     val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryLabel }
-    val trash = TrashController(fs, jobs) { refreshYears() }
+    val trash = TrashController(fs, jobs, { libraryLabel }) { refreshYears() }
+    val trashRetry = TrashRetryController(fs, jobs, trash, { refreshYears() }) { libraryLabel }
     val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
 
     /**

@@ -13,13 +13,14 @@ import app.osprey.actions.trash.TrashRestorer
 import app.osprey.actions.trash.TrashScanner
 import app.osprey.actions.trash.TrashSelection
 import app.osprey.actions.trash.clearConfirmation
+import app.osprey.actions.trash.clearOutcome
 import app.osprey.actions.trash.clearResultLines
+import app.osprey.actions.trash.restoreOutcome
 import app.osprey.actions.trash.restoreResultLines
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
-import app.osprey.jobs.JobOutcome
+import app.osprey.history.RunOrigin
 import app.osprey.jobs.JobQueue
-import app.osprey.jobs.withStoppedNote
 
 /**
  * The Trash screen (#41): what the Trash holds by year and action, the files ticked across its tabs, and
@@ -31,6 +32,7 @@ import app.osprey.jobs.withStoppedNote
 class TrashController(
     private val fs: FileSystemRepository,
     private val jobs: JobQueue,
+    private val library: () -> String = { "" },
     private val onChanged: () -> Unit = {},
 ) {
 
@@ -99,37 +101,33 @@ class TrashController(
         confirmation = null
         val selected = selection.entriesIn(contents)
         if (selected.isEmpty() || !claim()) return
-        jobs.enqueue("Trash delete", onDone = { state.busy = false; onChanged() }) { control ->
+        jobs.enqueue(
+            "Trash delete",
+            onDone = { state.busy = false; onChanged() },
+            origin = RunOrigin("trash-delete", library()),
+        ) { control ->
             val result = TrashClearer(fs).clear(root, selected, control)
             report = clearResultLines(result)
             refresh(root)
-            val failed = result.failures.size
-            JobOutcome(
-                summary = withStoppedNote("Trash: ${result.deleted} deleted, $failed failed", result.cancelled),
-                lines = report,
-                failures = failed,
-                stopped = result.cancelled,
-            )
+            clearOutcome(result)
         }
     }
 
     fun restore(root: FileHandle) {
         val selected = selection.entriesIn(contents)
         if (selected.isEmpty() || !claim()) return
-        jobs.enqueue("Trash restore", onDone = { state.busy = false; onChanged() }) { control ->
+        jobs.enqueue(
+            "Trash restore",
+            onDone = { state.busy = false; onChanged() },
+            origin = RunOrigin("trash-restore", library()),
+        ) { control ->
             val restorer = TrashRestorer(fs)
             val plan = restorer.plan(root, selected)
             val result = restorer.restore(root, plan, control)
             conflicts = plan.conflicts
             report = restoreResultLines(result, plan.conflicts.size)
             refresh(root)
-            val failed = result.failures.size
-            JobOutcome(
-                summary = withStoppedNote("Trash: ${result.restored} restored, $failed failed", result.cancelled),
-                lines = report,
-                failures = failed,
-                stopped = result.cancelled,
-            )
+            restoreOutcome(result, plan.conflicts.size)
         }
     }
 
