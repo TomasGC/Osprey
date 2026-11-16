@@ -76,7 +76,9 @@ class AppState(
     val historyScreen = HistoryController(history)
 
     val flatten = flattenController(fs, jobs) { libraryLabel }
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
+    val reorg = ReorgController(
+        ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }, { libraryLabel },
+    ) { refreshYears() }
     val rename = renameController(fs, jobs) { libraryLabel }
     val dedupe = dedupeController(fs, jobs, ::trashLocation) { libraryLabel }
     val trashMigration = trashMigrationController(fs, jobs) {

@@ -84,7 +84,9 @@ class AndroidAppState(
     val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
     val flatten = flattenController(fs, jobs) { libraryReference }
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
+    val reorg = ReorgController(
+        ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }, { libraryReference },
+    ) { refreshYears() }
     val rename = renameController(fs, jobs) { libraryReference }
     val dedupe = dedupeController(fs, jobs, ::trashLocation) { libraryReference }
     val trashMigration = trashMigrationController(fs, jobs) {

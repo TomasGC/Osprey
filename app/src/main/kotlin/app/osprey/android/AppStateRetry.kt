@@ -14,13 +14,13 @@ fun AndroidAppState.canRetry(run: RunRecord): Boolean = RetryPlanner.canRetry(ru
 
 /** Retries the files [run] failed on, in the action that ran it; the action does nothing unless [canRetry]. */
 fun AndroidAppState.retry(run: RunRecord) {
-    val year = yearHandle() ?: return
     val scope = retryScope(run)
     when (run.origin?.kind) {
-        "flatten" -> flatten.onRetry(year, run, scope)
-        "rename" -> rename.onRetry(year, run, scope)
-        "dedupe" -> dedupe.onRetry(year, run, scope)
-        "dates" -> dates.onRetry(year, run, scope)
-        "standardize" -> standardize.onRetry(year, run, scope)
+        "reorg" -> libraryRoot?.let { reorg.onRetry(it, run) }
+        "flatten" -> yearHandle()?.let { flatten.onRetry(it, run, scope) }
+        "rename" -> yearHandle()?.let { rename.onRetry(it, run, scope) }
+        "dedupe" -> yearHandle()?.let { dedupe.onRetry(it, run, scope) }
+        "dates" -> yearHandle()?.let { dates.onRetry(it, run, scope) }
+        "standardize" -> yearHandle()?.let { standardize.onRetry(it, run, scope) }
     }
 }
