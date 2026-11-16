@@ -97,7 +97,7 @@ class AndroidAppState(
     val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryReference }
     val trash = TrashController(fs, jobs, { libraryReference }) { refreshYears() }
     val trashRetry = TrashRetryController(fs, jobs, trash, { refreshYears() }) { libraryReference }
-    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, { libraryReference }, ::trashLocation)
 
     private var started = false
 

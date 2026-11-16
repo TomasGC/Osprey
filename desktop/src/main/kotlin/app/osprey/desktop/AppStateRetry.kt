@@ -34,5 +34,6 @@ private fun AppState.retryInYear(year: FileHandle, run: RunRecord) {
         "dedupe" -> dedupe.onRetry(year, run, scope)
         "dates" -> dates.onRetry(year, run, scope)
         "standardize" -> standardize.onRetry(year, run, scope)
+        "visual-dupes" -> visual.onRetry(year, run, scope)
     }
 }

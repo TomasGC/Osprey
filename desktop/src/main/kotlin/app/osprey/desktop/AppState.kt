@@ -89,7 +89,7 @@ class AppState(
     val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryLabel }
     val trash = TrashController(fs, jobs, { libraryLabel }) { refreshYears() }
     val trashRetry = TrashRetryController(fs, jobs, trash, { refreshYears() }) { libraryLabel }
-    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, { libraryLabel }, ::trashLocation)
 
     /**
      * Loads the saved settings, which open their output folder as the library. It reads state it has just
