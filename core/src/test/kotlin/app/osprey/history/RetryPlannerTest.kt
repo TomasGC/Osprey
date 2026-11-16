@@ -46,6 +46,13 @@ class RetryPlannerTest {
     }
 
     @Test
+    fun `the button counts the failed files`() {
+        val files = listOf(file("2021/a.jpg", FileResult.Failed), file("2021/b.jpg", FileResult.Done), file("2021/c.jpg", FileResult.Failed))
+
+        assertEquals("Retry failed (2)", RetryPlanner.retryLabel(run(files = files)))
+    }
+
+    @Test
     fun `the nine kinds are the ones the issue lists`() {
         assertEquals(
             listOf(

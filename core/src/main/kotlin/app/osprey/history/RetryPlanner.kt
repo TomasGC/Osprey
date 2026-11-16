@@ -14,6 +14,9 @@ object RetryPlanner {
     fun failedPaths(run: RunRecord): Set<String> =
         run.files.filter { it.result == FileResult.Failed }.map { it.path }.toSet()
 
+    /** What the button on the page of [run] says: how many failed files it would retry. */
+    fun retryLabel(run: RunRecord): String = "Retry failed (${failedPaths(run).size})"
+
     /** The names [run] failed on, as a plan records them: [failedPaths] without the scope folder in front. */
     fun failedNames(run: RunRecord): Set<String> {
         val prefix = run.origin?.scope?.let { "$it/" }.orEmpty()
