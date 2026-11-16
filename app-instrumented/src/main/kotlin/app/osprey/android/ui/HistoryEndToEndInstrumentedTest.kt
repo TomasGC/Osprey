@@ -2,9 +2,11 @@ package app.osprey.android.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -12,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.android.AndroidAppState
 import app.osprey.filesystem.FakeFileSystemRepository
+import app.osprey.filesystem.FaultyFileSystemRepository
 import app.osprey.history.FileResult
 import app.osprey.history.RunRecorder
 import app.osprey.history.UNDO_WINDOW_MS
@@ -22,6 +25,7 @@ import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsStore
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +87,23 @@ class HistoryEndToEndInstrumentedTest {
         val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default), RunRecorder(history))
         return AndroidAppState(fs, FakeMediaMetadataReader(), settings, jobs, { null }, {}, history)
             .also { it.openLibrary(fs.root) }
+    }
+
+    /** A launch of the app whose move of b.jpg fails until `fs.failMove` is cleared. */
+    private class Failing(val state: AndroidAppState, val fs: FaultyFileSystemRepository)
+
+    private fun launchFailingOnB(): Failing {
+        val fake = FakeFileSystemRepository()
+        val sub = fake.addFolder(fake.addFolder(fake.root, "2021"), "sub")
+        val files = listOf("a", "b", "c").associateWith { fake.addFile(sub, "$it.jpg", "photo $it".toByteArray()) }
+        val fs = FaultyFileSystemRepository(fake)
+        fs.failMove = { if (it == files.getValue("b")) IOException("locked") else null }
+        val history = openHistory(historyDir)
+        val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default), RunRecorder(history))
+        val state = AndroidAppState(fs, FakeMediaMetadataReader(), settings, jobs, { null }, {}, history)
+        state.libraryReference = "content://library"
+        state.openLibrary(fake.root)
+        return Failing(state, fs)
     }
 
     private fun waitForJobs(state: AndroidAppState) = runBlocking {
@@ -191,5 +212,46 @@ class HistoryEndToEndInstrumentedTest {
 
         composeRule.onNodeWithText("Interrupted (1)").assertExists()
         composeRule.onNodeWithText("Done (2)").assertExists()
+    }
+
+    @Test
+    fun aRunThatFailedOnAFileIsRetriedFromItsPageAndTheRetryIsLinkedToIt() {
+        val failing = launchFailingOnB()
+        val state = failing.state
+        composeRule.setContent { OspreyApp(state) }
+        flattenThroughTheScreen(state)
+        openHistoryFromTheDrawer()
+        composeRule.onNode(hasText("Flatten 2021 apply") and hasClickAction()).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Retry failed (1)").assertExists()
+        failing.fs.failMove = { null }
+
+        click("Retry failed (1)")
+        waitForJobs(state)
+        composeRule.waitForIdle()
+
+        val first = state.history.runs().first { it.action == "Flatten 2021 apply" }
+        val retry = state.history.runs().first { it.action == "Flatten 2021 retry" }
+        assertEquals(first.id, retry.origin?.retryOf)
+        val names = failing.fs.list(state.yearHandle()!!).map { it.name }
+        assertEquals(listOf("a.jpg", "b.jpg", "c.jpg"), names.filter { it.endsWith(".jpg") }.sorted())
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeRule.onNode(hasText("Flatten 2021 retry") and hasClickAction()).assertExists()
+    }
+
+    @Test
+    fun aFailedRunHasNoRetryOnceAnotherYearIsSelected() {
+        val state = launchFailingOnB().state
+        composeRule.setContent { OspreyApp(state) }
+        flattenThroughTheScreen(state)
+        composeRule.runOnUiThread { state.selectedYear = "2020" }
+        composeRule.waitForIdle()
+        openHistoryFromTheDrawer()
+
+        composeRule.onNode(hasText("Flatten 2021 apply") and hasClickAction()).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNode(hasText("2021/sub/b.jpg", substring = true)).assertExists()
+        composeRule.onAllNodesWithText("Retry failed (1)").assertCountEquals(0)
     }
 }

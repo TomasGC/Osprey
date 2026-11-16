@@ -4,6 +4,7 @@ import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.FileTimestamps
 import app.osprey.history.JobHistoryStore
 import app.osprey.history.RunRecorder
 import app.osprey.history.openHistory
@@ -29,6 +30,46 @@ class FailsToMove(private val inner: FileSystemRepository, private val name: Str
     override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
         if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("locked")
         return inner.move(entry, destFolder, newName)
+    }
+}
+
+/** The real file system, except that deleting the file called [name] fails like a locked file. */
+class FailsToDelete(private val inner: FileSystemRepository, private val name: String) :
+    FileSystemRepository by inner {
+
+    override fun delete(entry: FileHandle) {
+        if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("locked")
+        inner.delete(entry)
+    }
+}
+
+/** The real file system, except that renaming the file called [name] fails like a locked file. */
+class FailsToRename(private val inner: FileSystemRepository, private val name: String) :
+    FileSystemRepository by inner {
+
+    override fun rename(entry: FileHandle, newName: String): FileHandle {
+        if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("locked")
+        return inner.rename(entry, newName)
+    }
+}
+
+/** The real file system, except that setting the dates of the file called [name] fails like a locked file. */
+class FailsToStamp(private val inner: FileSystemRepository, private val name: String) :
+    FileSystemRepository by inner {
+
+    override fun writeTimestamps(entry: FileHandle, timestamps: FileTimestamps) {
+        if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("locked")
+        inner.writeTimestamps(entry, timestamps)
+    }
+}
+
+/** The real file system, except that copying the file called [name] fails like a locked file. */
+class FailsToCopy(private val inner: FileSystemRepository, private val name: String) :
+    FileSystemRepository by inner {
+
+    override fun copyTo(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
+        if ((entry as PathHandle).path.fileName.toString() == name) throw IOException("locked")
+        return inner.copyTo(entry, destFolder, newName)
     }
 }
 

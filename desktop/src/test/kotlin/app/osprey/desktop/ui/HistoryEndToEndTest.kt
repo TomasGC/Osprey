@@ -2,8 +2,10 @@ package app.osprey.desktop.ui
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
@@ -14,11 +16,14 @@ import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.desktop.testing.toJpeg
+import app.osprey.filesystem.FaultyFileSystemRepository
+import app.osprey.filesystem.FileSystemRepository
 import app.osprey.history.FileResult
 import app.osprey.history.UNDO_WINDOW_MS
 import app.osprey.history.openHistory
 import app.osprey.jobs.JobState
 import java.awt.image.BufferedImage
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -60,8 +65,8 @@ class HistoryEndToEndTest : TimedTest() {
     }
 
     /** A launch of the app: the history is opened from its folder, which closes any run an earlier launch left open. */
-    private fun launch() =
-        AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), FakeSettingsStore(), history = openHistory(historyDir))
+    private fun launch(fs: FileSystemRepository = DesktopFileSystemRepository()) =
+        AppState(fs, DesktopMediaMetadataReader(), FakeSettingsStore(), history = openHistory(historyDir))
             .also { it.openLibrary(library) }
 
     private fun waitForJobs(state: AppState) = runBlocking {
@@ -167,5 +172,65 @@ class HistoryEndToEndTest : TimedTest() {
 
         onNodeWithText("Interrupted (1)").assertExists()
         onNodeWithText("Done (2)").assertExists()
+    }
+
+    @Test
+    fun `a run that failed on a file is retried from its page and the retry is linked to it`() = runComposeUiTest {
+        val fs = FaultyFileSystemRepository(DesktopFileSystemRepository())
+        fs.failMove = { if ((it as PathHandle).path.fileName.toString() == "b.jpg") IOException("locked") else null }
+        val state = launch(fs)
+        setContent { OspreyApp(state) }
+        flattenThroughTheScreen(state)
+        click("🕘")
+        onNode(hasText("Flatten 2021 apply") and hasClickAction()).performClick()
+        waitForIdle()
+        onNodeWithText("Retry failed (1)").assertExists()
+        fs.failMove = { null }
+
+        click("Retry failed (1)")
+        waitForJobs(state)
+        waitForIdle()
+
+        val first = state.history.runs().first { it.action == "Flatten 2021 apply" }
+        val retry = state.history.runs().first { it.action == "Flatten 2021 retry" }
+        assertEquals(first.id, retry.origin?.retryOf)
+        listOf("a", "b", "c").forEach { assertTrue(Files.exists(year.resolve("$it.jpg"))) }
+        onAllNodesWithText("Back").assertCountEquals(0)
+        onNode(hasText("Flatten 2021 retry") and hasClickAction()).assertExists()
+    }
+
+    @Test
+    fun `a Trash delete that failed on a file asks on the History page before it is retried`() = runComposeUiTest {
+        val folder = Files.createDirectories(library.resolve("Trash/2021/Dedupe"))
+        listOf("a", "b").forEach { Files.writeString(folder.resolve("$it.jpg"), it) }
+        val fs = FaultyFileSystemRepository(DesktopFileSystemRepository())
+        fs.failDelete = { if ((it as PathHandle).path.fileName.toString() == "a.jpg") IOException("locked") else null }
+        val state = launch(fs)
+        val root = PathHandle(library)
+        state.trash.refresh(root)
+        state.trash.toggleTab()
+        state.trash.requestDelete()
+        state.trash.confirmDelete(root)
+        waitForJobs(state)
+        setContent { OspreyApp(state) }
+        click("🕘")
+        onNode(hasText("Trash delete") and hasClickAction()).performClick()
+        waitForIdle()
+
+        click("Retry failed (1)")
+        onNodeWithText("Delete for good?").assertExists()
+        click("Cancel")
+        assertTrue(Files.exists(folder.resolve("a.jpg")))
+        onNodeWithText("Retry failed (1)").assertExists()
+        fs.failDelete = { null }
+        click("Retry failed (1)")
+        click("Delete")
+        waitForJobs(state)
+        waitForIdle()
+
+        assertFalse(Files.exists(folder.resolve("a.jpg")))
+        val first = state.history.runs().first { it.action == "Trash delete" }
+        val retry = state.history.runs().first { it.action == "Trash delete retry" }
+        assertEquals(first.id, retry.origin?.retryOf)
     }
 }

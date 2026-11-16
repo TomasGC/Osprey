@@ -30,6 +30,7 @@ private const val LIBRARY = "D:/Photos"
 private const val LOCKED = "IMG_20180101_000000.jpg"
 private const val OTHER = "IMG_20180102_000000.jpg"
 private const val PAIR = "IMG_20180105_000000.jpg"
+private const val MISFILED = "IMG_20180106_000000.jpg"
 
 /** The retry of the failed files of a Reorg run (#83), on real files with one copy made to fail. */
 class ReorgRetryControllerTest : TimedTest() {
@@ -164,6 +165,28 @@ class ReorgRetryControllerTest : TimedTest() {
         assertTrue(Files.notExists(camera.resolve(PAIR)))
         assertTrue(Files.exists(output.resolve("2018").resolve(PAIR)))
         assertTrue(Files.exists(output.resolve("Trash/2018/Reorg").resolve(PAIR)))
+        assertEquals(RunState.Done, retries().single().state)
+    }
+
+    @Test
+    fun `a library file whose refile was dropped and whose trash failed is trashed again by the retry`() {
+        Files.delete(camera.resolve(LOCKED))
+        Files.createDirectory(output.resolve("2019"))
+        Files.writeString(output.resolve("2019").resolve(MISFILED), "same bytes")
+        Files.writeString(camera.resolve(MISFILED), "same bytes")
+        fs.failMove = { if ((it as PathHandle).path.parent.fileName.toString() == "2019") IOException("locked") else null }
+        controller.onScan(PathHandle(output))
+        controller.onApply(PathHandle(output))
+        controller.review.toggleLibrary(0)
+        controller.onContinue(PathHandle(output))
+        val run = history.runs().first { it.action == "Reorg apply" }
+        fs.failMove = { null }
+
+        controller.onRetry(PathHandle(output), run)
+
+        assertEquals(listOf("2019/$MISFILED"), run.files.filter { it.result == FileResult.Failed }.map { it.path })
+        assertTrue(Files.notExists(output.resolve("2019").resolve(MISFILED)))
+        assertTrue(Files.exists(output.resolve("Trash/2019/Reorg").resolve(MISFILED)))
         assertEquals(RunState.Done, retries().single().state)
     }
 }

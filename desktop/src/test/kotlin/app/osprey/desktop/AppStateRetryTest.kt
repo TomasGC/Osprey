@@ -5,6 +5,7 @@ import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.DesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.filesystem.FaultyFileSystemRepository
+import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
 import app.osprey.history.InMemoryJobHistoryStore
 import app.osprey.history.RunOrigin
@@ -13,9 +14,11 @@ import app.osprey.history.RunState
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -103,5 +106,38 @@ class AppStateRetryTest : TimedTest() {
 
         assertTrue(history.runs().none { it.action == "Dedupe 2021 retry" })
         assertFalse(Files.exists(trashed()))
+    }
+
+    private fun failedRunOf(id: Long, kind: String, scope: String?) = RunRecord(
+        id = id,
+        action = "$kind apply",
+        state = RunState.Failed,
+        queuedAt = Instant.EPOCH,
+        files = listOf(FileRecord("2021/gone.jpg", FileResult.Failed, "locked")),
+        origin = RunOrigin(kind, library.toString(), scope),
+    )
+
+    @Test
+    fun `retrying a run of every kind starts the retry of that kind, linked to the run`() {
+        val kinds = listOf(
+            "flatten" to "2021", "rename" to "2021", "dedupe" to "2021", "dates" to "2021",
+            "standardize" to "2021", "visual-dupes" to "2021", "reorg" to null,
+            "trash-delete" to null, "trash-restore" to null,
+        )
+        kinds.forEachIndexed { index, (kind, scope) ->
+            val run = failedRunOf(900L + index, kind, scope)
+            assertTrue(kind, state.canRetry(run))
+
+            state.retry(run)
+
+            val retry = history.runs().singleOrNull { it.origin?.retryOf == run.id }
+            assertNotNull("no retry run for $kind", retry)
+            assertEquals(kind, kind, retry?.origin?.kind)
+            assertEquals(
+                kind,
+                listOf(FileRecord("2021/gone.jpg", FileResult.Skipped, "no longer there or already handled")),
+                retry?.files,
+            )
+        }
     }
 }
