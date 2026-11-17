@@ -28,9 +28,9 @@ class InMemoryJobHistoryStore(
         sorted.filterNot { it.id in drop }
     }
 
-    override fun begin(action: String, at: Instant): Long = synchronized(lock) {
+    override fun begin(action: String, at: Instant, origin: RunOrigin?): Long = synchronized(lock) {
         val id = nextId++
-        commit(kept + RunRecord(id, action, RunState.Queued, queuedAt = at))
+        commit(kept + RunRecord(id, action, RunState.Queued, queuedAt = at, origin = origin))
         id
     }
 

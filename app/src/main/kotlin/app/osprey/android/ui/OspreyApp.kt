@@ -40,6 +40,9 @@ import app.osprey.android.ActionTab
 import app.osprey.android.AndroidAppState
 import app.osprey.android.ActionUiState
 import app.osprey.android.SimpleActionController
+import app.osprey.android.canRetry
+import app.osprey.android.retry
+import app.osprey.android.retryQuestion
 import app.osprey.android.filesystem.AndroidFileHandle
 import app.osprey.filesystem.FileHandle
 import kotlinx.coroutines.launch
@@ -120,7 +123,10 @@ private fun OspreyContent(state: AndroidAppState) {
     val libraryRoot = state.libraryRoot ?: return
     when {
         state.showsTrash -> TrashScreen(state, libraryRoot)
-        state.showsHistory -> HistoryScreen(state.historyScreen)
+        state.showsHistory -> HistoryScreen(
+            state.historyScreen,
+            retry = RunRetry({ state.canRetry(it) }, { state.retryQuestion(it) }, { state.retry(it) }),
+        )
         else -> ActionContent(state, libraryRoot)
     }
 }

@@ -56,6 +56,10 @@ class AppState(
 
     val settingsState = SettingsState(settingsStore) { openLibrary(it) }
     var libraryPath by mutableStateOf<Path?>(null)
+
+    /** Names the library in the History (#83): its path, empty until one is chosen. */
+    val libraryLabel: String get() = libraryPath?.toString().orEmpty()
+
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
     var selectedTab by mutableStateOf(ActionTab.REORG)
@@ -71,18 +75,21 @@ class AppState(
     /** The logic of the History screen over this app's run history. */
     val historyScreen = HistoryController(history)
 
-    val flatten = flattenController(fs, jobs)
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
-    val rename = renameController(fs, jobs)
-    val dedupe = dedupeController(fs, jobs, ::trashLocation)
+    val flatten = flattenController(fs, jobs) { libraryLabel }
+    val reorg = ReorgController(
+        ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }, { libraryLabel },
+    ) { refreshYears() }
+    val rename = renameController(fs, jobs) { libraryLabel }
+    val dedupe = dedupeController(fs, jobs, ::trashLocation) { libraryLabel }
     val trashMigration = trashMigrationController(fs, jobs) {
         refreshYears()
         refreshLegacyTrash()
     }
-    val dates = datesController(fs, mediaMetadataReader, jobs)
-    val standardize = standardizeController(fs, mediaMetadataReader, jobs)
-    val trash = TrashController(fs, jobs) { refreshYears() }
-    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
+    val dates = datesController(fs, mediaMetadataReader, jobs) { libraryLabel }
+    val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryLabel }
+    val trash = TrashController(fs, jobs, { libraryLabel }) { refreshYears() }
+    val trashRetry = TrashRetryController(fs, jobs, trash, { refreshYears() }) { libraryLabel }
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, { libraryLabel }, ::trashLocation)
 
     /**
      * Loads the saved settings, which open their output folder as the library. It reads state it has just

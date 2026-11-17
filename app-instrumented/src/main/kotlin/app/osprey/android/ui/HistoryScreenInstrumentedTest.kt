@@ -336,4 +336,88 @@ class HistoryScreenInstrumentedTest {
         assertEquals(listOf("Dates"), store.runs().map { it.action })
         composeRule.onNodeWithText("Undo").assertDoesNotExist()
     }
+
+    private val retried = mutableListOf<String>()
+
+    private fun retryOffer(question: String? = null) =
+        RunRetry(canRetry = { it.state == RunState.Failed }, question = { question }, onRetry = { retried += it.action })
+
+    private fun screenWith(retry: RunRetry?) {
+        controller.refresh()
+        composeRule.setContent { HistoryScreen(controller, ZoneOffset.UTC, retry) }
+        composeRule.waitForIdle()
+    }
+
+    @Test
+    fun aFailedRunsPageOffersRetryFailedWithTheNumberOfFailedFiles() {
+        threeRuns()
+        screenWith(retryOffer())
+
+        click("Dates")
+
+        composeRule.onNodeWithText("Retry failed (1)").assertExists()
+    }
+
+    @Test
+    fun aRunThatCannotBeRetriedHasNoRetryFailed() {
+        threeRuns()
+        screenWith(retryOffer())
+
+        click("Reorg")
+
+        composeRule.onAllNodesWithText("Retry failed (0)").assertCountEquals(0)
+    }
+
+    @Test
+    fun withoutARetryOfferAFailedRunsPageHasNoRetryFailed() {
+        threeRuns()
+        screenWith(null)
+
+        click("Dates")
+
+        composeRule.onAllNodesWithText("Retry failed (1)").assertCountEquals(0)
+    }
+
+    @Test
+    fun pressingRetryFailedStartsTheRetryAndReturnsToTheList() {
+        threeRuns()
+        screenWith(retryOffer())
+        click("Dates")
+
+        click("Retry failed (1)")
+
+        assertEquals(listOf("Dates"), retried)
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeRule.onNodeWithText("History").assertExists()
+    }
+
+    @Test
+    fun aRetryThatNeedsAQuestionAsksItFirstAndCancelStartsNothing() {
+        threeRuns()
+        screenWith(retryOffer(question = "Permanently delete 1 file?"))
+        click("Dates")
+
+        click("Retry failed (1)")
+        composeRule.onNodeWithText("Permanently delete 1 file?").assertExists()
+        assertEquals(emptyList<String>(), retried)
+        click("Cancel")
+
+        composeRule.onNodeWithText("Permanently delete 1 file?").assertDoesNotExist()
+        composeRule.onNodeWithText("Retry failed (1)").assertExists()
+        assertEquals(emptyList<String>(), retried)
+    }
+
+    @Test
+    fun confirmingTheQuestionStartsTheRetryAndReturnsToTheList() {
+        threeRuns()
+        screenWith(retryOffer(question = "Permanently delete 1 file?"))
+        click("Dates")
+        click("Retry failed (1)")
+
+        click("Delete")
+
+        assertEquals(listOf("Dates"), retried)
+        composeRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeRule.onNodeWithText("History").assertExists()
+    }
 }

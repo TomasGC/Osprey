@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,7 +29,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import app.osprey.history.FileRecord
 import app.osprey.history.HistoryController
 import app.osprey.history.HistoryView
+import app.osprey.history.RetryPlanner
 import app.osprey.history.RunRecord
 import app.osprey.history.RunSection
 import app.osprey.history.UNDO_WINDOW_MS
@@ -64,7 +68,11 @@ import kotlinx.coroutines.delay
  * else the successful ones. A removal shows a notice with Undo and the store forgets the runs when it ends.
  */
 @Composable
-fun HistoryScreen(controller: HistoryController, zone: ZoneId = ZoneId.systemDefault()) {
+fun HistoryScreen(
+    controller: HistoryController,
+    zone: ZoneId = ZoneId.systemDefault(),
+    retry: RunRetry? = null,
+) {
     val view by controller.view.collectAsState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(controller) { controller.follow() }
@@ -86,7 +94,7 @@ fun HistoryScreen(controller: HistoryController, zone: ZoneId = ZoneId.systemDef
         },
     ) {
         if (run != null) {
-            RunPage(run, zone, onBack = controller::back)
+            RunPage(run, zone, retry, onBack = controller::back)
         } else {
             HistoryList(view, zone, controller)
         }
@@ -179,7 +187,7 @@ private fun RemovalNotice(text: String, onUndo: () -> Unit, onClose: () -> Unit,
 
 /** A run's page: what it did, its log, and every file with what changed. A long run scrolls, it never truncates. */
 @Composable
-private fun RunPage(run: RunRecord, zone: ZoneId, onBack: () -> Unit) {
+private fun RunPage(run: RunRecord, zone: ZoneId, retry: RunRetry?, onBack: () -> Unit) {
     val whenLine = listOfNotNull(runWhenText(run, zone), runDurationText(run)?.let { "took $it" })
         .joinToString(" · ")
     LazyColumn(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -189,6 +197,7 @@ private fun RunPage(run: RunRecord, zone: ZoneId, onBack: () -> Unit) {
         item { Text(runSubtitle(run)) }
         item { Text(whenLine, fontSize = 12.sp) }
         item { Text(runCounts(run), fontSize = 12.sp) }
+        if (retry?.canRetry(run) == true) item { RetryButton(run, retry, onBack) }
         if (run.log.isNotEmpty()) {
             item { Text("Log", fontWeight = FontWeight.Bold) }
             items(run.log) { Text(it, fontSize = 12.sp) }
@@ -197,6 +206,37 @@ private fun RunPage(run: RunRecord, zone: ZoneId, onBack: () -> Unit) {
             item(key = "group-${group.result}") { Text(group.title, fontWeight = FontWeight.Bold) }
             items(group.files) { FileEntry(it, zone) }
         }
+    }
+}
+
+/**
+ * Retry failed (#83): starts a run of the same action on the files [run] failed on, then goes back to the list, where
+ * that run shows. A retry that cannot be undone asks first, with the question [retry] gives.
+ */
+@Composable
+private fun RetryButton(run: RunRecord, retry: RunRetry, onDone: () -> Unit) {
+    var asking by remember { mutableStateOf<String?>(null) }
+    val start = {
+        retry.onRetry(run)
+        onDone()
+    }
+    Button(onClick = { retry.question(run)?.let { asking = it } ?: start() }) { Text(RetryPlanner.retryLabel(run)) }
+    asking?.let { question ->
+        AlertDialog(
+            onDismissRequest = { asking = null },
+            title = { Text("Delete for good?") },
+            text = { Text(question) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        asking = null
+                        start()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DANGER),
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { asking = null }) { Text("Cancel") } },
+        )
     }
 }
 

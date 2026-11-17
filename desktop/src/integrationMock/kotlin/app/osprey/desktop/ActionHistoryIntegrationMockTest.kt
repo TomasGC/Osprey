@@ -35,7 +35,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         harness.file("sub/deep/b.jpg")
         val launch = harness.launch()
 
-        launch.scanAndApply(flattenController(harness.fs, launch.jobs))
+        launch.scanAndApply(flattenController(harness.fs, launch.jobs) { harness.libraryLabel })
 
         assertTrue(Files.exists(harness.year.resolve("a.jpg")))
         assertTrue(Files.exists(harness.year.resolve("b.jpg")))
@@ -54,7 +54,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         harness.file("photo (1).jpg", "twelve bytes")
         val launch = harness.launch()
 
-        launch.scanAndApply(renameController(harness.fs, launch.jobs))
+        launch.scanAndApply(renameController(harness.fs, launch.jobs) { harness.libraryLabel })
 
         assertTrue(Files.exists(harness.year.resolve("photo.jpg")))
         assertFalse(Files.exists(harness.year.resolve("photo (1).jpg")))
@@ -71,7 +71,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         harness.file("download_20160828_193034.jpeg", "photo")
         val launch = harness.launch()
 
-        launch.scanAndApply(standardizeController(harness.fs, harness.reader, launch.jobs))
+        launch.scanAndApply(standardizeController(harness.fs, harness.reader, launch.jobs) { harness.libraryLabel })
 
         assertTrue(Files.exists(harness.year.resolve("IMG_2016-08-28_19-30-34.jpeg")))
         val record = applyRun("Standardize 2021 apply").files.single()
@@ -86,7 +86,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         val photo = harness.file("IMG_20170425_152602.jpg", "photo")
         val launch = harness.launch()
 
-        launch.scanAndApply(datesController(harness.fs, harness.reader, launch.jobs))
+        launch.scanAndApply(datesController(harness.fs, harness.reader, launch.jobs) { harness.libraryLabel })
 
         val expected = LocalDateTime.of(2017, 4, 25, 15, 26, 2).atZone(ZoneId.systemDefault()).toInstant()
         assertEquals(expected.toEpochMilli(), Files.getLastModifiedTime(photo).toMillis())
@@ -102,7 +102,11 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         harness.file("a.jpg", "same bytes")
         harness.file("bb.jpg", "same bytes")
         val launch = harness.launch()
-        val dedupe = dedupeController(harness.fs, launch.jobs) { TrashLocation(PathHandle(harness.library), "2021") }
+        val dedupe = dedupeController(
+            harness.fs,
+            launch.jobs,
+            { TrashLocation(PathHandle(harness.library), "2021") },
+        ) { harness.libraryLabel }
 
         launch.scanAndApply(dedupe)
 
@@ -122,7 +126,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         harness.file("sub/c.jpg")
         val launch = harness.launch()
 
-        launch.scanAndApply(flattenController(FailsToMove(harness.fs, "b.jpg"), launch.jobs))
+        launch.scanAndApply(flattenController(FailsToMove(harness.fs, "b.jpg"), launch.jobs) { harness.libraryLabel })
 
         assertTrue(Files.exists(harness.year.resolve("a.jpg")))
         assertTrue(Files.exists(harness.year.resolve("c.jpg")))
@@ -140,7 +144,7 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
     fun `a run the app died in is Interrupted after a restart and keeps the files it had finished`() {
         harness.file("sub/a.jpg")
         val first = harness.launch()
-        first.scanAndApply(flattenController(harness.fs, first.jobs))
+        first.scanAndApply(flattenController(harness.fs, first.jobs) { harness.libraryLabel })
         File(harness.historyDir, "99.jsonl").writeText(
             """{"t":"run","id":99,"action":"Flatten 2021 scan","at":1793737437979}""" + "\n" +
                 """{"t":"start","at":1793737437986}""" + "\n" +

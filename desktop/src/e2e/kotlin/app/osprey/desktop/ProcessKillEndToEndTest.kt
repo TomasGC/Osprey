@@ -2,6 +2,8 @@ package app.osprey.desktop
 
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.FileResult
+import app.osprey.history.RetryPlanner
+import app.osprey.history.RunOrigin
 import app.osprey.history.RunState
 import app.osprey.history.openHistory
 import java.nio.file.Files
@@ -10,6 +12,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -74,6 +77,8 @@ class ProcessKillEndToEndTest : TimedTest() {
         val interrupted = runs.single { it.action == "Flatten 2021 apply" }
         assertEquals(RunState.Interrupted, interrupted.state)
         assertNotNull("the run had started before it was killed", interrupted.startedAt)
+        assertEquals(RunOrigin("flatten", "child-library", "2021"), interrupted.origin)
+        assertFalse(RetryPlanner.canRetry(interrupted, "child-library", "2021"))
         val finished = interrupted.files.single()
         assertEquals(FileResult.Done, finished.result)
         val moved = finished.path.substringAfterLast('/')

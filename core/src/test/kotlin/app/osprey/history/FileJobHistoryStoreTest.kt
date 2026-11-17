@@ -38,6 +38,15 @@ class FileJobHistoryStoreTest {
     }
 
     @Test
+    fun `the origin of a run is written to its file and read back at the next launch`() {
+        val origin = RunOrigin("dates", "D:/Photos", "2021", retryOf = 7)
+        val id = store().begin("Dates apply", at(1000), origin)
+
+        assertEquals(listOf(RunLines.encode(RunLine.Header(id, "Dates apply", at(1000), origin))), file(id).readLines())
+        assertEquals(origin, store().runs().single().origin)
+    }
+
+    @Test
     fun `a run is written to its own file as it happens`() {
         val store = store()
 

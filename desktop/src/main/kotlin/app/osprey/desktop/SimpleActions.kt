@@ -1,13 +1,18 @@
 package app.osprey.desktop
 
+import app.osprey.actions.dates.DATES_RETRY
 import app.osprey.actions.dates.DatesPlan
 import app.osprey.actions.dates.DatesPlanner
+import app.osprey.actions.dedupe.DEDUPE_RETRY
 import app.osprey.actions.dedupe.DedupePlan
 import app.osprey.actions.dedupe.DedupePlanner
+import app.osprey.actions.flatten.FLATTEN_RETRY
 import app.osprey.actions.flatten.FlattenPlan
 import app.osprey.actions.flatten.FlattenPlanner
+import app.osprey.actions.rename.RENAME_RETRY
 import app.osprey.actions.rename.RenamePlan
 import app.osprey.actions.rename.RenamePlanner
+import app.osprey.actions.standardize.STANDARDIZE_RETRY
 import app.osprey.actions.standardize.StandardizePlan
 import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.actions.trash.TrashLocation
@@ -17,7 +22,11 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
 
-fun flattenController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionController<FlattenPlan>(
+fun flattenController(
+    fs: FileSystemRepository,
+    jobs: JobQueue,
+    library: () -> String,
+) = SimpleActionController<FlattenPlan>(
     name = "Flatten",
     jobs = jobs,
     scan = { yearDir, control ->
@@ -28,9 +37,14 @@ fun flattenController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionCo
         ScanResult(plan, "count=$count", lines, count)
     },
     apply = { yearDir, plan, control -> FlattenPlanner(fs).apply(plan, yearDir, control) {} },
+    retry = RetryWiring("flatten", library, FLATTEN_RETRY),
 )
 
-fun renameController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionController<RenamePlan>(
+fun renameController(
+    fs: FileSystemRepository,
+    jobs: JobQueue,
+    library: () -> String,
+) = SimpleActionController<RenamePlan>(
     name = "Rename",
     jobs = jobs,
     scan = { yearDir, control ->
@@ -41,12 +55,14 @@ fun renameController(fs: FileSystemRepository, jobs: JobQueue) = SimpleActionCon
         ScanResult(plan, "count=$count  skipped=${plan.skips.size}", lines, count)
     },
     apply = { _, plan, control -> RenamePlanner(fs).apply(plan, control) },
+    retry = RetryWiring("rename", library, RENAME_RETRY),
 )
 
 fun dedupeController(
     fs: FileSystemRepository,
     jobs: JobQueue,
     trashLocation: () -> TrashLocation,
+    library: () -> String,
 ) = SimpleActionController<DedupePlan>(
     name = "Dedupe",
     jobs = jobs,
@@ -58,6 +74,7 @@ fun dedupeController(
         ScanResult(plan, "count=$count", lines, count)
     },
     apply = { _, plan, control -> DedupePlanner(fs).apply(plan, trashLocation(), control = control) },
+    retry = RetryWiring("dedupe", library, DEDUPE_RETRY),
 )
 
 /**
@@ -68,6 +85,7 @@ fun datesController(
     fs: FileSystemRepository,
     mediaMetadataReader: MediaMetadataReader,
     jobs: JobQueue,
+    library: () -> String,
 ) = SimpleActionController<DatesPlan>(
     name = "Dates",
     jobs = jobs,
@@ -81,6 +99,7 @@ fun datesController(
         ScanResult(plan, summary, lines, plan.fixes.size)
     },
     apply = { _, plan, control -> DatesPlanner(fs, mediaMetadataReader).apply(plan, control = control) },
+    retry = RetryWiring("dates", library, DATES_RETRY),
 )
 
 /** Runs on the library root: moves the old `<year>/TODELETE*` folders into `Trash` (#38). */
@@ -106,6 +125,7 @@ fun standardizeController(
     fs: FileSystemRepository,
     mediaMetadataReader: MediaMetadataReader,
     jobs: JobQueue,
+    library: () -> String,
 ) = SimpleActionController<StandardizePlan>(
     name = "Standardize",
     jobs = jobs,
@@ -117,4 +137,5 @@ fun standardizeController(
         ScanResult(plan, "count=$count  unfixable=${plan.unfixable.size}", lines, count)
     },
     apply = { _, plan, control -> StandardizePlanner(fs, mediaMetadataReader).apply(plan, control) },
+    retry = RetryWiring("standardize", library, STANDARDIZE_RETRY),
 )

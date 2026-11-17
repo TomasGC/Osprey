@@ -34,6 +34,16 @@ class InMemoryJobHistoryStoreTest {
     }
 
     @Test
+    fun `a run begun with an origin lists it, and one begun without lists none`() {
+        val origin = RunOrigin("flatten", "D:/Photos", "2021", retryOf = 3)
+        val with = store.begin("Flatten apply", T0, origin)
+        val without = store.begin("Reorg", T0)
+
+        assertEquals(origin, store.runs().first { it.id == with }.origin)
+        assertNull(store.runs().first { it.id == without }.origin)
+    }
+
+    @Test
     fun `ids grow and runs are listed newest first`() {
         val first = store.begin("A", T0)
         val second = store.begin("B", T0)

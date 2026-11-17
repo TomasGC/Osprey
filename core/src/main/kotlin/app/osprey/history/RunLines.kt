@@ -5,8 +5,7 @@ object RunLines {
     /** The one-line JSON text of [line]. */
     fun encode(line: RunLine): String = Json.write(
         when (line) {
-            is RunLine.Header ->
-                linkedMapOf("t" to "run", "id" to line.id, "action" to line.action, "at" to line.at.toEpochMilli())
+            is RunLine.Header -> headerFields(line)
             is RunLine.Started -> linkedMapOf("t" to "start", "at" to line.at.toEpochMilli())
             is RunLine.Logged -> linkedMapOf("t" to "log", "line" to line.line)
             is RunLine.Filed -> fileFields(line.record)
@@ -15,6 +14,19 @@ object RunLines {
             )
         },
     )
+
+    private fun headerFields(line: RunLine.Header): Map<String, Any?> {
+        val fields = linkedMapOf<String, Any?>(
+            "t" to "run", "id" to line.id, "action" to line.action, "at" to line.at.toEpochMilli(),
+        )
+        line.origin?.let { origin ->
+            fields["kind"] = origin.kind
+            fields["library"] = origin.library
+            origin.scope?.let { fields["scope"] = it }
+            origin.retryOf?.let { fields["retryOf"] = it }
+        }
+        return fields
+    }
 
     private fun fileFields(record: FileRecord): Map<String, Any?> {
         val fields = linkedMapOf<String, Any?>(
@@ -45,7 +57,8 @@ object RunLines {
             val current = run
             run = when {
                 current != null -> apply(current, line)
-                line is RunLine.Header -> RunRecord(line.id, line.action, RunState.Queued, queuedAt = line.at)
+                line is RunLine.Header ->
+                    RunRecord(line.id, line.action, RunState.Queued, queuedAt = line.at, origin = line.origin)
                 else -> null
             }
         }

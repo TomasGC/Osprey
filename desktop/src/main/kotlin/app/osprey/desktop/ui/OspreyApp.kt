@@ -16,6 +16,9 @@ import app.osprey.desktop.ActionTab
 import app.osprey.desktop.AppState
 import app.osprey.desktop.ActionUiState
 import app.osprey.desktop.SimpleActionController
+import app.osprey.desktop.canRetry
+import app.osprey.desktop.retry
+import app.osprey.desktop.retryQuestion
 import app.osprey.filesystem.FileHandle
 
 /** App shell: collapsible sidebar + a content area switching between the five simple-action tabs. */
@@ -62,7 +65,10 @@ private fun OspreyContent(state: AppState) {
         return
     }
     if (state.showsHistory && libraryDir != null) {
-        HistoryScreen(state.historyScreen)
+        HistoryScreen(
+                state.historyScreen,
+                retry = RunRetry({ state.canRetry(it) }, { state.retryQuestion(it) }, { state.retry(it) }),
+            )
         return
     }
     val rootAction = libraryDir?.let { rootActionFor(state, state.selectedTab, it) }

@@ -7,14 +7,20 @@ import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.visual.MoveDupsResult
 import app.osprey.actions.visual.VisualDupePlanner
 import app.osprey.actions.visual.moveUncheckedToTrash
+import app.osprey.actions.visual.retryVisualDupes
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.history.RetryPlanner
+import app.osprey.history.RunOrigin
+import app.osprey.history.RunRecord
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.scopedName
 import app.osprey.jobs.underFolder
 import app.osprey.jobs.withStoppedNote
 import app.osprey.media.MediaMetadataReader
+
+private const val KIND = "visual-dupes"
 
 /**
  * Visual Dupes: the scan, and "move unchecked" for one group, both as jobs of [jobs]. The groups stay in the
@@ -25,6 +31,7 @@ class VisualDupesController(
     private val fs: FileSystemRepository,
     private val mediaMetadataReader: MediaMetadataReader,
     private val jobs: JobQueue,
+    private val library: () -> String = { "" },
     private val trashLocation: () -> TrashLocation,
 ) {
     private var scannedDir by mutableStateOf<FileHandle?>(null)
@@ -65,7 +72,11 @@ class VisualDupesController(
                 group.moving = true
                 val trash = trashLocation()
                 val label = scopedName("Visual Dupes", scannedScope)
-                jobs.enqueue("$label group #${group.index}", onDone = { group.moving = false }) { control ->
+                jobs.enqueue(
+                    "$label group #${group.index}",
+                    onDone = { group.moving = false },
+                    origin = RunOrigin(KIND, library(), scannedScope),
+                ) { control ->
                     val placed = control.underFolder(scannedScope)
                     val result = moveUncheckedToTrash(fs, trash, yearDir, group.members, kept, placed)
                     val stopped = control.shouldStop()
@@ -77,6 +88,26 @@ class VisualDupesController(
                     JobOutcome(withStoppedNote(summary, stopped), stopped = stopped, failures = failures)
                 }
             }
+        }
+    }
+
+    /** Retries the files [run] failed on (#83): moves the ones still in [yearDir] to the Trash, with no new scan. */
+    fun onRetry(yearDir: FileHandle, run: RunRecord, scope: String? = null) {
+        if (run.origin?.kind != KIND || !RetryPlanner.canRetry(run, library(), scope)) return
+        val label = scopedName("Visual Dupes", scope)
+        val trash = trashLocation()
+        jobs.enqueue("$label retry", origin = RetryPlanner.retryOrigin(run)) { control ->
+            val failed = RetryPlanner.failedNames(run)
+            val result = retryVisualDupes(fs, trash, yearDir, failed, control.underFolder(scope))
+            val stopped = control.shouldStop()
+            val failures = result.failed.size
+            val counts = "$label retry: moved ${result.moved.size}"
+            val summary = if (failures > 0) "$counts, $failures failed" else counts
+            JobOutcome(
+                RetryPlanner.retrySummary(run, withStoppedNote(summary, stopped)),
+                stopped = stopped,
+                failures = failures,
+            )
         }
     }
 

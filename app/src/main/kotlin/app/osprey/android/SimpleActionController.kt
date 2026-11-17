@@ -1,11 +1,15 @@
 package app.osprey.android
 
 import app.osprey.filesystem.FileHandle
+import app.osprey.history.RetryPlanner
+import app.osprey.history.RunOrigin
+import app.osprey.history.RunRecord
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.JobOutcome
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.appliedSuffix
 import app.osprey.jobs.applyOutcome
+import app.osprey.jobs.retryCounts
 import app.osprey.jobs.scopedName
 import app.osprey.jobs.underFolder
 
@@ -24,6 +28,7 @@ class SimpleActionController<Plan>(
     private val scan: (FileHandle, JobControl) -> ScanResult<Plan>,
     private val apply: (FileHandle, Plan, JobControl) -> Int,
     private val onApplied: () -> Unit = {},
+    private val retry: RetryWiring<Plan>? = null,
 ) {
     val state = ActionUiState()
     private var cachedPlan: Plan? = null
@@ -56,12 +61,49 @@ class SimpleActionController<Plan>(
         val label = scopedName(name, scope)
         cachedPlan = null
         state.applyEnabled = false
-        jobs.enqueue("$label apply", onDone = { state.busy = false; onApplied() }) { control ->
+        jobs.enqueue(
+            "$label apply",
+            onDone = { state.busy = false; onApplied() },
+            origin = retry?.let { RunOrigin(it.kind, it.library(), scope) },
+        ) { control ->
             val applied = apply(yearDir, plan, control.underFolder(scope))
             val stopped = control.shouldStop()
             val failed = control.failedFiles
             state.appliedSuffix = appliedSuffix(applied, failed, stopped)
             applyOutcome(label, applied, failed, stopped)
+        }
+    }
+
+    /**
+     * Retries the files [run] failed on (#83), as a run of its own: scans again, keeps the plan's items for those
+     * files, applies them, and reports as skipped any failed file the new scan no longer holds. Nothing happens unless
+     * [RetryPlanner.canRetry] says the run can be retried on the library and [scope] selected now.
+     */
+    fun onRetry(yearDir: FileHandle, run: RunRecord, scope: String? = null) {
+        val wiring = retry ?: return
+        val filter = wiring.filter
+        if (!RetryPlanner.canRetry(run, wiring.library(), scope) || !claim()) return
+        val label = scopedName(name, scope)
+        jobs.enqueue(
+            "$label retry",
+            onDone = { state.busy = false; onApplied() },
+            origin = RetryPlanner.retryOrigin(run),
+        ) { control ->
+            val placed = control.underFolder(scope)
+            val failed = RetryPlanner.failedNames(run)
+            val plan = scan(yearDir, control).plan
+            if (control.shouldStop()) return@enqueue JobOutcome("$label retry: stopped", stopped = true)
+            RetryPlanner.missingRecords(failed, filter.names(plan)).forEach(placed::record)
+            val todo = filter.only(plan, failed)
+            val applied = if (filter.names(todo).isEmpty()) 0 else apply(yearDir, todo, placed)
+            val stopped = control.shouldStop()
+            val failures = placed.failedFiles
+            state.appliedSuffix = appliedSuffix(applied, failures, stopped)
+            JobOutcome(
+                RetryPlanner.retrySummary(run, retryCounts(applied, failures, stopped)),
+                stopped = stopped,
+                failures = failures,
+            )
         }
     }
 

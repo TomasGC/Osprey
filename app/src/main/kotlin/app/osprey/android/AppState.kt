@@ -53,11 +53,19 @@ class AndroidAppState(
 
     val settingsState = SettingsState(
         settingsStore,
-        onOutputChosen = { folder -> resolveFolder(folder)?.let { openLibrary(it) } },
+        onOutputChosen = { folder ->
+            resolveFolder(folder)?.let {
+                libraryReference = folder.reference
+                openLibrary(it)
+            }
+        },
         releaseGrant = releaseGrant,
     )
 
     var libraryRoot by mutableStateOf<FileHandle?>(null)
+
+    /** Names the library in the History (#83): the saved reference of the output folder, empty until one is chosen. */
+    var libraryReference by mutableStateOf("")
     var years by mutableStateOf<List<String>>(emptyList())
     var selectedYear by mutableStateOf<String?>(null)
     var selectedTab by mutableStateOf(ActionTab.REORG)
@@ -75,18 +83,21 @@ class AndroidAppState(
     /** True while the Settings screen is up, which is also the only screen until an output folder is set. */
     val showsSettings: Boolean get() = settingsState.showing || libraryRoot == null
 
-    val flatten = flattenController(fs, jobs)
-    val reorg = ReorgController(ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }) { refreshYears() }
-    val rename = renameController(fs, jobs)
-    val dedupe = dedupeController(fs, jobs, ::trashLocation)
+    val flatten = flattenController(fs, jobs) { libraryReference }
+    val reorg = ReorgController(
+        ReorgPlanner(fs, mediaMetadataReader), jobs, { reorgSources() }, { libraryReference },
+    ) { refreshYears() }
+    val rename = renameController(fs, jobs) { libraryReference }
+    val dedupe = dedupeController(fs, jobs, ::trashLocation) { libraryReference }
     val trashMigration = trashMigrationController(fs, jobs) {
         refreshYears()
         refreshLegacyTrash()
     }
-    val dates = datesController(fs, mediaMetadataReader, jobs)
-    val standardize = standardizeController(fs, mediaMetadataReader, jobs)
-    val trash = TrashController(fs, jobs) { refreshYears() }
-    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, ::trashLocation)
+    val dates = datesController(fs, mediaMetadataReader, jobs) { libraryReference }
+    val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryReference }
+    val trash = TrashController(fs, jobs, { libraryReference }) { refreshYears() }
+    val trashRetry = TrashRetryController(fs, jobs, trash, { refreshYears() }) { libraryReference }
+    val visual = VisualDupesController(fs, mediaMetadataReader, jobs, { libraryReference }, ::trashLocation)
 
     private var started = false
 

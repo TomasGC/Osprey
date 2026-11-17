@@ -3,6 +3,7 @@ package app.osprey.jobs
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
 import app.osprey.history.InMemoryJobHistoryStore
+import app.osprey.history.RunOrigin
 import app.osprey.history.RunRecorder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -64,9 +65,10 @@ class JobQueue(
         name: String,
         onDone: (JobOutcome) -> Unit = {},
         writes: Boolean = true,
+        origin: RunOrigin? = null,
         work: (JobControl) -> JobOutcome,
     ): JobHandle {
-        val job = Pending(ids.getAndIncrement(), name, work, onDone, recorder.begin(name))
+        val job = Pending(ids.getAndIncrement(), name, work, onDone, recorder.begin(name, origin))
         synchronized(lock) {
             active[job.id] = job
             mutableEntries.value = mutableEntries.value + JobEntry(job.id, name, JobState.Queued, writes)

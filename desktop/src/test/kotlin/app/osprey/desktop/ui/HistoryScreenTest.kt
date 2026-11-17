@@ -321,4 +321,89 @@ class HistoryScreenTest : TimedTest() {
 
         assertEquals(listOf("Dates"), store.runs().map { it.action })
     }
+
+    private val retried = mutableListOf<String>()
+
+    private fun retryOffer(question: String? = null) =
+        RunRetry(canRetry = { it.state == RunState.Failed }, question = { question }, onRetry = { retried += it.action })
+
+    private fun ComposeUiTest.screenWith(retry: RunRetry?) {
+        controller.refresh()
+        setContent { HistoryScreen(controller, ZoneOffset.UTC, retry) }
+        waitForIdle()
+    }
+
+    @Test
+    fun `a failed run's page offers Retry failed with the number of failed files`() = runComposeUiTest {
+        threeRuns()
+        screenWith(retryOffer())
+
+        click("Dates")
+
+        onNodeWithText("Retry failed (1)").assertExists()
+    }
+
+    @Test
+    fun `a run that cannot be retried has no Retry failed, and neither does a screen with no retry`() = runComposeUiTest {
+        threeRuns()
+        screenWith(retryOffer())
+        click("Reorg")
+        onAllNodesWithText("Retry failed (0)").assertCountEquals(0)
+        click("Back")
+        click("Dates")
+        onAllNodesWithText("Retry failed (1)").assertCountEquals(1)
+    }
+
+    @Test
+    fun `without a retry offer a failed run's page has no Retry failed`() = runComposeUiTest {
+        threeRuns()
+        screenWith(null)
+
+        click("Dates")
+
+        onAllNodesWithText("Retry failed (1)").assertCountEquals(0)
+    }
+
+    @Test
+    fun `pressing Retry failed starts the retry and returns to the list`() = runComposeUiTest {
+        threeRuns()
+        screenWith(retryOffer())
+        click("Dates")
+
+        click("Retry failed (1)")
+
+        assertEquals(listOf("Dates"), retried)
+        onAllNodesWithText("Back").assertCountEquals(0)
+        onNodeWithText("History").assertExists()
+    }
+
+    @Test
+    fun `a retry that needs a question asks it first, and Cancel starts nothing`() = runComposeUiTest {
+        threeRuns()
+        screenWith(retryOffer(question = "Permanently delete 1 file?"))
+        click("Dates")
+
+        click("Retry failed (1)")
+        onNodeWithText("Permanently delete 1 file?").assertExists()
+        assertEquals(emptyList<String>(), retried)
+        click("Cancel")
+
+        onNodeWithText("Permanently delete 1 file?").assertDoesNotExist()
+        onNodeWithText("Retry failed (1)").assertExists()
+        assertEquals(emptyList<String>(), retried)
+    }
+
+    @Test
+    fun `confirming the question starts the retry and returns to the list`() = runComposeUiTest {
+        threeRuns()
+        screenWith(retryOffer(question = "Permanently delete 1 file?"))
+        click("Dates")
+        click("Retry failed (1)")
+
+        click("Delete")
+
+        assertEquals(listOf("Dates"), retried)
+        onAllNodesWithText("Back").assertCountEquals(0)
+        onNodeWithText("History").assertExists()
+    }
 }
