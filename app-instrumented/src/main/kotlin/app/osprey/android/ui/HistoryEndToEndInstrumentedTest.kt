@@ -77,11 +77,15 @@ class HistoryEndToEndInstrumentedTest {
         historyDir.deleteRecursively()
     }
 
-    /** A launch of the app: a library with 2021/sub/{a,b,c}.jpg, and the history opened from its folder. */
-    private fun launch(): AndroidAppState {
-        val fs = FakeFileSystemRepository()
+    private fun seedFlattenLibrary(fs: FakeFileSystemRepository) {
         val sub = fs.addFolder(fs.addFolder(fs.root, "2021"), "sub")
         listOf("a", "b", "c").forEach { fs.addFile(sub, "$it.jpg", "photo $it".toByteArray()) }
+    }
+
+    /** A launch of the app over [fs] (default: 2021/sub/{a,b,c}.jpg), and the history opened from its folder. */
+    private fun launch(
+        fs: FakeFileSystemRepository = FakeFileSystemRepository().also(::seedFlattenLibrary),
+    ): AndroidAppState {
         val history = openHistory(historyDir)
         // As OspreyApplication does: the queue records into the same history the screens read.
         val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default), RunRecorder(history))
@@ -133,6 +137,12 @@ class HistoryEndToEndInstrumentedTest {
     private fun openHistoryFromTheDrawer() {
         openDrawer()
         composeRule.onNodeWithText("🕘 History").performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun openTrashFromTheDrawer() {
+        openDrawer()
+        composeRule.onNodeWithText("🗑 Trash").performScrollTo().performClick()
         composeRule.waitForIdle()
     }
 
@@ -253,5 +263,34 @@ class HistoryEndToEndInstrumentedTest {
 
         composeRule.onNode(hasText("2021/sub/b.jpg", substring = true)).assertExists()
         composeRule.onAllNodesWithText("Retry failed (1)").assertCountEquals(0)
+    }
+
+    @Test
+    fun aTrashRestoreOfTwoSameNameFilesThroughTheTrashScreenShowsTheSuffixedNameInTheHistory() {
+        val fs = FakeFileSystemRepository()
+        val year = fs.addFolder(fs.addFolder(fs.root, "Trash"), "2021")
+        fs.addFile(fs.addFolder(year, "Dedupe"), "IMG_001.jpg", "dedupe".toByteArray())
+        fs.addFile(fs.addFolder(year, "VisualDupes"), "IMG_001.jpg", "visual".toByteArray())
+        val state = launch(fs)
+        composeRule.setContent { OspreyApp(state) }
+
+        openTrashFromTheDrawer()
+        click("Select all in this tab")
+        click("VisualDupes (1)")
+        click("Select all in this tab")
+        click("Restore")
+        waitForJobs(state)
+        composeRule.waitForIdle()
+
+        composeRule.onNode(hasText("RESTORED 2, failed 0", substring = true)).assertExists()
+        val names = fs.list(fs.list(fs.root).single { it.name == "2021" }.handle).map { it.name }
+        assertEquals(listOf("IMG_001.jpg", "IMG_001_VisualDupes.jpg"), names.sorted())
+        openHistoryFromTheDrawer()
+        composeRule.onNode(hasText("Trash restore") and hasClickAction()).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Trash/2021/Dedupe/IMG_001.jpg: restored").assertExists()
+        composeRule.onNodeWithText("Trash/2021/VisualDupes/IMG_001.jpg: restored as IMG_001_VisualDupes.jpg")
+            .assertExists()
     }
 }
