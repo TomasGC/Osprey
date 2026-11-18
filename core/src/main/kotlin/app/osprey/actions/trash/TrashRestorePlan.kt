@@ -5,8 +5,15 @@ import app.osprey.filesystem.FileEntry
 /** A Trash file whose name is already taken in `<library>/<year>/`: both sides, to compare. */
 data class RestoreConflict(val entry: TrashEntry, val existing: FileEntry)
 
-/** The entries a restore can do at once ([direct]) and the ones that need a decision ([conflicts]). */
-data class RestorePlan(val direct: List<TrashEntry>, val conflicts: List<RestoreConflict>)
+/**
+ * The entries a restore can do at once ([direct]) and the ones that need a decision ([conflicts]). A direct file
+ * restored under another name than its own is listed in [renames] by its label (#85).
+ */
+data class RestorePlan(
+    val direct: List<TrashEntry>,
+    val conflicts: List<RestoreConflict>,
+    val renames: Map<String, String> = emptyMap(),
+)
 
 /** What to keep when a restored file meets a library file of the same name. */
 enum class ConflictChoice {
