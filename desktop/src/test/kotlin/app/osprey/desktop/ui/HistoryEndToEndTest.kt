@@ -233,4 +233,32 @@ class HistoryEndToEndTest : TimedTest() {
         val retry = state.history.runs().first { it.action == "Trash delete retry" }
         assertEquals(first.id, retry.origin?.retryOf)
     }
+
+    @Test
+    fun `a Trash restore of two same-name files through the Trash screen shows the suffixed name in the History`() =
+        runComposeUiTest {
+            listOf("Dedupe" to "dedupe", "VisualDupes" to "visual").forEach { (action, text) ->
+                val folder = Files.createDirectories(library.resolve("Trash/2021/$action"))
+                Files.writeString(folder.resolve("IMG_001.jpg"), text)
+            }
+            val state = launch()
+            setContent { OspreyApp(state) }
+
+            click("🗑")
+            click("Select all in this tab")
+            click("VisualDupes (1)")
+            click("Select all in this tab")
+            click("Restore")
+            waitForJobs(state)
+            waitForIdle()
+
+            onNode(hasText("RESTORED 2, failed 0", substring = true)).assertExists()
+            assertEquals("dedupe", Files.readString(year.resolve("IMG_001.jpg")))
+            assertEquals("visual", Files.readString(year.resolve("IMG_001_VisualDupes.jpg")))
+            click("🕘")
+            onNode(hasText("Trash restore") and hasClickAction()).performClick()
+            waitForIdle()
+            onNodeWithText("Trash/2021/Dedupe/IMG_001.jpg: restored").assertExists()
+            onNodeWithText("Trash/2021/VisualDupes/IMG_001.jpg: restored as IMG_001_VisualDupes.jpg").assertExists()
+        }
 }

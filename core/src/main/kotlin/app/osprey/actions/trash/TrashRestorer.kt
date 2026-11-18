@@ -17,7 +17,10 @@ private const val NOT_IN_TRASH = "not in the Trash any more"
  */
 class TrashRestorer(private val fs: FileSystemRepository) {
 
-    /** Splits [entries] into those whose name is free in the library and those that collide; changes nothing. */
+    /**
+     * Splits [entries] into those whose name is free in the library and those that collide; changes nothing. Free
+     * files that would share a name in one year get suffixed names, see [RestorePlan.renames].
+     */
     fun plan(libraryRoot: FileHandle, entries: Collection<TrashEntry>): RestorePlan {
         val libraryNames = mutableMapOf<String, Map<String, FileEntry>>()
         val direct = mutableListOf<TrashEntry>()
@@ -27,7 +30,7 @@ class TrashRestorer(private val fs: FileSystemRepository) {
             val existing = names[entry.name]
             if (existing == null) direct += entry else conflicts += RestoreConflict(entry, existing)
         }
-        return RestorePlan(direct, conflicts)
+        return RestorePlan(direct, conflicts, restoreRenames(direct, libraryNames.mapValues { it.value.keys }))
     }
 
     /**
@@ -45,8 +48,10 @@ class TrashRestorer(private val fs: FileSystemRepository) {
         var restored = 0
         val finished = control.forEachUntilStopped(plan.direct, TrashEntry::label) { entry ->
             touched += entry.year to entry.action
-            val failure = attempt(entry.label) { moveBack(locator, libraryRoot, entry, entry.name) }
-            control.recordResult(entry.label, failure?.reason, "restored")
+            val name = plan.renames[entry.label] ?: entry.name
+            val failure = attempt(entry.label) { moveBack(locator, libraryRoot, entry, name) }
+            val done = if (name == entry.name) "restored" else "restored as $name"
+            control.recordResult(entry.label, failure?.reason, done)
             if (failure == null) restored++ else failures += failure
         }
         val pruned = touched.sumOf { (year, action) -> locator.prune(year, action) }

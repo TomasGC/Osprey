@@ -40,7 +40,7 @@ class TrashRetrier(private val fs: FileSystemRepository) {
         val restorer = TrashRestorer(fs)
         val plan = restorer.plan(root, found)
         plan.conflicts.forEach { control.record(FileRecord(it.entry.label, FileResult.Skipped, NAME_TAKEN)) }
-        return restorer.restore(root, RestorePlan(plan.direct, emptyList()), control)
+        return restorer.restore(root, RestorePlan(plan.direct, emptyList(), plan.renames), control)
     }
 
     private fun skipGone(failed: Set<String>, found: List<TrashEntry>, control: JobControl) {

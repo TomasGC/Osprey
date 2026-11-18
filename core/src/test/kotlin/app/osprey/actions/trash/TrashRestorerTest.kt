@@ -6,6 +6,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.history.FileRecord
 import app.osprey.history.FileResult
 import app.osprey.jobs.RecordingJobControl
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -249,5 +250,199 @@ class TrashRestorerTest {
 
         assertEquals(1, result.restored)
         assertEquals(setOf("y.jpg"), lib.namesIn("2018"))
+    }
+
+    @Test
+    fun `two files of one name and year come back, the later action suffixed`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "IMG_001.jpg", "dedupe".toByteArray())
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "IMG_001.jpg", "visual".toByteArray())
+
+        val result = restoreAll(visual, dedupe) // ticked in the opposite order: the tab order decides, not the ticks
+
+        assertEquals(2, result.restored)
+        assertTrue(result.failures.isEmpty())
+        assertEquals(setOf("IMG_001.jpg", "IMG_001_VisualDupes.jpg"), lib.namesIn("2021"))
+        assertEquals("dedupe", textOf("2021", "IMG_001.jpg"))
+        assertEquals("visual", textOf("2021", "IMG_001_VisualDupes.jpg"))
+        assertFalse(lib.exists("Trash", "2021"))
+    }
+
+    @Test
+    fun `three actions with one name keep the first and suffix the others`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+        val reorg = lib.trash("2021", TrashAction.REORG, "a.jpg")
+
+        restoreAll(reorg, visual, dedupe)
+
+        assertEquals(setOf("a.jpg", "a_VisualDupes.jpg", "a_Reorg.jpg"), lib.namesIn("2021"))
+    }
+
+    @Test
+    fun `the same name in two years is not a clash`() {
+        val a = lib.trash("2020", TrashAction.DEDUPE, "a.jpg")
+        val b = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+
+        val plan = restorer.plan(lib.root, listOf(a, b))
+        restorer.restore(lib.root, plan)
+
+        assertTrue(plan.renames.isEmpty())
+        assertEquals(setOf("a.jpg"), lib.namesIn("2020"))
+        assertEquals(setOf("a.jpg"), lib.namesIn("2021"))
+    }
+
+    @Test
+    fun `a name without an extension gets the suffix at its end`() {
+        val a = lib.trash("2021", TrashAction.DEDUPE, "scan")
+        val b = lib.trash("2021", TrashAction.VISUAL_DUPES, "scan")
+
+        restoreAll(a, b)
+
+        assertEquals(setOf("scan", "scan_VisualDupes"), lib.namesIn("2021"))
+    }
+
+    @Test
+    fun `plan names the suffixed file and changes nothing`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+
+        val plan = restorer.plan(lib.root, listOf(visual, dedupe))
+
+        assertEquals(listOf(visual, dedupe).toSet(), plan.direct.toSet())
+        assertEquals(mapOf(visual.label to "a_VisualDupes.jpg"), plan.renames)
+        assertTrue(plan.conflicts.isEmpty())
+        assertTrue(lib.exists("Trash", "2021", "VisualDupes", "a.jpg"))
+    }
+
+    @Test
+    fun `a suffixed name the library already holds takes the next free dup name`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg", "visual".toByteArray())
+        lib.library("2021", "a_VisualDupes.jpg", "library".toByteArray())
+
+        val plan = restorer.plan(lib.root, listOf(dedupe, visual))
+        restorer.restore(lib.root, plan)
+
+        assertEquals(mapOf(visual.label to "a_VisualDupes__dup1.jpg"), plan.renames)
+        assertEquals("library", textOf("2021", "a_VisualDupes.jpg"))
+        assertEquals("visual", textOf("2021", "a_VisualDupes__dup1.jpg"))
+    }
+
+    @Test
+    fun `a suffixed name another file of the same restore keeps is never taken from it`() {
+        val plain = lib.trash("2021", TrashAction.DEDUPE, "a_VisualDupes.jpg", "plain".toByteArray())
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg", "visual".toByteArray())
+
+        val plan = restorer.plan(lib.root, listOf(visual, dedupe, plain))
+        restorer.restore(lib.root, plan)
+
+        assertEquals(mapOf(visual.label to "a_VisualDupes__dup1.jpg"), plan.renames)
+        assertEquals("plain", textOf("2021", "a_VisualDupes.jpg"))
+        assertEquals("visual", textOf("2021", "a_VisualDupes__dup1.jpg"))
+    }
+
+    @Test
+    fun `files that meet a library file are all conflicts and none is suffixed`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+        lib.library("2021", "a.jpg")
+
+        val plan = restorer.plan(lib.root, listOf(dedupe, visual))
+
+        assertTrue(plan.direct.isEmpty())
+        assertTrue(plan.renames.isEmpty())
+        assertEquals(setOf(dedupe, visual), plan.conflicts.map { it.entry }.toSet())
+    }
+
+    @Test
+    fun `a same-name pair is restored suffixed while another file that meets the library stays a conflict`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg", "dedupe".toByteArray())
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg", "visual".toByteArray())
+        val taken = lib.trash("2021", TrashAction.DEDUPE, "b.jpg", "trash b".toByteArray())
+        lib.library("2021", "b.jpg", "library b".toByteArray())
+
+        val plan = restorer.plan(lib.root, listOf(dedupe, visual, taken))
+        val result = restorer.restore(lib.root, plan)
+
+        assertEquals(setOf(dedupe, visual), plan.direct.toSet())
+        assertEquals(mapOf(visual.label to "a_VisualDupes.jpg"), plan.renames)
+        assertEquals(listOf(taken), plan.conflicts.map { it.entry })
+        assertEquals(2, result.restored)
+        assertEquals(setOf("a.jpg", "a_VisualDupes.jpg", "b.jpg"), lib.namesIn("2021"))
+        assertEquals("library b", textOf("2021", "b.jpg"))
+        assertEquals("trash b", textOf("Trash", "2021", "Dedupe", "b.jpg"))
+    }
+
+    @Test
+    fun `a stop after the first file leaves the suffixed one in the Trash`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+
+        val plan = restorer.plan(lib.root, listOf(dedupe, visual))
+        val result = restorer.restore(lib.root, plan, control = RecordingJobControl(stopAfterReports = 1))
+
+        assertTrue(result.cancelled)
+        assertEquals(setOf("a.jpg"), lib.namesIn("2021"))
+        assertEquals(setOf("a.jpg"), lib.namesIn("Trash", "2021", "VisualDupes"))
+    }
+
+    @Test
+    fun `a suffixed file that cannot be moved stays in the Trash and the plain one is restored`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+        val faulty = FaultyFileSystemRepository(lib.fs)
+        faulty.failMove = { entry -> if (entry == visual.handle) FileAlreadyExistsException("taken") else null }
+        val faultyRestorer = TrashRestorer(faulty)
+
+        val result = faultyRestorer.restore(lib.root, faultyRestorer.plan(lib.root, listOf(dedupe, visual)))
+
+        assertEquals(1, result.restored)
+        assertEquals(listOf(visual.label), result.failures.map { it.label })
+        assertEquals(setOf("a.jpg"), lib.namesIn("2021"))
+        assertTrue(lib.exists("Trash", "2021", "VisualDupes", "a.jpg"))
+    }
+
+    @Test
+    fun `records the name a suffixed file was restored as`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+        val control = RecordingJobControl()
+
+        restorer.restore(lib.root, restorer.plan(lib.root, listOf(dedupe, visual)), control)
+
+        assertEquals(
+            listOf(
+                FileRecord("Trash/2021/Dedupe/a.jpg", FileResult.Done, "restored"),
+                FileRecord("Trash/2021/VisualDupes/a.jpg", FileResult.Done, "restored as a_VisualDupes.jpg"),
+            ),
+            control.files,
+        )
+    }
+
+    @Test
+    fun `whatever the mix of names, a restore never gives two files one name nor overwrites the library`() {
+        val names = listOf("a.jpg", "a_VisualDupes.jpg", "a_Reorg.jpg", "a_VisualDupes__dup1.jpg")
+        val random = Random(85)
+        repeat(300) { round ->
+            val library = TrashTestLibrary()
+            val inLibrary = names.filter { random.nextInt(10) < 3 }
+            inLibrary.forEach { library.library("2021", it) }
+            val entries = TrashAction.entries.flatMap { action ->
+                names.filter { random.nextInt(10) < 4 }.map { library.trash("2021", action, it) }
+            }
+            val restorer = TrashRestorer(library.fs)
+
+            val plan = restorer.plan(library.root, entries)
+            val result = restorer.restore(library.root, plan)
+
+            val targets = plan.direct.map { plan.renames[it.label] ?: it.name }
+            assertEquals("round $round: targets", targets.size, targets.toSet().size)
+            assertTrue("round $round: library", targets.none { it in inLibrary })
+            assertEquals("round $round: split", entries.size, plan.direct.size + plan.conflicts.size)
+            assertEquals("round $round: restored", plan.direct.size, result.restored)
+            assertTrue("round $round: failures", result.failures.isEmpty())
+            assertEquals("round $round: names", inLibrary.size + plan.direct.size, library.namesIn("2021").size)
+        }
     }
 }

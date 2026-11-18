@@ -168,6 +168,23 @@ class TrashControllerTest : TimedTest() {
     }
 
     @Test
+    fun `restore brings back same-name files ticked in two tabs, the later action suffixed`() {
+        trash("2021", "Dedupe", "IMG_001.jpg", "dedupe")
+        trash("2021", "VisualDupes", "IMG_001.jpg", "visual")
+        controller.refresh(root)
+        controller.toggle(entry("2021", TrashAction.VISUAL_DUPES, "IMG_001.jpg"))
+        controller.toggle(entry("2021", TrashAction.DEDUPE, "IMG_001.jpg"))
+
+        runBlocking { controller.restore(root) }
+
+        assertEquals("dedupe", Files.readString(library.resolve("2021/IMG_001.jpg")))
+        assertEquals("visual", Files.readString(library.resolve("2021/IMG_001_VisualDupes.jpg")))
+        assertTrue(controller.conflicts.isEmpty())
+        assertTrue(controller.contents.entries.isEmpty())
+        assertEquals("  RESTORED 2, failed 0, to settle 0, empty folders removed 3", controller.report.first())
+    }
+
+    @Test
     fun `resolving a conflict applies the choice and refreshes`() {
         trash("2019", "Dedupe", "taken.jpg", "from trash")
         Files.createDirectories(library.resolve("2019"))

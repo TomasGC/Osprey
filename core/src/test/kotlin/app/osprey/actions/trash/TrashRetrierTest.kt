@@ -80,6 +80,44 @@ class TrashRetrierTest {
     }
 
     @Test
+    fun `a restore retry of two same-name files that both failed restores both, the second suffixed`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg", "dedupe".toByteArray())
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg", "visual".toByteArray())
+
+        val result = retrier.restore(lib.root, setOf(dedupe.label, visual.label), control)
+
+        assertEquals(2, result.restored)
+        assertTrue(result.failures.isEmpty())
+        assertEquals(setOf("a.jpg", "a_VisualDupes.jpg"), lib.namesIn("2021"))
+        assertTrue(control.files.contains(FileRecord(visual.label, FileResult.Done, "restored as a_VisualDupes.jpg")))
+    }
+
+    @Test
+    fun `a restore retry of the plain file alone restores it under its own name`() {
+        val dedupe = lib.trash("2021", TrashAction.DEDUPE, "a.jpg")
+        lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg")
+        lib.library("2021", "a_VisualDupes.jpg")
+
+        val result = retrier.restore(lib.root, setOf(dedupe.label), control)
+
+        assertEquals(1, result.restored)
+        assertEquals(setOf("a.jpg", "a_VisualDupes.jpg"), lib.namesIn("2021"))
+        assertEquals(setOf("a.jpg"), lib.namesIn("Trash", "2021", "VisualDupes"))
+    }
+
+    @Test
+    fun `a restore retry of the suffixed file alone finds the plain name taken and reports it skipped`() {
+        lib.library("2021", "a.jpg", "restored first".toByteArray())
+        val visual = lib.trash("2021", TrashAction.VISUAL_DUPES, "a.jpg", "visual".toByteArray())
+
+        val result = retrier.restore(lib.root, setOf(visual.label), control)
+
+        assertEquals(0, result.restored)
+        assertEquals(setOf("a.jpg"), lib.namesIn("Trash", "2021", "VisualDupes"))
+        assertEquals(listOf(FileRecord(visual.label, FileResult.Skipped, TAKEN)), control.files)
+    }
+
+    @Test
     fun `a clear outcome counts what was deleted and what failed, and notes a stop`() {
         val result = TrashClearResult(2, listOf(TrashFailure("Trash/2019/Dedupe/a.jpg", "locked")), 1, cancelled = false)
 
