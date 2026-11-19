@@ -199,6 +199,7 @@ class DuplicateReviewInstrumentedTest {
     }
 
     @Test
+    @Suppress("SpreadOperator") // `show` takes a vararg and the list is built once for the test
     fun aLongListDecodesOnlyTheRowsInView() {
         show(*Array(MANY) { pair("img$it.jpg") })
         waitForDecodes(2)

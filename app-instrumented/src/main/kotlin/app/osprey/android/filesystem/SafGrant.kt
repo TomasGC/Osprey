@@ -75,7 +75,8 @@ object SafGrant {
         click(device, By.text("⚙ Settings"))
         click(device, By.text("Add folder"))
         device.wait(Until.hasObject(By.pkg(picker)), WAIT_MS)
-        // The picker opens where it was last left: go to the storage root, the first crumb, so the folder is made there.
+        // The picker opens where it was last left: go to the storage root, the first crumb, so the folder is made
+        // there.
         click(device, By.res(picker, BREADCRUMB_ID))
         val name = "$FOLDER_PREFIX${System.currentTimeMillis()}"
         click(device, By.res(picker, NEW_FOLDER_ID))
@@ -93,7 +94,8 @@ object SafGrant {
     }
 
     /**
-     * Removes what the picker flow leaves behind: its grants (read from the tree id, `primary:osprey_instrumented_<ms>`)
+      * Removes what the picker flow leaves behind: its grants (read from the tree id,
+      * `primary:osprey_instrumented_<ms>`)
      * and its folders at the root of the shared storage. Another grant or folder is never touched, so a phone's own
      * grant stays. Runs before each picker flow and when the run ends (`OspreyInstrumentationRunner`).
      */

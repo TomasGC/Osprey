@@ -54,12 +54,18 @@ class AndroidRealHeicInstrumentedTest {
 
     @Test
     fun aRealHeicWithARotationPropertyReportsIt() {
-        assertEquals(ExifOrientation.ROTATE_90, AndroidOrientationSource(context).orientationOf(photo(WITH_ROTATION_PROPERTY)))
+        assertEquals(
+            ExifOrientation.ROTATE_90,
+            AndroidOrientationSource(context).orientationOf(photo(WITH_ROTATION_PROPERTY)),
+        )
     }
 
     @Test
     fun aRealHeicWithoutARotationPropertyIsUpright() {
-        assertEquals(ExifOrientation.NORMAL, AndroidOrientationSource(context).orientationOf(photo(WITHOUT_ROTATION_PROPERTY)))
+        assertEquals(
+            ExifOrientation.NORMAL,
+            AndroidOrientationSource(context).orientationOf(photo(WITHOUT_ROTATION_PROPERTY)),
+        )
     }
 
     @Test
@@ -69,7 +75,13 @@ class AndroidRealHeicInstrumentedTest {
         val portrait = reader.decodeFrame(photo(WITH_ROTATION_PROPERTY), FRAME_SIDE)!!
         val landscape = reader.decodeFrame(photo(WITHOUT_ROTATION_PROPERTY), FRAME_SIDE)!!
 
-        assertTrue("the turned photo is a portrait: ${portrait.width}x${portrait.height}", portrait.height > portrait.width)
-        assertTrue("the plain photo is a landscape: ${landscape.width}x${landscape.height}", landscape.width > landscape.height)
+        assertTrue(
+            "the turned photo is a portrait: ${portrait.width}x${portrait.height}",
+            portrait.height > portrait.width,
+        )
+        assertTrue(
+            "the plain photo is a landscape: ${landscape.width}x${landscape.height}",
+            landscape.width > landscape.height,
+        )
     }
 }

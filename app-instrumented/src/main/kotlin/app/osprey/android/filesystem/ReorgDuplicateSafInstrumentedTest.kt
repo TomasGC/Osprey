@@ -29,7 +29,8 @@ private val PHOTO_BYTES = "same photo bytes".toByteArray()
 /**
  * The Reorg duplicate review (#91) on a real Storage Access Framework tree: a Move input file whose content is already
  * in the library is offered as a pair, and the file the user unticks is set aside in `Trash/<year>/Reorg` by the same
- * calls the app makes (copy, verify, delete for the input file; a document move for the library file). The input and the
+  * calls the app makes (copy, verify, delete for the input file; a document move for the library file). The input and
+  * the
  * library are two folders of one granted tree, so one provider: a trash across two providers is a phone check.
  */
 @RunWith(AndroidJUnit4::class)
@@ -59,14 +60,17 @@ class ReorgDuplicateSafInstrumentedTest {
 
     private fun seed(parent: DocumentFile, name: String) {
         val doc = parent.createFile("image/jpeg", name) ?: error("could not create $name")
-        context.contentResolver.openOutputStream(doc.uri)?.use { it.write(PHOTO_BYTES) } ?: error("could not write $name")
+        context.contentResolver.openOutputStream(doc.uri)?.use { it.write(PHOTO_BYTES) } ?: error(
+            "could not write $name",
+        )
     }
 
     private fun output() = AndroidFileHandle(library)
 
     private fun sources() = listOf(ReorgSource(AndroidFileHandle(camera), "Camera", InputMode.MOVE))
 
-    private fun namesIn(folder: DocumentFile?): Set<String> = folder?.listFiles()?.mapNotNull { it.name }?.toSet().orEmpty()
+    private fun namesIn(folder: DocumentFile?): Set<String> =
+        folder?.listFiles()?.mapNotNull { it.name }?.toSet().orEmpty()
 
     private fun trashReorg(): DocumentFile? = library.findFile("Trash")?.findFile("2018")?.findFile("Reorg")
 

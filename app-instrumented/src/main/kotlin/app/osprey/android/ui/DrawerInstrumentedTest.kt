@@ -64,7 +64,13 @@ class DrawerInstrumentedTest {
         state.openLibrary(fs.root)
         composeRule.setContent {
             ShortScreen {
-                DrawerContent(state, onOpenSettings = {}, onOpenTrash = {}, onOpenHistory = onOpenHistory, onTabSelected = {})
+                DrawerContent(
+                    state,
+                    onOpenSettings = {},
+                    onOpenTrash = {},
+                    onOpenHistory = onOpenHistory,
+                    onTabSelected = {},
+                )
             }
         }
         composeRule.waitForIdle()
