@@ -27,19 +27,27 @@ private const val FULL_PERCENT = 100
  * Turns the words and numbers `:core` decided ([JobNotification]) into Android notifications: one ongoing
  * notification with a progress bar and a Stop button while jobs run, and one result per finished job.
  */
-class JobNotifications(private val context: Context) {
+class JobNotifications(
+    private val context: Context,
+    private val runningChannelId: String = CHANNEL_ONGOING,
+    private val legacyRunningChannelId: String = CHANNEL_ONGOING_LEGACY,
+) {
 
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     /**
      * The running channel has the importance of the results', silent, so the shade ranks the two by their sort keys
      * and the running card stays in front (#114). A channel's importance cannot be changed once it exists, so the
-     * running channel has a new id and the old one is deleted.
+     * running channel has a new id and the old one is deleted. A user who had switched the old one off keeps it off:
+     * the new channel then starts blocked, and one that already exists keeps whatever the user set on it.
      */
     fun createChannels() {
-        manager.deleteNotificationChannel(CHANNEL_ONGOING_LEGACY)
+        val legacy = manager.getNotificationChannel(legacyRunningChannelId)
+        val blocked = legacy?.importance == NotificationManager.IMPORTANCE_NONE
+        manager.deleteNotificationChannel(legacyRunningChannelId)
+        val importance = if (blocked) NotificationManager.IMPORTANCE_NONE else NotificationManager.IMPORTANCE_DEFAULT
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ONGOING, "Running jobs", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(runningChannelId, "Running jobs", importance).apply {
                 setSound(null, null)
                 enableVibration(false)
                 setShowBadge(false)
@@ -50,7 +58,7 @@ class JobNotifications(private val context: Context) {
         )
     }
 
-    fun ongoing(model: JobNotification) = NotificationCompat.Builder(context, CHANNEL_ONGOING)
+    fun ongoing(model: JobNotification) = NotificationCompat.Builder(context, runningChannelId)
         .setSmallIcon(R.drawable.ic_stat_job)
         .setContentTitle(model.title)
         .setContentText(model.text)

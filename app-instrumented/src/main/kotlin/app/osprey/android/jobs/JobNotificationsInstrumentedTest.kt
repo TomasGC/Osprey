@@ -104,6 +104,23 @@ class JobNotificationsInstrumentedTest {
         assertFalse("no vibration", channel.shouldVibrate())
     }
 
+    @Test
+    fun aRunningChannelTheUserSwitchedOffStaysSwitchedOffUnderItsNewId() {
+        val stamp = System.nanoTime()
+        val legacyId = "legacy_running_$stamp"
+        val newId = "running_$stamp"
+        manager.createNotificationChannel(
+            NotificationChannel(legacyId, "Running jobs", NotificationManager.IMPORTANCE_NONE),
+        )
+
+        JobNotifications(context, newId, legacyId).createChannels()
+
+        val created = checkNotNull(manager.getNotificationChannel(newId))
+        assertEquals(NotificationManager.IMPORTANCE_NONE, created.importance)
+        assertNull(manager.getNotificationChannel(legacyId))
+        manager.deleteNotificationChannel(newId)
+    }
+
     private fun importanceOf(notification: Notification): Int =
         checkNotNull(manager.getNotificationChannel(notification.channelId)).importance
 
