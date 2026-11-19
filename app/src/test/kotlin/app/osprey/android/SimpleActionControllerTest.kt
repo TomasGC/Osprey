@@ -30,8 +30,7 @@ class SimpleActionControllerTest {
     private fun controller(
         scan: (FileHandle, JobControl) -> ScanResult<Int> = { _, _ -> ScanResult(5, "count=5", listOf("a"), 5) },
         apply: (FileHandle, Int, JobControl) -> Int = { _, plan, _ -> plan },
-        onApplied: () -> Unit = {},
-    ) = SimpleActionController("Test", jobs, scan, apply, onApplied)
+    ) = SimpleActionController("Test", jobs, scan, apply)
 
     @Test
     fun `apply before any scan does nothing`() {
@@ -195,18 +194,6 @@ class SimpleActionControllerTest {
         val outcome = (jobs.entries.value.last().state as JobState.Finished).outcome
         assertEquals("Test apply: 4 done, 1 failed", outcome.summary)
         assertEquals(1, outcome.failures)
-    }
-
-    @Test
-    fun `the applied hook runs once an apply is over, and not after a scan`() {
-        var applied = 0
-        val controller = controller(onApplied = { applied++ })
-
-        controller.onScan(FakeHandle)
-        assertEquals(0, applied)
-        controller.onApply(FakeHandle)
-
-        assertEquals(1, applied)
     }
 
     @Test

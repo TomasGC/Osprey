@@ -20,14 +20,12 @@ import app.osprey.jobs.underFolder
  *
  * Both run as jobs of [jobs] under [name], so they show progress, can be stopped and wait their turn. The result
  * is written to [state] by the job itself, so it lands even if the screen it was started from is gone.
- * [onApplied] is called once an apply is over, whether or not it finished.
  */
 class SimpleActionController<Plan>(
     private val name: String,
     private val jobs: JobQueue,
     private val scan: (FileHandle, JobControl) -> ScanResult<Plan>,
     private val apply: (FileHandle, Plan, JobControl) -> Int,
-    private val onApplied: () -> Unit = {},
     private val retry: RetryWiring<Plan>? = null,
 ) {
     val state = ActionUiState()
@@ -63,7 +61,7 @@ class SimpleActionController<Plan>(
         state.applyEnabled = false
         jobs.enqueue(
             "$label apply",
-            onDone = { state.busy = false; onApplied() },
+            onDone = { state.busy = false },
             origin = retry?.let { RunOrigin(it.kind, it.library(), scope) },
         ) { control ->
             val applied = apply(yearDir, plan, control.underFolder(scope))
@@ -86,7 +84,7 @@ class SimpleActionController<Plan>(
         val label = scopedName(name, scope)
         jobs.enqueue(
             "$label retry",
-            onDone = { state.busy = false; onApplied() },
+            onDone = { state.busy = false },
             origin = RetryPlanner.retryOrigin(run),
         ) { control ->
             val placed = control.underFolder(scope)
