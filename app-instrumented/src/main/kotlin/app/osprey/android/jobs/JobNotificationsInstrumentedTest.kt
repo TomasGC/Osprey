@@ -1,5 +1,8 @@
 package app.osprey.android.jobs
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -8,6 +11,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.osprey.jobs.JobNotification
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +27,7 @@ class JobNotificationsInstrumentedTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val probe = NotificationProbe(context)
+    private val manager = context.getSystemService(NotificationManager::class.java)
 
     @Before
     fun setUp() = probe.prepare()
@@ -61,6 +68,44 @@ class JobNotificationsInstrumentedTest {
         assertEquals(View.GONE, view.find("notification_stop").visibility)
         assertEquals(View.GONE, view.find("notification_progress").visibility)
     }
+
+    @Test
+    fun theRunningNotificationSortsAheadOfAResultOfTheSameImportance() {
+        val notifications = JobNotifications(context).also { it.createChannels() }
+        notifications.showResult(1, JobNotification("Result A", "A done"))
+        notifications.showOngoing(JobNotification("Running C", "Working...", indeterminate = true))
+        probe.waitFor("both notifications") { probe.count() == 2 }
+
+        val posted = manager.activeNotifications
+        val running = posted.single { it.isOngoing }.notification
+        val result = posted.single { !it.isOngoing }.notification
+
+        assertEquals(importanceOf(result), importanceOf(running))
+        val runningKey = running.sortKey
+        val resultKey = result.sortKey
+        assertTrue("sort keys: running=$runningKey result=$resultKey", runningKey != null && resultKey != null)
+        assertTrue("running $runningKey must sort before result $resultKey", runningKey!! < resultKey!!)
+    }
+
+    @Test
+    fun theRunningChannelIsSilentAndTheOldRunningChannelIsGone() {
+        manager.createNotificationChannel(
+            NotificationChannel("osprey_jobs", "Running jobs", NotificationManager.IMPORTANCE_LOW),
+        )
+        val notifications = JobNotifications(context).also { it.createChannels() }
+        notifications.showOngoing(JobNotification("Running C", "Working...", indeterminate = true))
+        probe.waitFor("the running notification") { probe.ongoingTitles() == listOf("Running C") }
+
+        val channelId = manager.activeNotifications.single().notification.channelId
+        val channel = checkNotNull(manager.getNotificationChannel(channelId))
+
+        assertNull(manager.getNotificationChannel("osprey_jobs"))
+        assertNull("no sound", channel.sound)
+        assertFalse("no vibration", channel.shouldVibrate())
+    }
+
+    private fun importanceOf(notification: Notification): Int =
+        checkNotNull(manager.getNotificationChannel(notification.channelId)).importance
 
     private fun inflate(model: JobNotification): View {
         var view: View? = null

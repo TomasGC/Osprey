@@ -8,7 +8,6 @@ import app.osprey.jobs.JobState
 import org.junit.After
 import org.junit.Assert.assertFalse
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -57,7 +56,6 @@ class StopFromNotificationInstrumentedTest {
         probe.waitFor("its result") { "Stop me" in probe.resultTitles() }
     }
 
-    @Ignore("#114: One UI sometimes ranks the result card above the running card, hiding Stop")
     @Test
     fun theRunningJobKeepsItsStopWithAResultStackedBehindIt() {
         val first = held("Chain first")

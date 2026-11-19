@@ -16,8 +16,11 @@ internal const val ACTION_STOP = "app.osprey.action.STOP_JOB"
 internal const val EXTRA_JOB_ID = "app.osprey.extra.JOB_ID"
 internal const val ONGOING_ID = 1
 private const val RESULT_ID_BASE = 1000
-private const val CHANNEL_ONGOING = "osprey_jobs"
+private const val CHANNEL_ONGOING = "osprey_jobs_v2"
+private const val CHANNEL_ONGOING_LEGACY = "osprey_jobs"
 private const val CHANNEL_RESULT = "osprey_job_results"
+private const val SORT_RUNNING = "0"
+private const val SORT_RESULT = "1"
 private const val FULL_PERCENT = 100
 
 /**
@@ -28,9 +31,19 @@ class JobNotifications(private val context: Context) {
 
     private val manager = context.getSystemService(NotificationManager::class.java)
 
+    /**
+     * The running channel has the importance of the results', silent, so the shade ranks the two by their sort keys
+     * and the running card stays in front (#114). A channel's importance cannot be changed once it exists, so the
+     * running channel has a new id and the old one is deleted.
+     */
     fun createChannels() {
+        manager.deleteNotificationChannel(CHANNEL_ONGOING_LEGACY)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ONGOING, "Running jobs", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL_ONGOING, "Running jobs", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+            },
         )
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL_RESULT, "Finished jobs", NotificationManager.IMPORTANCE_DEFAULT),
@@ -44,6 +57,7 @@ class JobNotifications(private val context: Context) {
         .setStyle(NotificationCompat.DecoratedCustomViewStyle())
         .setCustomContentView(ongoingView(model))
         .setOngoing(true)
+        .setSortKey(SORT_RUNNING)
         .setOnlyAlertOnce(true)
         .setCategory(NotificationCompat.CATEGORY_PROGRESS)
         .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -78,6 +92,7 @@ class JobNotifications(private val context: Context) {
             .setContentText(model.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(model.text))
             .setAutoCancel(true)
+            .setSortKey(SORT_RESULT)
             .setContentIntent(openApp())
             .setCategory(if (model.failed) NotificationCompat.CATEGORY_ERROR else NotificationCompat.CATEGORY_STATUS)
             .build()
