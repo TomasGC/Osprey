@@ -47,7 +47,11 @@ class RetryPlannerTest {
 
     @Test
     fun `the button counts the failed files`() {
-        val files = listOf(file("2021/a.jpg", FileResult.Failed), file("2021/b.jpg", FileResult.Done), file("2021/c.jpg", FileResult.Failed))
+        val files = listOf(
+            file("2021/a.jpg", FileResult.Failed),
+            file("2021/b.jpg", FileResult.Done),
+            file("2021/c.jpg", FileResult.Failed),
+        )
 
         assertEquals("Retry failed (2)", RetryPlanner.retryLabel(run(files = files)))
     }
@@ -106,7 +110,10 @@ class RetryPlannerTest {
 
     @Test
     fun `the summary of a retry says which run it retries`() {
-        assertEquals("Retry of run #7: Dedupe: 2 done, 0 failed", RetryPlanner.retrySummary(run(), "Dedupe: 2 done, 0 failed"))
+        assertEquals(
+            "Retry of run #7: Dedupe: 2 done, 0 failed",
+            RetryPlanner.retrySummary(run(), "Dedupe: 2 done, 0 failed"),
+        )
     }
 
     @Test

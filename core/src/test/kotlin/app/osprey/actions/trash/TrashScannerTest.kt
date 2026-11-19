@@ -17,7 +17,11 @@ class TrashScannerTest {
 
     @Test
     fun `lists files by year and action with their size`() {
-        lib.fs.addFile(TrashFolders(lib.fs).ensure(TrashLocation(lib.root, "2019"), TrashAction.DEDUPE), "a.jpg", ByteArray(5))
+        lib.fs.addFile(
+            TrashFolders(lib.fs).ensure(TrashLocation(lib.root, "2019"), TrashAction.DEDUPE),
+            "a.jpg",
+            ByteArray(5),
+        )
         lib.trash("2019", TrashAction.VISUAL_DUPES, "b.jpg")
         lib.trash("2020", TrashAction.DEDUPE, "c.jpg")
 

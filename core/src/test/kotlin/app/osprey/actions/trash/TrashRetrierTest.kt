@@ -119,20 +119,33 @@ class TrashRetrierTest {
 
     @Test
     fun `a clear outcome counts what was deleted and what failed, and notes a stop`() {
-        val result = TrashClearResult(2, listOf(TrashFailure("Trash/2019/Dedupe/a.jpg", "locked")), 1, cancelled = false)
+        val result = TrashClearResult(
+            2,
+            listOf(TrashFailure("Trash/2019/Dedupe/a.jpg", "locked")),
+            1,
+            cancelled = false,
+        )
 
         val outcome = clearOutcome(result)
 
         assertEquals("Trash: 2 deleted, 1 failed", outcome.summary)
         assertEquals(clearResultLines(result), outcome.lines)
         assertEquals(1, outcome.failures)
-        assertEquals("Trash: 0 deleted, 0 failed (stopped)", clearOutcome(TrashClearResult(0, emptyList(), 0, true)).summary)
+        assertEquals(
+            "Trash: 0 deleted, 0 failed (stopped)",
+            clearOutcome(TrashClearResult(0, emptyList(), 0, true)).summary,
+        )
         assertTrue(clearOutcome(TrashClearResult(0, emptyList(), 0, true)).stopped)
     }
 
     @Test
     fun `a restore outcome counts what was restored and what failed, and notes a stop`() {
-        val result = TrashRestoreResult(3, listOf(TrashFailure("Trash/2019/Dedupe/a.jpg", "locked")), 0, cancelled = false)
+        val result = TrashRestoreResult(
+            3,
+            listOf(TrashFailure("Trash/2019/Dedupe/a.jpg", "locked")),
+            0,
+            cancelled = false,
+        )
 
         val outcome = restoreOutcome(result, conflicts = 2)
 

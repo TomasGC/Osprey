@@ -28,7 +28,10 @@ class JobAttentionTest {
 
     @Test
     fun `a job that appeared already finished is new`() {
-        assertEquals(listOf(entry(2, done)), newlyFinished(listOf(entry(1, done)), listOf(entry(1, done), entry(2, done))))
+        assertEquals(
+            listOf(entry(2, done)),
+            newlyFinished(listOf(entry(1, done)), listOf(entry(1, done), entry(2, done))),
+        )
     }
 
     /** What the service holds when it starts late (#108): the last state it announced, not the queue as it is now. */

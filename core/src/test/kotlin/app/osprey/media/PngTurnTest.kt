@@ -22,11 +22,12 @@ class PngTurnTest {
     private fun image(colorType: Int = RGB, depth: Int = 8, width: Int = 7, height: Int = 5) =
         randomSamples(width, height, depth, colorType)
 
-    private fun turned(png: ByteArray, quarterTurns: Int): ByteArray = when (val result = PngTurn.turn(png, quarterTurns)) {
-        is PngTurnResult.Turned -> result.bytes
-        PngTurnResult.Unchanged -> png
-        is PngTurnResult.Refused -> throw AssertionError("refused: ${result.reason}")
-    }
+    private fun turned(png: ByteArray, quarterTurns: Int): ByteArray =
+        when (val result = PngTurn.turn(png, quarterTurns)) {
+            is PngTurnResult.Turned -> result.bytes
+            PngTurnResult.Unchanged -> png
+            is PngTurnResult.Refused -> throw AssertionError("refused: ${result.reason}")
+        }
 
     private fun refusal(png: ByteArray, quarterTurns: Int = 1, limit: Int = PngTurn.MAX_RAW_BYTES): String =
         when (val result = PngTurn.turn(png, quarterTurns, limit)) {
@@ -76,7 +77,10 @@ class PngTurnTest {
     fun `every filter type is read`() {
         val source = image(RGB, 16, 9, 6)
         for (filter in 0..4) {
-            assertSame(source.oriented(ExifOrientation.ROTATE_90), decode(turned(pngOf(source, filters = { filter }), 1)))
+            assertSame(
+                source.oriented(ExifOrientation.ROTATE_90),
+                decode(turned(pngOf(source, filters = { filter }), 1)),
+            )
         }
     }
 
@@ -119,7 +123,9 @@ class PngTurnTest {
 
     @Test
     fun `rows are filtered so a smooth picture does not grow`() {
-        val values = IntArray(GRADIENT_SIDE * GRADIENT_SIDE * 3) { (it / 3 % GRADIENT_SIDE) * 3 + it / 3 / GRADIENT_SIDE }
+        val values = IntArray(GRADIENT_SIDE * GRADIENT_SIDE * 3) {
+            (it / 3 % GRADIENT_SIDE) * 3 + it / 3 / GRADIENT_SIDE
+        }
         val smooth = Samples(GRADIENT_SIDE, GRADIENT_SIDE, 8, RGB, values)
         val result = turned(pngOf(smooth), 1)
         val unfiltered = pngOf(decode(result), filters = { 0 }, idatSize = Int.MAX_VALUE)
@@ -131,8 +137,11 @@ class PngTurnTest {
     @Test
     fun `every other chunk is kept byte for byte in its place and the image data becomes one chunk`() {
         val before = listOf(
-            chunk("gAMA", int32(45455)), chunk("iCCP", "p\u0000\u0000xx".toByteArray()), chunk("tEXt", "k\u0000v".toByteArray()),
-            chunk("iTXt", "i\u0000\u0000\u0000\u0000\u0000ü".toByteArray()), chunk("tIME", ByteArray(7) { it.toByte() }),
+            chunk("gAMA", int32(45455)),
+            chunk("iCCP", "p\u0000\u0000xx".toByteArray()),
+            chunk("tEXt", "k\u0000v".toByteArray()),
+            chunk("iTXt", "i\u0000\u0000\u0000\u0000\u0000ü".toByteArray()),
+            chunk("tIME", ByteArray(7) { it.toByte() }),
             chunk("zzZz", byteArrayOf(1, 2, 3)),
         )
         val after = listOf(chunk("tEXt", "late\u0000text".toByteArray()))
@@ -140,7 +149,10 @@ class PngTurnTest {
 
         val result = chunksOf(turned(source, 1))
 
-        assertEquals(listOf("IHDR") + before.map { String(it, 4, 4) } + "IDAT" + "tEXt" + "IEND", result.map { it.type })
+        assertEquals(
+            listOf("IHDR") + before.map { String(it, 4, 4) } + "IDAT" + "tEXt" + "IEND",
+            result.map { it.type },
+        )
         val kept = (before + after).map { it.toList() }
         assertEquals(kept, result.filter { it.type !in setOf("IHDR", "IDAT", "IEND") }.map { it.bytes.toList() })
         assertTrue(result.all { it.crcOk })
@@ -226,7 +238,9 @@ class PngTurnTest {
     @Test
     fun `a chunk this code does not know is carried when it is safe to copy`() {
         val unknown = chunk("zzZz", byteArrayOf(9))
-        assertTrue(chunksOf(turned(pngOf(image(), before = listOf(unknown)), 1)).any { it.bytes.contentEquals(unknown) })
+        assertTrue(
+            chunksOf(turned(pngOf(image(), before = listOf(unknown)), 1)).any { it.bytes.contentEquals(unknown) },
+        )
     }
 
     // --- refusals
@@ -322,16 +336,34 @@ class PngTurnTest {
             ),
             "palette of 16 bits" to rawPng(chunk("IHDR", ihdrData(7, 5, 16, PALETTE)), idat, chunk("IEND")),
             "unknown colour type" to rawPng(chunk("IHDR", ihdrData(7, 5, 8, 5)), idat, chunk("IEND")),
-            "unknown compression method" to rawPng(chunk("IHDR", ihdrData(7, 5, 8, RGB).also { it[10] = 1 }), idat, chunk("IEND")),
-            "unknown filter method" to rawPng(chunk("IHDR", ihdrData(7, 5, 8, RGB).also { it[11] = 1 }), idat, chunk("IEND")),
+            "unknown compression method" to rawPng(
+                chunk("IHDR", ihdrData(7, 5, 8, RGB).also { it[10] = 1 }),
+                idat,
+                chunk("IEND"),
+            ),
+            "unknown filter method" to rawPng(
+                chunk("IHDR", ihdrData(7, 5, 8, RGB).also { it[11] = 1 }),
+                idat,
+                chunk("IEND"),
+            ),
             "image data that is not zlib" to rawPng(ihdr, chunk("IDAT", ByteArray(40) { 7 }), chunk("IEND")),
             "image data of the wrong length" to rawPng(ihdr, chunk("IDAT", deflate(ByteArray(3))), chunk("IEND")),
-            "image data cut short" to rawPng(ihdr, chunk("IDAT", deflate(scanlines(image(), { 0 })).copyOf(10)), chunk("IEND")),
-            "a filter type that does not exist" to rawPng(ihdr, chunk("IDAT", deflate(scanlines(image(), { 7 }))), chunk("IEND")),
+            "image data cut short" to rawPng(
+                ihdr,
+                chunk("IDAT", deflate(scanlines(image(), { 0 })).copyOf(10)),
+                chunk("IEND"),
+            ),
+            "a filter type that does not exist" to rawPng(
+                ihdr,
+                chunk("IDAT", deflate(scanlines(image(), { 7 }))),
+                chunk("IEND"),
+            ),
             "the first filter type that does not exist" to
                 rawPng(ihdr, chunk("IDAT", deflate(scanlines(image(), { 5 }))), chunk("IEND")),
             "palette image without a palette" to rawPng(
-                chunk("IHDR", ihdrData(7, 5, 8, PALETTE)), chunk("IDAT", deflate(scanlines(image(PALETTE, 8), { 0 }))), chunk("IEND"),
+                chunk("IHDR", ihdrData(7, 5, 8, PALETTE)),
+                chunk("IDAT", deflate(scanlines(image(PALETTE, 8), { 0 }))),
+                chunk("IEND"),
             ),
         )
         for ((name, png) in cases) assertEquals(name, PngTurn.DAMAGED, refusal(png))
@@ -358,7 +390,16 @@ class PngTurnTest {
 
     @Test
     fun `rows of a byte or more per pixel are filtered Up`() {
-        val formats = listOf(GRAY to 8, GRAY to 16, RGB to 8, RGB to 16, GRAY_ALPHA to 8, GRAY_ALPHA to 16, RGBA to 8, RGBA to 16)
+        val formats = listOf(
+            GRAY to 8,
+            GRAY to 16,
+            RGB to 8,
+            RGB to 16,
+            GRAY_ALPHA to 8,
+            GRAY_ALPHA to 16,
+            RGBA to 8,
+            RGBA to 16,
+        )
         for ((colorType, depth) in formats) {
             val types = filterTypesOf(turned(pngOf(image(colorType, depth)), 1))
             assertEquals("colour $colorType depth $depth", List(types.size) { 2 }, types)

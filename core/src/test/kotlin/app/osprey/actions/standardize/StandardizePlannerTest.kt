@@ -42,7 +42,10 @@ class StandardizePlannerTest {
         val fs = FakeFileSystemRepository()
         val reader = FakeMediaMetadataReader()
         val video = fs.addFile(fs.root, "VID_20170425_152602.mp4")
-        reader.setCaptureDateTime(video, MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA))
+        reader.setCaptureDateTime(
+            video,
+            MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA),
+        )
 
         val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
 
@@ -222,7 +225,10 @@ class StandardizePlannerTest {
         val fs = FakeFileSystemRepository()
         twoRenames(fs)
 
-        val plan = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root, RecordingJobControl(stopAfterReports = 1))
+        val plan = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(
+            fs.root,
+            RecordingJobControl(stopAfterReports = 1),
+        )
 
         assertEquals(1, plan.renames.size)
     }

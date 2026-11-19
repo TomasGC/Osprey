@@ -27,7 +27,10 @@ class TrashAttemptTest {
 
     @Test
     fun `a name that is already taken becomes a failure`() {
-        assertEquals(TrashFailure("Trash/2019/a.jpg", "a.jpg exists"), failureOf(FileAlreadyExistsException("a.jpg exists")))
+        assertEquals(
+            TrashFailure("Trash/2019/a.jpg", "a.jpg exists"),
+            failureOf(FileAlreadyExistsException("a.jpg exists")),
+        )
     }
 
     @Test

@@ -62,7 +62,8 @@ internal fun xmpSegment(): ByteArray = segment(0xE1, "http://ns.adobe.com/xap/1.
 
 /**
  * A JPEG built by hand: SOI, the [leading] segments, an Exif segment (unless [withExif] is false) whose IFD0 holds
- * Orientation [orientation] of [type] and [count] (none when null) between other tags, an IFD1 holding [thumbnail] when given, a
+  * Orientation [orientation] of [type] and [count] (none when null) between other tags, an IFD1 holding [thumbnail]
+  * when given, a
  * vendor segment, a scan that contains the text `Exif` and a stuffed `FF 00`, EOI, then [trailer].
  */
 internal fun jpegWith(

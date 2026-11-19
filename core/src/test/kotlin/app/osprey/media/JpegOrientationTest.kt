@@ -33,7 +33,9 @@ class JpegOrientationTest {
         assertEquals(ExifOrientation.ROTATE_180, JpegOrientation.read(jpegWith(orientation = 3)))
 
     @Test
-    fun `a file with no Exif segment has no value`() = assertNull(JpegOrientation.valueOffset(jpegWith(withExif = false)))
+    fun `a file with no Exif segment has no value`() = assertNull(
+        JpegOrientation.valueOffset(jpegWith(withExif = false)),
+    )
 
     @Test
     fun `an Exif block without Orientation has no value`() =
@@ -92,7 +94,10 @@ class JpegOrientationTest {
     fun `an out of range stored value reads as normal and can be replaced`() {
         val jpeg = jpegWith(orientation = 9)
         assertEquals(ExifOrientation.NORMAL, JpegOrientation.read(jpeg))
-        assertEquals(ExifOrientation.ROTATE_90, JpegOrientation.read(JpegOrientation.rewrite(jpeg) { ExifOrientation.ROTATE_90 }!!))
+        assertEquals(
+            ExifOrientation.ROTATE_90,
+            JpegOrientation.read(JpegOrientation.rewrite(jpeg) { ExifOrientation.ROTATE_90 }!!),
+        )
     }
 
     @Test
@@ -104,7 +109,10 @@ class JpegOrientationTest {
                 val written = JpegOrientation.rewrite(jpeg) { target }!!
                 assertEquals(jpeg.size, written.size)
                 assertEquals(true, differingPositions(jpeg, written).all { it in offset until offset + VALUE_BYTES })
-                assertArrayEquals(jpeg.copyOfRange(offset + VALUE_BYTES, jpeg.size), written.copyOfRange(offset + VALUE_BYTES, jpeg.size))
+                assertArrayEquals(
+                    jpeg.copyOfRange(offset + VALUE_BYTES, jpeg.size),
+                    written.copyOfRange(offset + VALUE_BYTES, jpeg.size),
+                )
                 assertEquals(target, JpegOrientation.read(written))
             }
         }

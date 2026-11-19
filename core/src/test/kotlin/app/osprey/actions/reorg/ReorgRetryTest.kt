@@ -49,7 +49,10 @@ class ReorgRetryTest {
 
     @Test
     fun `a reorg retry with nothing named keeps nothing`() {
-        assertEquals(ReorgPlan(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()), REORG_RETRY.only(plan, emptySet()))
+        assertEquals(
+            ReorgPlan(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()),
+            REORG_RETRY.only(plan, emptySet()),
+        )
     }
 
     @Test

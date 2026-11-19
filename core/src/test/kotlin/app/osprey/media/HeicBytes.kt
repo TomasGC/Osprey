@@ -40,7 +40,10 @@ internal fun heicBox(type: String, payload: ByteArray = ByteArray(0)): ByteArray
     int32(HEADER + payload.size) + type.toByteArray(Charsets.US_ASCII) + payload
 
 internal fun heicFullBox(type: String, version: Int, flags: Int, payload: ByteArray): ByteArray =
-    heicBox(type, byteArrayOf(version.toByte(), (flags shr 16).toByte(), (flags shr 8).toByte(), flags.toByte()) + payload)
+    heicBox(
+        type,
+        byteArrayOf(version.toByte(), (flags shr 16).toByte(), (flags shr 8).toByte(), flags.toByte()) + payload,
+    )
 
 private fun int16(value: Int) = byteArrayOf((value shr 8).toByte(), value.toByte())
 
@@ -91,7 +94,9 @@ internal fun heic(
     }
     val ispe = addProp("ispe", ByteArray(12))
     val hvcc = addProp("hvcC", ByteArray(8))
-    val primaryIrotIndex = primaryIrot?.let { addProp("irot", if (quirks.emptyIrot) ByteArray(0) else byteArrayOf(it.toByte())) }
+    val primaryIrotIndex = primaryIrot?.let {
+        addProp("irot", if (quirks.emptyIrot) ByteArray(0) else byteArrayOf(it.toByte()))
+    }
     val secondIrotIndex = if (twoPrimaryIrot) addProp("irot", byteArrayOf(1)) else null
     val mirrorIndex = if (mirror) addProp("imir", byteArrayOf(0)) else null
     val tileIrotIndex = tileIrot?.let { addProp("irot", byteArrayOf(it.toByte())) }
@@ -114,7 +119,8 @@ internal fun heic(
     )
     val tileIndexes = listOfNotNull(ispe to false, hvcc to false, tileIrotIndex?.let { it to true })
     val tileEntries = listOf(entry(2, tileIndexes), entry(3, tileIndexes))
-    val entries = if (quirks.primaryHasNoAssociations) tileEntries else listOf(entry(PRIMARY_ID, primaryIndexes)) + tileEntries
+    val entries =
+        if (quirks.primaryHasNoAssociations) tileEntries else listOf(entry(PRIMARY_ID, primaryIndexes)) + tileEntries
     val ipma = heicFullBox("ipma", ipmaVersion, ipmaFlags, int32(entries.size) + entries.joined())
     val iprp = heicBox("iprp", ipco + ipma)
 
@@ -123,11 +129,20 @@ internal fun heic(
         quirks.infeVersion == 3 -> heicFullBox("infe", 3, 0, int32(id) + int16(0) + type.toByteArray() + byteArrayOf(0))
         else -> heicFullBox("infe", 2, 0, int16(id) + int16(0) + type.toByteArray() + byteArrayOf(0))
     }
-    val infes = listOf(infe(PRIMARY_ID, "grid"), infe(2, "hvc1", quirks.legacyTileInfe), infe(3, "hvc1", quirks.legacyTileInfe)) +
+    val infes = listOf(
+        infe(PRIMARY_ID, "grid"),
+        infe(2, "hvc1", quirks.legacyTileInfe),
+        infe(3, "hvc1", quirks.legacyTileInfe),
+    ) +
         if (exif) listOf(infe(EXIF_ID, "Exif")) else emptyList()
     val itemCount = if (quirks.iinfVersion == 0) int16(infes.size) else int32(infes.size)
     val iinf = heicFullBox("iinf", quirks.iinfVersion, 0, itemCount + infes.joined())
-    val pitm = heicFullBox("pitm", quirks.pitmVersion, 0, if (quirks.pitmVersion == 0) int16(PRIMARY_ID) else int32(PRIMARY_ID))
+    val pitm = heicFullBox(
+        "pitm",
+        quirks.pitmVersion,
+        0,
+        if (quirks.pitmVersion == 0) int16(PRIMARY_ID) else int32(PRIMARY_ID),
+    )
     val hdlr = heicFullBox("hdlr", 0, 0, int32(0) + "pict".toByteArray() + ByteArray(12) + byteArrayOf(0))
 
     val exifBytes = int32(quirks.exifTiffOffset) + "Exif".toByteArray() + byteArrayOf(0, 0) +
@@ -159,7 +174,8 @@ internal fun heic(
             val offset = if (exifInIdat) 0 else mdatPayloadAt + 2 * TILE_BYTES
             rows += row(EXIF_ID, method, offset, length, extents)
         }
-        val kept = quirks.ilocRows?.let { ids -> rows.filterIndexed { i, _ -> (i + 2).coerceAtMost(EXIF_ID) in ids } } ?: rows
+        val kept =
+            quirks.ilocRows?.let { ids -> rows.filterIndexed { i, _ -> (i + 2).coerceAtMost(EXIF_ID) in ids } } ?: rows
         val count = if (ilocVersion == 2) int32(kept.size) else int16(kept.size)
         val sizes = byteArrayOf(((offsetSize shl 4) or 4).toByte(), 0x00)
         return heicFullBox("iloc", ilocVersion, 0, sizes + count + kept.joined())
@@ -189,6 +205,7 @@ internal fun heic(
     val ipcoPayloadAt = metaPayloadAt + beforeIprp + HEADER + HEADER
     val irotAt = primaryIrotIndex?.let { ipcoPayloadAt + props.take(it - 1).sumOf { p -> p.size } + HEADER }
     val exifAt = if (exifInIdat) metaPayloadAt + beforeIprp + iprp.size + HEADER else mdatPayloadAt + 2 * TILE_BYTES
-    val exifValueAt = if (exif && exifOrientation != null) exifAt + 4 + EXIF_PREFIX_SIZE + TIFF_ORIENTATION_VALUE_AT else null
+    val exifValueAt =
+        if (exif && exifOrientation != null) exifAt + 4 + EXIF_PREFIX_SIZE + TIFF_ORIENTATION_VALUE_AT else null
     return BuiltHeic(bytes, irotAt, exifValueAt)
 }

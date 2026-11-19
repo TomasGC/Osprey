@@ -34,7 +34,11 @@ private val C = handle()
 class RetryFiltersTest {
 
     private val dedupe = DedupePlan(
-        listOf(DedupeMove(A, "a.jpg", "a.jpg", "k"), DedupeMove(B, "b.jpg", "b.jpg", "k"), DedupeMove(C, "c.jpg", "c.jpg", "k")),
+        listOf(
+            DedupeMove(A, "a.jpg", "a.jpg", "k"),
+            DedupeMove(B, "b.jpg", "b.jpg", "k"),
+            DedupeMove(C, "c.jpg", "c.jpg", "k"),
+        ),
     )
 
     @Test
@@ -70,7 +74,10 @@ class RetryFiltersTest {
     }
 
     private val dates = DatesPlan(
-        fixes = listOf(DatesFix(A, "a.jpg", NOON, MediaDateSource.EXIF), DatesFix(B, "b.jpg", NOON, MediaDateSource.FILENAME)),
+        fixes = listOf(
+            DatesFix(A, "a.jpg", NOON, MediaDateSource.EXIF),
+            DatesFix(B, "b.jpg", NOON, MediaDateSource.FILENAME),
+        ),
         unfixable = listOf(FileEntry(C, "c.jpg", isDirectory = false, sizeBytes = 3)),
     )
 
@@ -132,7 +139,12 @@ class RetryFiltersTest {
 
     @Test
     fun `the failed names are the failed paths without the scope folder`() {
-        val run = failedRun("2021", failed("2021/a.jpg"), failed("2021/sub/b.jpg"), FileRecord("2021/c.jpg", FileResult.Done))
+        val run = failedRun(
+            "2021",
+            failed("2021/a.jpg"),
+            failed("2021/sub/b.jpg"),
+            FileRecord("2021/c.jpg", FileResult.Done),
+        )
 
         assertEquals(setOf("a.jpg", "sub/b.jpg"), RetryPlanner.failedNames(run))
     }

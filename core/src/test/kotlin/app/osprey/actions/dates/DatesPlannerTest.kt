@@ -84,7 +84,10 @@ class DatesPlannerTest {
         val fs = FakeFileSystemRepository()
         val reader = FakeMediaMetadataReader()
         val video = fs.addFile(fs.root, "VID_20170425_152602.mp4")
-        reader.setCaptureDateTime(video, MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA))
+        reader.setCaptureDateTime(
+            video,
+            MediaDate(LocalDateTime.of(1904, 1, 1, 0, 0, 0), MediaDateSource.VIDEO_METADATA),
+        )
 
         val fix = DatesPlanner(fs, reader).plan(fs.root).fixes.single()
 
@@ -139,9 +142,24 @@ class DatesPlannerTest {
         fs.addFile(fs.root, "d.jpg")
         val plan = DatesPlan(
             fixes = listOf(
-                DatesFix(fs.addFile(fs.root, "a.jpg"), "a.jpg", LocalDateTime.of(2020, 1, 1, 0, 0, 0), MediaDateSource.EXIF),
-                DatesFix(fs.addFile(fs.root, "b.jpg"), "b.jpg", LocalDateTime.of(2020, 1, 2, 0, 0, 0), MediaDateSource.VIDEO_METADATA),
-                DatesFix(fs.addFile(fs.root, "c.jpg"), "c.jpg", LocalDateTime.of(2020, 1, 3, 0, 0, 0), MediaDateSource.FILENAME),
+                DatesFix(
+                    fs.addFile(fs.root, "a.jpg"),
+                    "a.jpg",
+                    LocalDateTime.of(2020, 1, 1, 0, 0, 0),
+                    MediaDateSource.EXIF,
+                ),
+                DatesFix(
+                    fs.addFile(fs.root, "b.jpg"),
+                    "b.jpg",
+                    LocalDateTime.of(2020, 1, 2, 0, 0, 0),
+                    MediaDateSource.VIDEO_METADATA,
+                ),
+                DatesFix(
+                    fs.addFile(fs.root, "c.jpg"),
+                    "c.jpg",
+                    LocalDateTime.of(2020, 1, 3, 0, 0, 0),
+                    MediaDateSource.FILENAME,
+                ),
             ),
             unfixable = fs.list(fs.root).filter { it.name == "d.jpg" },
         )

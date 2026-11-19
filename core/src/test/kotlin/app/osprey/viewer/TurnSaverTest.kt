@@ -80,7 +80,11 @@ class TurnSaverTest {
 
     @Test
     fun `a turn stores the orientation the exif table gives`() {
-        val cases = listOf(Triple(1, 1, ExifOrientation.ROTATE_90), Triple(6, -1, ExifOrientation.NORMAL), Triple(6, 1, ExifOrientation.ROTATE_180))
+        val cases = listOf(
+            Triple(1, 1, ExifOrientation.ROTATE_90),
+            Triple(6, -1, ExifOrientation.NORMAL),
+            Triple(6, 1, ExifOrientation.ROTATE_180),
+        )
         for ((stored, turns, expected) in cases) {
             val original = jpegWith(orientation = stored)
             val entry = photo(original, "$stored$turns.jpg")

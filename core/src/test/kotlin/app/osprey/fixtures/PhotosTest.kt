@@ -115,7 +115,9 @@ class PhotosTest {
         val folder = Files.createDirectories(tmp.resolve("Osprey-fixtures"))
         val jpg = Files.createDirectories(folder.resolve("jpg"))
         val png = Files.createDirectories(folder.resolve("png"))
-        listOf("b_1.jpg", "a_1.jpeg", "c_1.JPG", "note.txt", "d_1.png").forEach { Files.writeString(jpg.resolve(it), "x") }
+        listOf("b_1.jpg", "a_1.jpeg", "c_1.JPG", "note.txt", "d_1.png").forEach {
+            Files.writeString(jpg.resolve(it), "x")
+        }
         listOf("b_1.png", "a_1.PNG", "z_1.jpg").forEach { Files.writeString(png.resolve(it), "x") }
 
         assertEquals(listOf("a_1.jpeg", "b_1.jpg", "c_1.JPG"), Photos.jpeg(folder).map { it.fileName.toString() })
