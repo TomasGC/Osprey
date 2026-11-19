@@ -143,7 +143,7 @@ class RetryIntegrationMockTest : TimedTest() {
         Files.writeString(folder.resolve("b.jpg"), "b")
         val root = PathHandle(harness.library)
         val first = harness.launch()
-        val trash = TrashController(FailsToDelete(harness.fs, "a.jpg"), first.jobs, { label })
+        val trash = TrashController(FailsToRemove(harness.fs, "a.jpg"), first.jobs, { label })
         trash.refresh(root)
         trash.toggleTab()
         trash.requestDelete()

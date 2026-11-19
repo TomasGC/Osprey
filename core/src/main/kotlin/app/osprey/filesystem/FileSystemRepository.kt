@@ -30,7 +30,7 @@ interface FileSystemRepository : FileTransfer, ContentReplacer {
     /**
      * Ensures a subfolder named [name] exists directly inside [parent], creating it if needed.
      * Idempotent when [name] already exists there as a folder (matching the POC's
-     * `mkdir(exist_ok=True)` for `TODELETE`); throws [FileAlreadyExistsException] if [name]
+     * `mkdir(exist_ok=True)`); throws [FileAlreadyExistsException] if [name]
      * already exists there as a file.
      */
     fun createFolder(parent: FileHandle, name: String): FileHandle

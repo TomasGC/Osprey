@@ -120,21 +120,6 @@ class StandardizePlannerTest {
     }
 
     @Test
-    fun `plan skips TODELETE and TODELETEDUPS`() {
-        val fs = FakeFileSystemRepository()
-        val todelete = fs.addFolder(fs.root, "TODELETE")
-        fs.addFile(todelete, "IMG_20170425_152602.jpg")
-        val todeleteDups = fs.addFolder(fs.root, "TODELETEDUPS")
-        fs.addFile(todeleteDups, "IMG_20170425_152602.jpg")
-        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
-
-        val plan = planner.plan(fs.root)
-
-        assertEquals(emptyList<StandardizeRename>(), plan.renames)
-        assertEquals(emptyList<Any>(), plan.unfixable)
-    }
-
-    @Test
     fun `apply renames on the repository`() {
         val fs = FakeFileSystemRepository()
         fs.addFile(fs.root, "download_20160828_193034.jpeg", "x".toByteArray())

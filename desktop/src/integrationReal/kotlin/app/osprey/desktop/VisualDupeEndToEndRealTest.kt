@@ -24,7 +24,7 @@ import org.junit.Test
 private const val IMAGE_SIZE = 256
 
 /**
- * Runs #8's real [VisualDupePlanner] and [moveUncheckedToTodeleteDups] against real JPEGs
+ * Runs #8's real [VisualDupePlanner] and [moveUncheckedToTrash] against real JPEGs
  * -- the spot-check #12's DoD asks for, for the WhatsApp-recompression case specifically: same
  * picture, re-encoded at a different JPEG quality, must still cluster as a visual dupe. The
  * burst-set case (a real camera burst, e.g. the POC's zoo-bears set) needs the real library on a

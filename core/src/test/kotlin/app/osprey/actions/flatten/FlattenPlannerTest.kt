@@ -45,19 +45,6 @@ class FlattenPlannerTest {
     }
 
     @Test
-    fun `plan skips TODELETE entirely`() {
-        val fs = FakeFileSystemRepository()
-        val todelete = fs.addFolder(fs.root, "TODELETE")
-        fs.addFile(todelete, "dup.jpg")
-        val planner = FlattenPlanner(fs)
-
-        val plan = planner.plan(fs.root)
-
-        assertEquals(emptyList<FlattenMove>(), plan.moves)
-        assertEquals(emptyList<FlattenFolder>(), plan.folders)
-    }
-
-    @Test
     fun `plan suffixes a name collision with __flat1`() {
         val fs = FakeFileSystemRepository()
         fs.addFile(fs.root, "a.jpg", byteArrayOf(1))
@@ -168,19 +155,6 @@ class FlattenPlannerTest {
         val plan = FlattenPlanner(fs).plan(fs.root)
 
         assertEquals(listOf("a.jpg", "a__flat1.jpg", "a__flat2.jpg"), plan.moves.map { it.destName }.sorted())
-    }
-
-    @Test
-    fun `plan leaves a nested TODELETE alone and lists only the folders it flattens`() {
-        val fs = FakeFileSystemRepository()
-        val month = fs.addFolder(fs.root, "06")
-        fs.addFile(month, "b.jpg")
-        fs.addFile(fs.addFolder(month, "TODELETE"), "dup.jpg")
-
-        val plan = FlattenPlanner(fs).plan(fs.root)
-
-        assertEquals(listOf("06"), plan.folders.map { it.relativePath })
-        assertEquals(listOf("b.jpg"), plan.moves.map { it.destName })
     }
 
     @Test

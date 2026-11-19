@@ -9,8 +9,6 @@ import app.osprey.jobs.NoJobControl
 import app.osprey.jobs.forEachUntilStopped
 import app.osprey.jobs.tryFile
 
-private const val TODELETE = "TODELETE"
-
 /**
  * Collapses nested `<year>/<month>/[<day>]/files` folders into [FlattenPlanner.plan]'s `root`:
  * every file in every subfolder moves up to `root` directly, then the now-empty subfolders are
@@ -22,9 +20,7 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
     /**
      * Scans `root`: every file nested one or more levels deep is queued to move directly into
      * `root`, deepest subfolders listed first. Nothing on disk changes — call [apply] to act on
-     * the result. Any subfolder named [TODELETE], at any depth, is skipped entirely (neither its
-     * files nor its own nested subfolders are touched), matching every other action's rule of
-     * never touching anything already parked there.
+     * the result.
      */
     fun plan(root: FileHandle, control: JobControl = NoJobControl): FlattenPlan {
         val folders = collectNestedFolders(root)
@@ -98,7 +94,7 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
         val found = mutableListOf<Queued>()
         val queue = ArrayDeque<Queued>()
         for (entry in fs.list(root)) {
-            if (entry.isDirectory && entry.name != TODELETE) {
+            if (entry.isDirectory) {
                 queue += Queued(FlattenFolder(entry.handle, entry.name), 1)
             }
         }
@@ -106,7 +102,7 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
             val current = queue.removeFirst()
             found += current
             for (child in fs.list(current.folder.handle)) {
-                if (child.isDirectory && child.name != TODELETE) {
+                if (child.isDirectory) {
                     val childFolder = FlattenFolder(child.handle, "${current.folder.relativePath}/${child.name}")
                     queue += Queued(childFolder, current.depth + 1)
                 }

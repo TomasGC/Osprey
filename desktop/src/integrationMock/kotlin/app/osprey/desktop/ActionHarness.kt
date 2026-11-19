@@ -34,7 +34,7 @@ class FailsToMove(private val inner: FileSystemRepository, private val name: Str
 }
 
 /** The real file system, except that deleting the file called [name] fails like a locked file. */
-class FailsToDelete(private val inner: FileSystemRepository, private val name: String) :
+class FailsToRemove(private val inner: FileSystemRepository, private val name: String) :
     FileSystemRepository by inner {
 
     override fun delete(entry: FileHandle) {

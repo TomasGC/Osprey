@@ -56,13 +56,13 @@ class VisualDupePlannerTest {
     }
 
     @Test
-    fun `plan ignores files inside TODELETE`() {
+    fun `plan ignores files inside a subfolder`() {
         val fs = FakeFileSystemRepository()
         val reader = FakeMediaMetadataReader()
         val a = fs.addFile(fs.root, "a.jpg")
         reader.setFrame(a, noisePixelBuffer(seed = 1))
-        val todelete = fs.addFolder(fs.root, "TODELETE")
-        val b = fs.addFile(todelete, "b.jpg")
+        val subfolder = fs.addFolder(fs.root, "extras")
+        val b = fs.addFile(subfolder, "b.jpg")
         reader.setFrame(b, noisePixelBuffer(seed = 1))
         val planner = VisualDupePlanner(fs, reader)
 
