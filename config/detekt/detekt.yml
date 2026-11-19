@@ -4,6 +4,26 @@ naming:
     functionPattern: '[a-z][a-zA-Z0-9]*'
     # Composable functions use PascalCase per Compose convention.
     ignoreAnnotated: ['Composable']
+    # A test is named by a backticked sentence, which detekt's default allows under `src/test`. The other test folders
+    # follow the same convention (#107).
+    #
+    # The test source sets, written once: the globs detekt itself skips under `src/test`, plus this repository's other
+    # test folders and the instrumented-test module. A new test source set (a folder under `src` other than `main`)
+    # goes in this list. The rules below that do not fit test code use it through `*testSources`.
+    excludes: &testSources
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/jsTest/**'
+      - '**/iosTest/**'
+      - '**/integrationMock/**'
+      - '**/integrationReal/**'
+      - '**/e2e/**'
+      - '**/testFixtures/**'
+      - '**/app-instrumented/**'
 
 complexity:
   LongParameterList:
@@ -11,8 +31,43 @@ complexity:
     # Composable functions legitimately take one parameter per callback/state slot --
     # that's the standard Compose shape, not a code smell to refactor away.
     ignoreAnnotated: ['Composable']
+    # A test fixture builder takes one parameter per property of the file it builds (a PNG's filters, a HEIC's
+    # properties); detekt's default accepts that under `src/test` (#107).
+    excludes: *testSources
+  LongMethod:
+    active: true
+    # A test method may hold a table of cases, one entry per damaged file or per photo: wrapping its long lines
+    # (#107) makes it longer without making it harder to read. Detekt's default exempts `src/test` from the
+    # size rules; the other test folders and the instrumented-test module are the same kind of code.
+    excludes: *testSources
+  TooManyFunctions:
+    active: true
+    # A test class has one function per case, which detekt's default accepts under `src/test`. The other test
+    # folders and the instrumented-test module are the same kind of code (#107).
+    excludes: *testSources
 
 style:
   ReturnCount:
     active: true
     max: 4
+  MagicNumber:
+    active: true
+    # Test data are literals (sizes, counts, timestamps): a named constant for each adds noise, not meaning. Detekt's
+    # default accepts them under `src/test`; the other test folders and the instrumented-test module are the same
+    # kind of code (#107). The list is `testSources` plus the Gradle scripts, which cannot be added to an alias.
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/jsTest/**'
+      - '**/iosTest/**'
+      - '**/integrationMock/**'
+      - '**/integrationReal/**'
+      - '**/e2e/**'
+      - '**/testFixtures/**'
+      - '**/app-instrumented/**'
+      # A Gradle script states SDK levels, JVM versions and timeouts as literals: that is what it is for.
+      - '**/*.kts'

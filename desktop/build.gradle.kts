@@ -109,7 +109,7 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
-    source.setFrom("$projectDir/src/main/kotlin")
+    source.setFrom("$projectDir/src", "$projectDir/build.gradle.kts")
 }
 
 // The report Condor's coverage gate reads merges every module (`merged`, see :app): :core and :desktop add their JVM
