@@ -15,5 +15,13 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.compose.multiplatform) apply false
     alias(libs.plugins.kover) apply false
-    alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.detekt)
+}
+
+// The root project has no sources: detekt reads its own scripts and the settings script (#107).
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    source.setFrom("$projectDir/build.gradle.kts", "$projectDir/settings.gradle.kts")
 }

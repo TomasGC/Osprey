@@ -57,7 +57,9 @@ class GridHeicRendererTest : TimedTest() {
     fun `a tile grid is composed with its tiles and its turn, and nothing else is run`() {
         val calls = Calls()
 
-        val png = renderer(calls, probe = gridJson, turns = 3) { if (isComposed(it)) composed else whole }.renderPng(photo)
+        val png = renderer(calls, probe = gridJson, turns = 3) { if (isComposed(it)) composed else whole }.renderPng(
+            photo,
+        )
 
         assertArrayEquals(composed, png)
         assertEquals(1, calls.commands.size)

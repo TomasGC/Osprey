@@ -55,7 +55,9 @@ class AndroidFileSystemRepositoryInstrumentedTest {
 
     private fun seedFile(parent: DocumentFile, name: String, content: ByteArray): DocumentFile {
         val doc = parent.createFile("application/octet-stream", name) ?: error("could not create $name")
-        context.contentResolver.openOutputStream(doc.uri)?.use { it.write(content) } ?: error("could not open $name for write")
+        context.contentResolver.openOutputStream(doc.uri)?.use { it.write(content) } ?: error(
+            "could not open $name for write",
+        )
         return doc
     }
 
@@ -65,7 +67,9 @@ class AndroidFileSystemRepositoryInstrumentedTest {
     private fun jpegWithOrientation(name: String, orientation: Int): DocumentFile {
         val doc = testRoot!!.createFile("image/jpeg", name) ?: error("could not create $name")
         val bitmap = Bitmap.createBitmap(WIDE, HIGH, Bitmap.Config.ARGB_8888)
-        context.contentResolver.openOutputStream(doc.uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }
+        context.contentResolver.openOutputStream(doc.uri)?.use {
+            bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it)
+        }
             ?: error("could not open $name for write")
         context.contentResolver.openFileDescriptor(doc.uri, "rw")?.use { pfd ->
             ExifInterface(pfd.fileDescriptor).apply {

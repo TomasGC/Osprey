@@ -18,10 +18,11 @@ class HeicTurnTest {
             else -> throw AssertionError("expected edits, got $result")
         }
 
-    private fun refusal(file: ByteArray, quarterTurns: Int = 1): String = when (val result = HeicTurn.turn(file, quarterTurns)) {
-        is HeicTurnResult.Refused -> result.reason
-        else -> throw AssertionError("expected a refusal, got $result")
-    }
+    private fun refusal(file: ByteArray, quarterTurns: Int = 1): String =
+        when (val result = HeicTurn.turn(file, quarterTurns)) {
+            is HeicTurnResult.Refused -> result.reason
+            else -> throw AssertionError("expected a refusal, got $result")
+        }
 
     private fun applied(file: ByteArray, result: HeicTurnResult.Patched): ByteArray =
         file.copyOf().also { out -> result.edits.forEach { it.bytes.copyInto(out, it.offset) } }
@@ -49,7 +50,11 @@ class HeicTurnTest {
     fun `the Exif orientation is written to match, in either byte order`() {
         for (bigEndian in listOf(false, true)) {
             for (angle in 0..3) {
-                val built = heic(primaryIrot = angle, exifOrientation = EXIF_OF_IROT.getValue(angle), exifBigEndian = bigEndian)
+                val built = heic(
+                    primaryIrot = angle,
+                    exifOrientation = EXIF_OF_IROT.getValue(angle),
+                    exifBigEndian = bigEndian,
+                )
                 val out = applied(built.bytes, patched(built.bytes, 1))
                 assertEquals(
                     "angle $angle, big endian $bigEndian",

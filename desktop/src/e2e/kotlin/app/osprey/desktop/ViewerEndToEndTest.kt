@@ -105,7 +105,9 @@ class ViewerEndToEndTest : TimedTest() {
         setContent { OspreyApp(state) }
         onNodeWithText("🗑").performClick()
         waitUntil(timeoutMillis = WAIT_MS) {
-            listOf(PLAIN, PLAIN_PNG, TAG_6, TAG_8).all { onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty() }
+            listOf(PLAIN, PLAIN_PNG, TAG_6, TAG_8).all {
+                onAllNodesWithContentDescription(it).fetchSemanticsNodes().isNotEmpty()
+            }
         }
         return state
     }
@@ -126,9 +128,11 @@ class ViewerEndToEndTest : TimedTest() {
     private fun ComposeUiTest.waitForText(text: String) =
         waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
 
-    private fun ComposeUiTest.card(name: String): PixelMap = onNodeWithContentDescription(name).captureToImage().toPixelMap()
+    private fun ComposeUiTest.card(name: String): PixelMap =
+        onNodeWithContentDescription(name).captureToImage().toPixelMap()
 
-    private fun PixelMap.at(fromLeft: Double, fromTop: Double): Color = this[(width * fromLeft).toInt(), (height * fromTop).toInt()]
+    private fun PixelMap.at(fromLeft: Double, fromTop: Double): Color =
+        this[(width * fromLeft).toInt(), (height * fromTop).toInt()]
 
     private fun Color.isRed() = red > STRONG && blue < WEAK
 
@@ -227,7 +231,9 @@ class ViewerEndToEndTest : TimedTest() {
             onAllNodes(hasContentDescription("Save turn") and isNotEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
         onNodeWithText("Close").performClick()
-        waitUntil(timeoutMillis = WAIT_MS) { onAllNodesWithContentDescription(PLAIN_PNG).fetchSemanticsNodes().size == 1 }
+        waitUntil(timeoutMillis = WAIT_MS) {
+            onAllNodesWithContentDescription(PLAIN_PNG).fetchSemanticsNodes().size == 1
+        }
 
         assertSaveRecorded(state, PLAIN_PNG, hashBefore)
         val pixels = card(PLAIN_PNG)

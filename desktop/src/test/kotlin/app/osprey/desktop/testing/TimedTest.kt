@@ -33,8 +33,12 @@ fun untimedTestClasses(anchor: Class<*>): List<String> {
         paths.asSequence()
             .map { root.relativize(it).toString() }
             .filter { it.endsWith(".class") }
-            .map { Class.forName(it.removeSuffix(".class").replace(File.separatorChar, '.'), false, anchor.classLoader) }
-            .filter { !Modifier.isAbstract(it.modifiers) && it.methods.any { m -> m.isAnnotationPresent(Test::class.java) } }
+            .map {
+                Class.forName(it.removeSuffix(".class").replace(File.separatorChar, '.'), false, anchor.classLoader)
+            }
+            .filter { !Modifier.isAbstract(it.modifiers) && it.methods.any { m ->
+                m.isAnnotationPresent(Test::class.java) }
+            }
             .filterNot { TimedTest::class.java.isAssignableFrom(it) }
             .map { it.name }
             .sorted()

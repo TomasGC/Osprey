@@ -74,7 +74,9 @@ internal fun randomSamples(width: Int, height: Int, depth: Int, colorType: Int, 
 internal fun int32(value: Int): ByteArray =
     byteArrayOf((value ushr 24).toByte(), (value ushr 16).toByte(), (value ushr 8).toByte(), value.toByte())
 
-internal fun readInt(bytes: ByteArray, at: Int): Int = (0 until 4).fold(0) { acc, i -> (acc shl 8) or (bytes[at + i].toInt() and BYTE_MASK) }
+internal fun readInt(bytes: ByteArray, at: Int): Int = (0 until 4).fold(0) { acc, i ->
+    (acc shl 8) or (bytes[at + i].toInt() and BYTE_MASK)
+}
 
 internal fun chunk(type: String, data: ByteArray = ByteArray(0)): ByteArray {
     val body = type.toByteArray(Charsets.US_ASCII) + data
@@ -97,14 +99,21 @@ private fun packRow(samples: Samples, y: Int): ByteArray {
     var bit = 0
     for (x in 0 until samples.width) {
         for (c in 0 until samples.channels) {
-            val value = samples.at(x, y, c)
-            for (b in samples.depth - 1 downTo 0) {
-                if ((value shr b) and 1 == 1) out[bit / BITS_PER_BYTE] = (out[bit / BITS_PER_BYTE].toInt() or (0x80 shr (bit % BITS_PER_BYTE))).toByte()
-                bit++
-            }
+            packSample(out, bit, samples.at(x, y, c), samples.depth)
+            bit += samples.depth
         }
     }
     return out
+}
+
+/** Writes the [depth] bits of [value] into [out], most significant first, from bit number [firstBit]. */
+private fun packSample(out: ByteArray, firstBit: Int, value: Int, depth: Int) {
+    for (b in depth - 1 downTo 0) {
+        if ((value shr b) and 1 == 1) {
+            val bit = firstBit + depth - 1 - b
+            out[bit / BITS_PER_BYTE] = (out[bit / BITS_PER_BYTE].toInt() or (0x80 shr (bit % BITS_PER_BYTE))).toByte()
+        }
+    }
 }
 
 private fun paeth(a: Int, b: Int, c: Int): Int {
@@ -135,7 +144,8 @@ internal fun scanlines(samples: Samples, filters: (Int) -> Int): ByteArray {
         val type = filters(y)
         out.write(type)
         out.write(ByteArray(row.size) { i ->
-            (at(row, i) - predictor(type, at(row, i - bytesPerPixel), at(previous, i), at(previous, i - bytesPerPixel))).toByte()
+            val guess = predictor(type, at(row, i - bytesPerPixel), at(previous, i), at(previous, i - bytesPerPixel))
+            (at(row, i) - guess).toByte()
         })
         previous = row
     }
@@ -203,13 +213,15 @@ internal fun decode(png: ByteArray): Samples {
         val row = ByteArray(stride)
         for (i in 0 until stride) {
             val raw = inflated[y * (stride + 1) + 1 + i].toInt() and BYTE_MASK
-            row[i] = (raw + predictor(type, at(row, i - bytesPerPixel), at(previous, i), at(previous, i - bytesPerPixel))).toByte()
+            val guess = predictor(type, at(row, i - bytesPerPixel), at(previous, i), at(previous, i - bytesPerPixel))
+            row[i] = (raw + guess).toByte()
         }
         for (s in 0 until width * channelsOf(colorType)) {
             var value = 0
             for (b in 0 until depth) {
                 val bit = s * depth + b
-                value = (value shl 1) or ((row[bit / BITS_PER_BYTE].toInt() shr (BITS_PER_BYTE - 1 - bit % BITS_PER_BYTE)) and 1)
+                val sample = (row[bit / BITS_PER_BYTE].toInt() shr (BITS_PER_BYTE - 1 - bit % BITS_PER_BYTE)) and 1
+                value = (value shl 1) or sample
             }
             values[y * width * channelsOf(colorType) + s] = value
         }

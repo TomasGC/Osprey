@@ -125,7 +125,9 @@ class SimpleActionControllerTest : TimedTest() {
 
     @Test
     fun `a stopped scan keeps no plan and says so`() {
-        val controller = controller(scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) })
+        val controller = controller(
+            scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) },
+        )
 
         controller.onScan(FakeHandle)
         controller.onApply(FakeHandle)
@@ -158,7 +160,9 @@ class SimpleActionControllerTest : TimedTest() {
 
     @Test
     fun `a stopped scan with a scope names it in its summary`() {
-        val controller = controller(scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) })
+        val controller = controller(
+            scan = { _, control -> stopAsked(control); ScanResult(5, "count=5", listOf("a"), 5) },
+        )
 
         controller.onScan(FakeHandle, "2021")
 
@@ -233,7 +237,9 @@ class SimpleActionControllerTest : TimedTest() {
             assertTrue(controller.state.busy)
             assertEquals(1, real.entries.value.size)
             gate.countDown()
-            runBlocking { withTimeout(WAIT_SECONDS * 1000) { real.entries.first { e -> e.all { it.state is JobState.Finished } } } }
+            runBlocking { withTimeout(WAIT_SECONDS * 1000) { real.entries.first { e ->
+                e.all { it.state is JobState.Finished } } }
+            }
             assertFalse(controller.state.busy)
         } finally {
             gate.countDown()

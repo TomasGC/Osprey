@@ -16,7 +16,16 @@ private const val DQT = 0xDB
 private const val APP0 = 0xE0
 private const val APP1 = 0xE1
 private const val COMMENT = 0xFE
-private val SIGNATURE_OF_PNG = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10)
+private val SIGNATURE_OF_PNG = byteArrayOf(
+    0x89.toByte(),
+    'P'.code.toByte(),
+    'N'.code.toByte(),
+    'G'.code.toByte(),
+    13,
+    10,
+    26,
+    10,
+)
 
 /** The guard on the JPEG and PNG fixtures (#76): pixels and, for a JPEG, one Orientation entry; nothing else. */
 class FixtureScrubFormatsTest {
@@ -32,7 +41,9 @@ class FixtureScrubFormatsTest {
         "Exif".toByteArray() + byteArrayOf(0, 0) + "MM".toByteArray() + u16(42) + u32(8) + u16(tags.size) +
             tags.map { entry(it, 6) }.fold(ByteArray(0)) { all, one -> all + one } + u32(0) + extra
 
-    private fun segment(marker: Int, body: ByteArray) = byteArrayOf(0xFF.toByte(), marker.toByte()) + u16(body.size + 2) + body
+    private fun segment(marker: Int, body: ByteArray) = byteArrayOf(0xFF.toByte(), marker.toByte()) + u16(
+        body.size + 2,
+    ) + body
 
     private val jfif = segment(APP0, "JFIF".toByteArray() + byteArrayOf(0, 1, 1, 0, 0, 1, 0, 1, 0, 0))
 
@@ -40,7 +51,9 @@ class FixtureScrubFormatsTest {
         segments.fold(ByteArray(0)) { all, one -> all + one } +
         segment(DQT, ByteArray(65)) + segment(SOS, ByteArray(6)) + byteArrayOf(0x12, 0x34, 0xFF.toByte(), EOI.toByte())
 
-    private fun chunk(type: String, data: ByteArray = ByteArray(0)) = u32(data.size) + type.toByteArray() + data + u32(0)
+    private fun chunk(type: String, data: ByteArray = ByteArray(0)) = u32(data.size) + type.toByteArray() + data + u32(
+        0,
+    )
 
     private fun png(vararg chunks: ByteArray) = SIGNATURE_OF_PNG + chunk("IHDR", ByteArray(13)) +
         chunks.fold(ByteArray(0)) { all, one -> all + one } + chunk("IDAT", ByteArray(4)) + chunk("IEND")
@@ -48,14 +61,23 @@ class FixtureScrubFormatsTest {
     @Test
     fun `a JPEG with no metadata, or with one Orientation entry only, has nothing to report`() {
         assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1.jpg", jpeg(jfif)))
-        assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1_tag6.jpg", jpeg(jfif, segment(APP1, exifBody()))))
+        assertEquals(
+            emptyList<String>(),
+            FixtureScrub.problems("gull_1_tag6.jpg", jpeg(jfif, segment(APP1, exifBody()))),
+        )
         assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1_tag8.JPEG", jpeg(segment(APP1, exifBody()))))
     }
 
     @Test
     fun `a JPEG Exif with another entry, data after it or no orientation is reported`() {
-        val more = FixtureScrub.problems("gull_1.jpg", jpeg(segment(APP1, exifBody(listOf(EXIF_ORIENTATION_TAG, MODEL_TAG)))))
-        val after = FixtureScrub.problems("gull_1.jpg", jpeg(segment(APP1, exifBody(extra = "2026:07:25".toByteArray()))))
+        val more = FixtureScrub.problems(
+            "gull_1.jpg",
+            jpeg(segment(APP1, exifBody(listOf(EXIF_ORIENTATION_TAG, MODEL_TAG)))),
+        )
+        val after = FixtureScrub.problems(
+            "gull_1.jpg",
+            jpeg(segment(APP1, exifBody(extra = "2026:07:25".toByteArray()))),
+        )
         val none = FixtureScrub.problems("gull_1.jpg", jpeg(segment(APP1, exifBody(listOf(MODEL_TAG)))))
 
         assertTrue(more.toString(), more.any { "Exif" in it && "2 entries" in it })
@@ -66,7 +88,10 @@ class FixtureScrubFormatsTest {
     @Test
     fun `a JPEG with a comment, an XMP packet or any other segment is reported, whatever it holds`() {
         val comment = FixtureScrub.problems("a_1.jpg", jpeg(jfif, segment(COMMENT, "hello".toByteArray())))
-        val xmp = FixtureScrub.problems("a_1.jpg", jpeg(jfif, segment(APP1, "http://ns.adobe.com/xap/1.0/".toByteArray())))
+        val xmp = FixtureScrub.problems(
+            "a_1.jpg",
+            jpeg(jfif, segment(APP1, "http://ns.adobe.com/xap/1.0/".toByteArray())),
+        )
 
         assertTrue(comment.toString(), comment.any { "FFFE" in it })
         assertTrue(xmp.toString(), xmp.any { "FFE1" in it })
@@ -81,7 +106,10 @@ class FixtureScrubFormatsTest {
     @Test
     fun `a PNG with only its image chunks and the colour ones has nothing to report`() {
         assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1.png", png()))
-        assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1.png", png(chunk("sRGB", ByteArray(1)), chunk("pHYs", ByteArray(9)))))
+        assertEquals(
+            emptyList<String>(),
+            FixtureScrub.problems("gull_1.png", png(chunk("sRGB", ByteArray(1)), chunk("pHYs", ByteArray(9)))),
+        )
     }
 
     @Test
@@ -116,7 +144,9 @@ class FixtureScrubFormatsTest {
         val all = Photos.jpeg(folder) + Photos.png(folder)
         assertTrue("no photos in the jpg and png folders of $folder", all.isNotEmpty())
 
-        val reported = all.associate { it.fileName.toString() to FixtureScrub.problems(it.fileName.toString(), Files.readAllBytes(it)) }
+        val reported = all.associate {
+            it.fileName.toString() to FixtureScrub.problems(it.fileName.toString(), Files.readAllBytes(it))
+        }
             .filterValues { it.isNotEmpty() }
 
         assertEquals(emptyMap<String, List<String>>(), reported)

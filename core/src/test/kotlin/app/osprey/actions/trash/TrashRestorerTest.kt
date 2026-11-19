@@ -179,7 +179,9 @@ class TrashRestorerTest {
         lib.library("2019", "taken.jpg", "library".toByteArray())
         val conflict = restorer.plan(lib.root, listOf(taken)).conflicts.single()
         val faulty = FaultyFileSystemRepository(lib.fs)
-        faulty.failMove = { entry -> if (entry == taken.handle) FileAlreadyExistsException("taken.jpg appeared") else null }
+        faulty.failMove = { entry ->
+            if (entry == taken.handle) FileAlreadyExistsException("taken.jpg appeared") else null
+        }
 
         val failure = TrashRestorer(faulty).resolve(lib.root, conflict, ConflictChoice.TRASH_COPY)
 

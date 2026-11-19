@@ -37,7 +37,8 @@ class VisualDupesRealPhotosTest : TimedTest() {
 
     private fun place(photo: Path) = Files.copy(photo, folder.resolve(photo.fileName.toString()))
 
-    private fun groups() = planner.plan(PathHandle(folder)).groups.map { group -> group.map { it.name }.toSet() }.toSet()
+    private fun groups() =
+        planner.plan(PathHandle(folder)).groups.map { group -> group.map { it.name }.toSet() }.toSet()
 
     @Test
     fun `the burst shots of a scene are never grouped, nor are different subjects`() {

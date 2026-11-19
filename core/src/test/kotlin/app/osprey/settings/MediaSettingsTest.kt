@@ -124,7 +124,9 @@ class MediaSettingsTest {
 
     @Test
     fun `removing an input drops it and leaves the rest`() {
-        val base = accepted(accepted(accepted(MediaSettings().withOutput(pictures)).addInput(camera)).addInput(whatsapp))
+        val base = accepted(
+            accepted(accepted(MediaSettings().withOutput(pictures)).addInput(camera)).addInput(whatsapp),
+        )
 
         val settings = base.removeInput(camera.reference)
 
@@ -140,7 +142,9 @@ class MediaSettingsTest {
 
     @Test
     fun `withMode changes only that input`() {
-        val base = accepted(accepted(accepted(MediaSettings().withOutput(pictures)).addInput(camera)).addInput(whatsapp))
+        val base = accepted(
+            accepted(accepted(MediaSettings().withOutput(pictures)).addInput(camera)).addInput(whatsapp),
+        )
 
         val settings = base.withMode(whatsapp.reference, InputMode.MOVE)
 

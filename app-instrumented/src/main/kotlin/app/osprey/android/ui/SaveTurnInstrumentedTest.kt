@@ -170,7 +170,9 @@ class SaveTurnInstrumentedTest {
 
     private fun waitFor(condition: () -> Boolean) = composeRule.waitUntil(timeoutMillis = WAIT_MS, condition)
 
-    private fun waitForText(text: String) = waitFor { composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitForText(text: String) = waitFor {
+        composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    }
 
     private fun rotateRight() = composeRule.onNodeWithContentDescription("Rotate right").performClick()
 

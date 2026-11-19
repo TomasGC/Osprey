@@ -325,7 +325,11 @@ class HistoryScreenTest : TimedTest() {
     private val retried = mutableListOf<String>()
 
     private fun retryOffer(question: String? = null) =
-        RunRetry(canRetry = { it.state == RunState.Failed }, question = { question }, onRetry = { retried += it.action })
+        RunRetry(
+            canRetry = { it.state == RunState.Failed },
+            question = { question },
+            onRetry = { retried += it.action },
+        )
 
     private fun ComposeUiTest.screenWith(retry: RunRetry?) {
         controller.refresh()
@@ -344,7 +348,8 @@ class HistoryScreenTest : TimedTest() {
     }
 
     @Test
-    fun `a run that cannot be retried has no Retry failed, and neither does a screen with no retry`() = runComposeUiTest {
+    fun `a run that cannot be retried has no Retry failed, and neither does a screen with no retry`() =
+        runComposeUiTest {
         threeRuns()
         screenWith(retryOffer())
         click("Reorg")

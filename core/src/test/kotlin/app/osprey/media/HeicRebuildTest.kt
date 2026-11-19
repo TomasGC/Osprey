@@ -121,14 +121,20 @@ class HeicRebuildTest {
             "iloc version 0" to (heic(primaryIrot = null, ilocVersion = 0) to 1),
             "iloc version 2" to (heic(primaryIrot = null, ilocVersion = 2) to 1),
             "64-bit mdat size" to (heic(primaryIrot = null, largeMdat = true) to 1),
-            "boxes after meta" to (heic(primaryIrot = null, trailer = heicBox("free", ByteArray(40)) + heicBox("sefd", ByteArray(9))) to 1),
+            "boxes after meta" to (
+                heic(primaryIrot = null, trailer = heicBox("free", ByteArray(40)) + heicBox("sefd", ByteArray(9))) to 1
+            ),
         )
         for ((name, pair) in layouts) {
             val (built, associationBytes) = pair
             val result = rebuilt(built.bytes, 1)
             assertEquals(name, built.bytes.size + IROT_BOX_SIZE + associationBytes, result.bytes.size)
             assertEquals(name, 1, irotBoxes(result.bytes).size)
-            assertEquals(name, EXIF_OF_IROT.getValue(angleAfter(1)), exifValue(result.bytes, built.exifValueAt!!, false))
+            assertEquals(
+                name,
+                EXIF_OF_IROT.getValue(angleAfter(1)),
+                exifValue(result.bytes, built.exifValueAt!!, false),
+            )
         }
     }
 
@@ -139,7 +145,10 @@ class HeicRebuildTest {
         val out = rebuilt(built.bytes, 1).bytes
 
         // the new box and the association are both inserted before the idat
-        assertEquals(EXIF_OF_IROT.getValue(angleAfter(1)), exifValue(out, built.exifValueAt!! + IROT_BOX_SIZE + 1, false))
+        assertEquals(
+            EXIF_OF_IROT.getValue(angleAfter(1)),
+            exifValue(out, built.exifValueAt!! + IROT_BOX_SIZE + 1, false),
+        )
     }
 
     @Test
@@ -160,8 +169,14 @@ class HeicRebuildTest {
         val unsafe = mapOf(
             "meta before mdat" to heic(primaryIrot = null, metaFirst = true),
             "a meta box with a 64-bit size" to heic(primaryIrot = null, quirks = Quirks(largeMeta = true)),
-            "a primary item with no associations" to heic(primaryIrot = null, quirks = Quirks(primaryHasNoAssociations = true)),
-            "more properties than a one-byte index holds" to heic(primaryIrot = null, quirks = Quirks(extraProps = 125)),
+            "a primary item with no associations" to heic(
+                primaryIrot = null,
+                quirks = Quirks(primaryHasNoAssociations = true),
+            ),
+            "more properties than a one-byte index holds" to heic(
+                primaryIrot = null,
+                quirks = Quirks(extraProps = 125),
+            ),
             "an item stored in a way we cannot follow" to heic(primaryIrot = null, quirks = Quirks(tileMethod = 2)),
             "no item data to check" to heic(primaryIrot = null, exif = false, quirks = Quirks(ilocRows = emptyList())),
         )
@@ -221,8 +236,14 @@ class HeicRebuildTest {
         assertFalse("garbage", HeicRebuild.isSound(built.bytes, ByteArray(40), angle))
         assertFalse("the wrong angle", HeicRebuild.isSound(built.bytes, good, (angle + 1) % 4))
         assertFalse("a byte too many", HeicRebuild.isSound(built.bytes, good + byteArrayOf(0), angle))
-        assertFalse("the wrong Exif", HeicRebuild.isSound(built.bytes, good.copyOf().also { it[built.exifValueAt!!] = 1 }, angle))
-        assertFalse("a tile that changed", HeicRebuild.isSound(built.bytes, good.copyOf().also { it[FIRST_TILE_AT] = 7 }, angle))
+        assertFalse(
+            "the wrong Exif",
+            HeicRebuild.isSound(built.bytes, good.copyOf().also { it[built.exifValueAt!!] = 1 }, angle),
+        )
+        assertFalse(
+            "a tile that changed",
+            HeicRebuild.isSound(built.bytes, good.copyOf().also { it[FIRST_TILE_AT] = 7 }, angle),
+        )
         val fewerItems = heic(primaryIrot = null, exifOrientation = 1, quirks = Quirks(ilocRows = listOf(2, 4))).bytes
         assertFalse("a different item table", HeicRebuild.isSound(fewerItems, good, angle))
         val noOrientation = rebuilt(heic(primaryIrot = null, exifOrientation = null).bytes, 1).bytes
@@ -230,11 +251,21 @@ class HeicRebuildTest {
         val unfollowable = Quirks(tileMethod = 2)
         val oldUnfollowable = heic(primaryIrot = null, exifOrientation = 1, quirks = unfollowable).bytes
         assertFalse("data we cannot follow in the old file", HeicRebuild.isSound(oldUnfollowable, good, angle))
-        val newUnfollowable = heic(primaryIrot = angle, exifOrientation = EXIF_OF_IROT.getValue(angle), quirks = unfollowable)
-        assertFalse("data we cannot follow in the new file", HeicRebuild.isSound(built.bytes, newUnfollowable.bytes, angle))
+        val newUnfollowable = heic(
+            primaryIrot = angle,
+            exifOrientation = EXIF_OF_IROT.getValue(angle),
+            quirks = unfollowable,
+        )
+        assertFalse(
+            "data we cannot follow in the new file",
+            HeicRebuild.isSound(built.bytes, newUnfollowable.bytes, angle),
+        )
         val plain = heic(primaryIrot = null, exif = false).bytes
         val plainTurned = rebuilt(plain, 1).bytes
-        assertFalse("the wrong angle, with no Exif to give it away", HeicRebuild.isSound(plain, plainTurned, (angle + 1) % 4))
+        assertFalse(
+            "the wrong angle, with no Exif to give it away",
+            HeicRebuild.isSound(plain, plainTurned, (angle + 1) % 4),
+        )
         val oneTile = heic(primaryIrot = null, exif = false, quirks = Quirks(ilocRows = listOf(2))).bytes
         assertFalse("fewer items before", HeicRebuild.isSound(oneTile, plainTurned, angle))
         assertTrue("sanity: the angle byte is where the box says", good[at].toInt() == angle)

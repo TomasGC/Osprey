@@ -41,18 +41,23 @@ internal object JpegScrub {
             if (marker == START_OF_SCAN) break
             val length = file.u16(at + MARKER_SIZE, true)
             val end = at + MARKER_SIZE + length
-            if (length < LENGTH_FIELD || end > file.size) return found + "not a readable JPEG: a segment runs past the end"
-            val body = at + SEGMENT_HEADER + LENGTH_FIELD
-            when {
-                marker in PICTURE_SEGMENTS -> Unit
-                marker == APP0 && file.startsWith(JFIF_PREFIX, body) -> Unit
-                marker == APP1 && file.startsWith(EXIF_PREFIX, body) -> found += exifProblems(file, body, end)
-                else -> unexpected += "FF%02X".format(marker)
+            if (length < LENGTH_FIELD || end > file.size) {
+                return found + "not a readable JPEG: a segment runs past the end"
             }
+            val segment = segmentProblems(file, marker, at + SEGMENT_HEADER + LENGTH_FIELD, end)
+            if (segment == null) unexpected += "FF%02X".format(marker) else found += segment
             at = end
         }
         if (unexpected.isNotEmpty()) found += "unexpected JPEG segments: ${unexpected.joinToString(", ")}"
         return found
+    }
+
+    /** What the segment [marker] reports: nothing for a kept segment, null for one a fixture must not carry. */
+    private fun segmentProblems(file: ByteArray, marker: Int, body: Int, end: Int): List<String>? = when {
+        marker in PICTURE_SEGMENTS -> emptyList()
+        marker == APP0 && file.startsWith(JFIF_PREFIX, body) -> emptyList()
+        marker == APP1 && file.startsWith(EXIF_PREFIX, body) -> exifProblems(file, body, end)
+        else -> null
     }
 
     private fun ByteArray.startsWith(prefix: ByteArray, at: Int) =
@@ -67,7 +72,9 @@ internal object JpegScrub {
         when {
             entries != 1 -> listOf("the Exif holds $entries entries, only the orientation is allowed")
             file.u16(ifd + ENTRY_COUNT_SIZE, big) != ORIENTATION_TAG -> listOf("the Exif has no Orientation entry")
-            ifd + ENTRY_COUNT_SIZE + ENTRY_SIZE + NEXT_IFD_SIZE < end -> listOf("the Exif holds data after the orientation entry")
+            ifd + ENTRY_COUNT_SIZE + ENTRY_SIZE + NEXT_IFD_SIZE < end -> listOf(
+                "the Exif holds data after the orientation entry",
+            )
             else -> emptyList()
         }
     } catch (ignored: IndexOutOfBoundsException) {

@@ -34,7 +34,8 @@ object Photos {
     fun need(env: (String) -> String? = System::getenv, from: Path = Path.of("").toAbsolutePath()): Path {
         val folder = locate(env, from)
         if (folder != null) return folder
-        val reason = "The real-photo fixtures are missing: clone $SIBLING next to the repository or set $FOLDER_VARIABLE"
+        val reason =
+            "The real-photo fixtures are missing: clone $SIBLING next to the repository or set $FOLDER_VARIABLE"
         if (env(REQUIRE_VARIABLE) == REQUIRED) throw AssertionError("$reason ($REQUIRE_VARIABLE is set)")
         throw AssumptionViolatedException(reason)
     }

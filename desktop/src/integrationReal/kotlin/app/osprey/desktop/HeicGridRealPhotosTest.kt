@@ -31,7 +31,9 @@ class HeicGridRealPhotosTest : TimedTest() {
 
     private fun firstOfEachSubject(): List<Path> {
         val fixtures = Photos.need()
-        return Photos.png(fixtures).map { fixtures.resolve("heic").resolve(it.fileName.toString().replace(".png", ".heic")) }
+        return Photos.png(fixtures).map {
+            fixtures.resolve("heic").resolve(it.fileName.toString().replace(".png", ".heic"))
+        }
     }
 
     private fun turnsOf(photo: Path) = HeicRotation.of(Files.readAllBytes(photo))
@@ -58,7 +60,11 @@ class HeicGridRealPhotosTest : TimedTest() {
 
             val grid = parseHeicGrid(probeHeicGroups(photo)!!)
             assertNotNull("${photo.fileName} has no tile grid", grid)
-            val composed = decodeHeicPixelBuffer(photo, null, HeicRenderer { runFfmpeg(heicGridCommand(it, grid!!, turnsOf(it))) })
+            val composed = decodeHeicPixelBuffer(
+                photo,
+                null,
+                HeicRenderer { runFfmpeg(heicGridCommand(it, grid!!, turnsOf(it))) },
+            )
 
             assertEquals("${photo.fileName}", plain, composed)
         }

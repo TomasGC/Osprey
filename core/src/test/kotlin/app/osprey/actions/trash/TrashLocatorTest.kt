@@ -134,7 +134,9 @@ class TrashLocatorTest {
     @Test
     fun `prune keeps a folder that turns out not to be empty when it is removed`() {
         emptyFolder("2019", TrashAction.DEDUPE)
-        val faulty = FaultyFileSystemRepository(lib.fs).also { it.failDeleteEmptyFolder = { DirectoryNotEmptyException("late file") } }
+        val faulty = FaultyFileSystemRepository(lib.fs).also {
+            it.failDeleteEmptyFolder = { DirectoryNotEmptyException("late file") }
+        }
 
         assertEquals(0, TrashLocator(faulty, lib.root).prune("2019", TrashAction.DEDUPE))
         assertTrue(lib.exists("Trash", "2019", "Dedupe"))

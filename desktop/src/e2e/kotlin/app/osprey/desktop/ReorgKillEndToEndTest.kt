@@ -59,15 +59,12 @@ class ReorgKillEndToEndTest : TimedTest() {
                 lines.onEach { output += it }.any { it == "READY" }
             }
         }
-        try {
+        runCatching {
             assertTrue(
                 "the app process never got mid-move:\n${output.joinToString("\n")}",
                 ready.get(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
             )
-        } catch (e: Exception) {
-            process.destroyForcibly()
-            throw e
-        }
+        }.onFailure { process.destroyForcibly() }.getOrThrow()
         return process
     }
 
@@ -86,7 +83,12 @@ class ReorgKillEndToEndTest : TimedTest() {
         assertEquals(emptyList<Any>(), plan.items)
         val pair = plan.duplicates.single()
 
-        val result = planner.apply(plan, output, listOf(DuplicateChoice(pair, keepInput = false, keepLibrary = true)), NoJobControl)
+        val result = planner.apply(
+            plan,
+            output,
+            listOf(DuplicateChoice(pair, keepInput = false, keepLibrary = true)),
+            NoJobControl,
+        )
 
         assertEquals(1, result.trashed)
         assertEquals(emptyList<Any>(), result.failures)

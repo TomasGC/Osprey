@@ -33,7 +33,9 @@ internal object FixtureScrub {
         return found + when (extension) {
             "jpg", "jpeg" -> JpegScrub.problems(file)
             "png" -> PngScrub.problems(file)
-            else -> if (".$extension" in heicExtensions) heicProblems(file) else listOf("unknown fixture format: .$extension")
+            else -> if (".$extension" in heicExtensions) heicProblems(file) else listOf(
+                "unknown fixture format: .$extension",
+            )
         }
     }
 
@@ -49,7 +51,9 @@ internal object FixtureScrub {
         val exif = exifRange(file, layout)
         found += exifProblems(file, layout, exif)
         val text = String(metadata(file, layout), Charsets.ISO_8859_1)
-        LEAKS.forEach { (label, pattern) -> if (pattern.containsMatchIn(text)) found += "$label text found in the metadata" }
+        LEAKS.forEach { (label, pattern) ->
+            if (pattern.containsMatchIn(text)) found += "$label text found in the metadata"
+        }
         return found
     }
 
@@ -68,7 +72,9 @@ internal object FixtureScrub {
         val problems = mutableListOf<String>()
         if (entries != ONE_ENTRY) problems += "the Exif holds $entries entries, only the orientation is allowed"
         val end = ifd + ENTRY_COUNT_SIZE + entries * ENTRY_SIZE + NEXT_IFD_SIZE
-        if ((end..exif.last).any { file[it] != 0.toByte() }) problems += "the Exif holds data after the orientation entry"
+        if ((end..exif.last).any { file[it] != 0.toByte() }) {
+            problems += "the Exif holds data after the orientation entry"
+        }
         return problems
     }
 

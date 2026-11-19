@@ -340,7 +340,11 @@ class HistoryScreenInstrumentedTest {
     private val retried = mutableListOf<String>()
 
     private fun retryOffer(question: String? = null) =
-        RunRetry(canRetry = { it.state == RunState.Failed }, question = { question }, onRetry = { retried += it.action })
+        RunRetry(
+            canRetry = { it.state == RunState.Failed },
+            question = { question },
+            onRetry = { retried += it.action },
+        )
 
     private fun screenWith(retry: RunRetry?) {
         controller.refresh()

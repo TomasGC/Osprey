@@ -77,7 +77,9 @@ class BackedUpReplaceTest {
 
     @Test
     fun `a write that fails puts the original back removes the copy and says why`() {
-        val failure = assertThrows(IOException::class.java) { replace(write = firstThen(cutShortThenFail("disk full"))) }
+        val failure = assertThrows(IOException::class.java) {
+            replace(write = firstThen(cutShortThenFail("disk full")))
+        }
 
         assertEquals("disk full", failure.message)
         assertArrayEquals(original, files.readBytes(entry))
@@ -114,7 +116,10 @@ class BackedUpReplaceTest {
     fun `a put back that lands other bytes keeps the copy too`() {
         var calls = 0
         val write: (FileHandle, ByteArray) -> Unit = { target, _ ->
-            if (calls++ == 0) cutShortThenFail("disk full")(target, original) else files.replaceContent(target, byteArrayOf(8))
+            if (calls++ == 0) cutShortThenFail("disk full")(target, original) else files.replaceContent(
+                target,
+                byteArrayOf(8),
+            )
         }
 
         val failure = assertThrows(IOException::class.java) { replace(write = write) }
@@ -172,7 +177,9 @@ class BackedUpReplaceTest {
     fun `a copy that cannot be deleted after a put back still reports the write failure`() {
         faulty.failDelete = { IOException("busy") }
 
-        val failure = assertThrows(IOException::class.java) { replace(write = firstThen(cutShortThenFail("disk full"))) }
+        val failure = assertThrows(IOException::class.java) {
+            replace(write = firstThen(cutShortThenFail("disk full")))
+        }
 
         assertEquals("disk full", failure.message)
         assertArrayEquals(original, files.readBytes(entry))

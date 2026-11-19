@@ -29,7 +29,10 @@ class FixtureScrubTest {
         val skip = source.u32(extent.first, true)
         val tiff = extent.first + 4 + skip
         val little = source[tiff] == 'I'.code.toByte()
-        fun short(v: Int) = if (little) byteArrayOf(v.toByte(), (v shr 8).toByte()) else byteArrayOf((v shr 8).toByte(), v.toByte())
+        fun short(v: Int) = if (little) byteArrayOf(v.toByte(), (v shr 8).toByte()) else byteArrayOf(
+            (v shr 8).toByte(),
+            v.toByte(),
+        )
         fun int(v: Int) = if (little) byteArrayOf(v.toByte(), 0, 0, 0) else byteArrayOf(0, 0, 0, v.toByte())
         val minimal = (if (little) "II*".toByteArray() + 0 else "MM".toByteArray() + 0 + "*".toByteArray()) + int(8) +
             short(1) + short(ORIENTATION_TAG) + short(SHORT_TYPE) + int(1) + short(value) + short(0) + int(0)
@@ -58,7 +61,9 @@ class FixtureScrubTest {
     fun `data left in the Exif after the orientation entry is reported`() {
         val file = clean
         val layout = HeicLayout.of(file)
-        val extent = layout.extents.map { it.range(file, layout.idat)!! }.first { (layout.exif as ExifTarget.At).offset in it }
+        val extent = layout.extents.map { it.range(file, layout.idat)!! }.first {
+            (layout.exif as ExifTarget.At).offset in it
+        }
         file[extent.last] = 'G'.code.toByte()
 
         assertTrue(FixtureScrub.problems("gull_1.heic", file).any { "Exif" in it })
@@ -123,7 +128,10 @@ class FixtureScrubTest {
     fun `the colour profile's own text is not a leak`() {
         // the Samsung profile carries "Samsung Electronics" in its description, the same on every phone (#76)
         val file = clean
-        val profile = heicBox("colr", "prof".toByteArray() + "Copyright (c) 2022 Samsung Electronics Co., Ltd".toByteArray())
+        val profile = heicBox(
+            "colr",
+            "prof".toByteArray() + "Copyright (c) 2022 Samsung Electronics Co., Ltd".toByteArray(),
+        )
         val withProfile = insertInIpco(file, profile)
 
         assertEquals(emptyList<String>(), FixtureScrub.problems("gull_1.heic", withProfile))
@@ -131,7 +139,10 @@ class FixtureScrubTest {
 
     @Test
     fun `a name that looks like a camera timestamp is reported`() {
-        for (name in listOf("20260725_115212.heic", "IMG_2026.heic", "PXL_1.heic", "2026-07-25.heic", "vid_0001.heic")) {
+        val timestamps = listOf(
+            "20260725_115212.heic", "IMG_2026.heic", "PXL_1.heic", "2026-07-25.heic", "vid_0001.heic",
+        )
+        for (name in timestamps) {
             assertTrue(name, FixtureScrub.problems(name, clean).any { "name" in it })
         }
         for (name in listOf("gull_1.heic", "spider_wall_3.heic", "image.heic")) {
@@ -150,13 +161,17 @@ class FixtureScrubTest {
         val all = Photos.heic(folder)
         assertTrue("no photos in the heic folder of $folder", all.isNotEmpty())
 
-        val reported = all.associate { it.fileName.toString() to FixtureScrub.problems(it.fileName.toString(), Files.readAllBytes(it)) }
+        val reported = all.associate {
+            it.fileName.toString() to FixtureScrub.problems(it.fileName.toString(), Files.readAllBytes(it))
+        }
             .filterValues { it.isNotEmpty() }
 
         assertEquals(emptyMap<String, List<String>>(), reported)
     }
 
-    /** [file] with [box] added at the end of `ipco`, sizes of `ipco`, `iprp` and `meta` raised (association unchanged). */
+    /**
+     * [file] with [box] added at the end of `ipco`, sizes of `ipco`, `iprp` and `meta` raised (association unchanged).
+     */
     private fun insertInIpco(file: ByteArray, box: ByteArray): ByteArray {
         val layout = HeicLayout.of(file)
         val properties = checkNotNull(layout.properties)
@@ -164,7 +179,10 @@ class FixtureScrubTest {
         val out = file.copyOf(file.size + box.size)
         file.copyInto(out, at + box.size, at, file.size)
         box.copyInto(out, at)
-        for (parent in listOf(properties.ipco, properties.iprp, properties.meta)) out.putU32(parent.start, file.u32(parent.start, true) + box.size)
+        for (parent in listOf(properties.ipco, properties.iprp, properties.meta)) out.putU32(
+            parent.start,
+            file.u32(parent.start, true) + box.size,
+        )
         return out
     }
 }

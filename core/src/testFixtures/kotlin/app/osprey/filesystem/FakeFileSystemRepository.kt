@@ -128,14 +128,21 @@ class FakeFileSystemRepository : FileSystemRepository {
         node.timestamps = node.timestamps.copy(modified = Instant.now())
     }
 
-    private fun newNode(parent: FileHandle, name: String, isDirectory: Boolean, bytes: ByteArray = ByteArray(0)): FileHandle {
+    private fun newNode(
+        parent: FileHandle,
+        name: String,
+        isDirectory: Boolean,
+        bytes: ByteArray = ByteArray(0),
+    ): FileHandle {
         val id = nextId++
         nodes[id] = Node(name, parent.id(), isDirectory, bytes)
         return Handle(id)
     }
 
     private fun requireNoCollision(parentId: Long, name: String, exceptId: Long) {
-        val collision = nodes.entries.any { (id, node) -> id != exceptId && node.parentId == parentId && node.name == name }
+        val collision = nodes.entries.any { (id, node) ->
+            id != exceptId && node.parentId == parentId && node.name == name
+        }
         if (collision) throw FileAlreadyExistsException("$name already exists")
     }
 

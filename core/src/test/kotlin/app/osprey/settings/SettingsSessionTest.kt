@@ -7,7 +7,11 @@ import org.junit.Test
 
 class SettingsSessionTest {
 
-    private fun folder(path: String) = FolderSetting("ref:$path", FolderLocation.of("primary", path), path.substringAfterLast('/'))
+    private fun folder(path: String) = FolderSetting(
+        "ref:$path",
+        FolderLocation.of("primary", path),
+        path.substringAfterLast('/'),
+    )
 
     private val library = folder("Pictures")
     private val camera = folder("DCIM/Camera")

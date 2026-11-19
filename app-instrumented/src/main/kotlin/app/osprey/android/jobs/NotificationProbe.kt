@@ -14,7 +14,10 @@ private const val WAIT_MS = 15_000L
 private const val POLL_MS = 100L
 private const val NANOS_PER_MS = 1_000_000L
 
-/** How `dumpsys activity services` names a live service: `ServiceRecord{... u12 app.osprey/.android.jobs.JobService ...}`. */
+/**
+ * How `dumpsys activity services` names a live service: `ServiceRecord{... u12 app.osprey/.android.jobs.JobService
+ * ...}`.
+ */
 private val JOB_SERVICE_RECORD = Regex("ServiceRecord\\{[^}]*JobService")
 
 /** The app's own notifications as the system holds them, with bounded waits on that state, for the job tests (#94). */
@@ -24,7 +27,8 @@ class NotificationProbe(private val context: Context) {
 
     /**
      * Waits for the previous test's job service to be gone (a job queued while it stops can run without a service,
-     * #111), allows notifications (a refusal would drop every `notify()` without a word) and starts from an empty shade.
+      * #111), allows notifications (a refusal would drop every `notify()` without a word) and starts from an empty
+      * shade.
      */
     fun prepare() {
         waitFor("the previous job service to stop") { !jobServiceRunning() }

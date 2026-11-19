@@ -60,7 +60,9 @@ class ExifOrientationTest {
         assertEquals(expected, ExifOrientation.entries.map { it.turnedBy(1) })
     }
 
-    /** Turning the stored orientation must give the pixels that turning the shown photo gives, for all 8 and 4 turns. */
+    /**
+     * Turning the stored orientation must give the pixels that turning the shown photo gives, for all 8 and 4 turns.
+     */
     @Test
     fun `turning the tag turns the shown photo`() {
         val source = PixelBuffer(2, 3, intArrayOf(1, 2, 3, 4, 5, 6))

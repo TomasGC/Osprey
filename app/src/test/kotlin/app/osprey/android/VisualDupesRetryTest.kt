@@ -45,7 +45,10 @@ class VisualDupesRetryTest {
 
     private fun picture(name: String): FileHandle {
         val handle = fake.addFile(year, name, name.toByteArray())
-        reader.setFrame(handle, PixelBuffer(PICTURE_SIDE, PICTURE_SIDE, IntArray(PICTURE_SIDE * PICTURE_SIDE) { it * 3 }))
+        reader.setFrame(
+            handle,
+            PixelBuffer(PICTURE_SIDE, PICTURE_SIDE, IntArray(PICTURE_SIDE * PICTURE_SIDE) { it * 3 }),
+        )
         return handle
     }
 
@@ -90,7 +93,10 @@ class VisualDupesRetryTest {
         val retried = retries().single()
         assertEquals(RunOrigin("visual-dupes", LIBRARY, "2019", retryOf = run.id), retried.origin)
         assertEquals(RunState.Done, retried.state)
-        assertTrue(retried.summary, retried.summary.startsWith("Retry of run #${run.id}: Visual Dupes 2019 retry: moved 1"))
+        assertTrue(
+            retried.summary,
+            retried.summary.startsWith("Retry of run #${run.id}: Visual Dupes 2019 retry: moved 1"),
+        )
     }
 
     @Test

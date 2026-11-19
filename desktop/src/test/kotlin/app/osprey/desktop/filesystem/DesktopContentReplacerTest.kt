@@ -62,7 +62,9 @@ class DesktopContentReplacerTest : TimedTest() {
     fun `a move refused for good fails after waiting five seconds and leaves the file and the folder as they were`() {
         val replacer = replacerDeniedFor(deniedMoves = Int.MAX_VALUE)
 
-        assertThrows(AccessDeniedException::class.java) { replacer.replaceContent(PathHandle(photo), byteArrayOf(9, 8)) }
+        assertThrows(AccessDeniedException::class.java) {
+            replacer.replaceContent(PathHandle(photo), byteArrayOf(9, 8))
+        }
 
         assertEquals(5_000L, pauses.sum())
         assertArrayEquals(byteArrayOf(1, 2, 3), Files.readAllBytes(photo))

@@ -43,7 +43,14 @@ class DesktopDownsampledDecodeIntegrationRealTest : TimedTest() {
     private fun bigJpeg(name: String = "big.jpg"): Path {
         val image = BufferedImage(PHOTO_WIDTH, PHOTO_HEIGHT, BufferedImage.TYPE_INT_RGB)
         val g = image.createGraphics()
-        g.paint = GradientPaint(0f, 0f, Color(20, 60, 160), PHOTO_WIDTH.toFloat(), PHOTO_HEIGHT.toFloat(), Color(230, 190, 60))
+        g.paint = GradientPaint(
+            0f,
+            0f,
+            Color(20, 60, 160),
+            PHOTO_WIDTH.toFloat(),
+            PHOTO_HEIGHT.toFloat(),
+            Color(230, 190, 60),
+        )
         g.fillRect(0, 0, PHOTO_WIDTH, PHOTO_HEIGHT)
         val random = java.util.Random(SEED)
         repeat(SHAPE_COUNT) {

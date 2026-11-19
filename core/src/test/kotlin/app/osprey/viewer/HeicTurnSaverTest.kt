@@ -60,7 +60,9 @@ class HeicTurnSaverTest {
 
     private fun expected(original: ByteArray, quarterTurns: Int): ByteArray =
         when (val turned = HeicTurn.turn(original, quarterTurns)) {
-            is HeicTurnResult.Patched -> original.copyOf().also { out -> turned.edits.forEach { it.bytes.copyInto(out, it.offset) } }
+            is HeicTurnResult.Patched -> original.copyOf().also { out ->
+                turned.edits.forEach { it.bytes.copyInto(out, it.offset) }
+            }
             is HeicTurnResult.Rebuilt -> turned.bytes
             else -> throw AssertionError("not a turn: $turned")
         }
@@ -136,10 +138,13 @@ class HeicTurnSaverTest {
 
     @Test
     fun `a refusal says why and leaves the file alone`() {
+        val jpegBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte(), 0, 0, 0, 0, 0)
         val cases = mapOf(
             "a mirrored photo" to (heic(mirror = true).bytes to HeicTurn.MIRRORED),
-            "a layout that cannot be rebuilt" to (heic(primaryIrot = null, metaFirst = true).bytes to HeicTurn.UNSAFE_LAYOUT),
-            "a jpeg named heic" to (byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD9.toByte(), 0, 0, 0, 0, 0) to HeicTurn.NOT_A_HEIC),
+            "a layout that cannot be rebuilt" to (
+                heic(primaryIrot = null, metaFirst = true).bytes to HeicTurn.UNSAFE_LAYOUT
+            ),
+            "a jpeg named heic" to (jpegBytes to HeicTurn.NOT_A_HEIC),
             "damage" to (heic(quirks = Quirks(emptyIrot = true)).bytes to HeicTurn.DAMAGED),
         )
         for ((name, pair) in cases) {

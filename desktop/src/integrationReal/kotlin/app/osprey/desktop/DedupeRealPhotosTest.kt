@@ -79,7 +79,10 @@ class DedupeRealPhotosTest : TimedTest() {
 
         assertEquals(originals.size, planner().apply(plan, trash))
         val dedupe = libraryDir.resolve("Trash").resolve(YEAR).resolve("Dedupe")
-        assertEquals(originals.map(::copyName).sorted(), Files.list(dedupe).use { l -> l.map { it.fileName.toString() }.sorted().toList() })
+        assertEquals(
+            originals.map(::copyName).sorted(),
+            Files.list(dedupe).use { l -> l.map { it.fileName.toString() }.sorted().toList() },
+        )
         for (photo in originals) {
             assertArrayEquals(Files.readAllBytes(photo), Files.readAllBytes(yearDir.resolve(photo.fileName.toString())))
             assertTrue(Files.notExists(yearDir.resolve(copyName(photo))))

@@ -44,7 +44,8 @@ import org.junit.runner.RunWith
 private const val WAIT_MS = 10_000L
 
 /**
- * The History (#79) through the whole Android app: the real shell with its drawer, a real [AndroidAppState] over the core
+  * The History (#79) through the whole Android app: the real shell with its drawer, a real [AndroidAppState] over the
+  * core
  * fakes, and a real history in files. What a person does with a finger is done here with the test's clicks, the system
  * Back button goes through the activity's dispatcher, and a new launch is a new state over the same folder. Jobs are
  * awaited on the queue's own state, never by polling the screen.
@@ -112,7 +113,9 @@ class HistoryEndToEndInstrumentedTest {
 
     private fun waitForJobs(state: AndroidAppState) = runBlocking {
         withTimeout(WAIT_MS) {
-            state.jobs.entries.first { entries -> entries.isNotEmpty() && entries.all { it.state is JobState.Finished } }
+            state.jobs.entries.first { entries ->
+                entries.isNotEmpty() && entries.all { it.state is JobState.Finished }
+            }
         }
     }
 

@@ -86,7 +86,9 @@ class RunLinesTest {
         )
         assertEquals(
             RunLine.Filed(FileRecord("p", FileResult.Done, "", before = null, after = FileState(1))),
-            RunLines.decode("""{"t":"file","path":"p","result":"Done","message":7,"before":3,"after":{"size":1,"created":"x"}}"""),
+            RunLines.decode(
+                """{"t":"file","path":"p","result":"Done","message":7,"before":3,"after":{"size":1,"created":"x"}}""",
+            ),
         )
         assertEquals(
             RunLine.Filed(FileRecord("p", FileResult.Done)),

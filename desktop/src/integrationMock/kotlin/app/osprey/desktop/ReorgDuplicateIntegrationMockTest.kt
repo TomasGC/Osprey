@@ -20,7 +20,8 @@ private const val LIBRARY_FILE = "IMG_20180101_000000.jpg"
 private const val INPUT_FILE = "IMG_20180101_000001.jpg"
 
 /**
- * The "Which files do you want to keep?" flow of Reorg (#91) through its real controller, real job queue, real files and
+  * The "Which files do you want to keep?" flow of Reorg (#91) through its real controller, real job queue, real files
+  * and
  * a real history on disk, read back the way a new launch would.
  */
 class ReorgDuplicateIntegrationMockTest : TimedTest() {

@@ -66,7 +66,7 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
-    source.setFrom("$projectDir/src/main/kotlin")
+    source.setFrom("$projectDir/src", "$projectDir/build.gradle.kts")
 }
 
 dependencies {
