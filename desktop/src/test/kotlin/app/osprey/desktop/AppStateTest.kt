@@ -40,7 +40,7 @@ class AppStateTest : TimedTest() {
         Files.createDirectory(tempDir.resolve("2023"))
         Files.createDirectory(tempDir.resolve("2021"))
         Files.createDirectory(tempDir.resolve("2022"))
-        Files.createDirectory(tempDir.resolve("TODELETE"))
+        Files.createDirectory(tempDir.resolve("Trash"))
         Files.writeString(tempDir.resolve("notes.txt"), "x")
 
         val state = newState()

@@ -13,11 +13,9 @@ internal data class ScannedFile(val entry: FileEntry, val folders: List<String>)
 }
 
 private const val TRASH_FOLDER = "Trash"
-private const val LEGACY_TRASH_PREFIX = "TODELETE"
 
-/** The Trash and the legacy `TODELETE*` folders hold files set aside by Osprey: never a source. */
-private fun isTrash(name: String) = name.equals(TRASH_FOLDER, ignoreCase = true) ||
-    name.startsWith(LEGACY_TRASH_PREFIX, ignoreCase = true)
+/** The Trash holds files set aside by Osprey: never a source. */
+private fun isTrash(name: String) = name.equals(TRASH_FOLDER, ignoreCase = true)
 
 private fun isMedia(name: String): Boolean {
     val suffix = splitStemAndSuffix(name).second.lowercase()

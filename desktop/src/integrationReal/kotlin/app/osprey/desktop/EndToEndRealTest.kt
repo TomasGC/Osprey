@@ -10,7 +10,6 @@ import app.osprey.actions.rename.RenamePlanner
 import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.actions.trash.TrashAction
 import app.osprey.actions.trash.TrashLocation
-import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.actions.trash.TrashRestorer
 import app.osprey.actions.trash.TrashScanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
@@ -42,6 +41,8 @@ class EndToEndRealTest : TimedTest() {
     private val mediaMetadataReader = DesktopMediaMetadataReader()
     private lateinit var libraryDir: Path
     private lateinit var yearDir: Path
+    private val trashedFile: Path
+        get() = libraryDir.resolve("Trash/2015/Dedupe/IMG_20150101_000000.jpg")
 
     @Before
     fun setUp() {
@@ -104,11 +105,11 @@ class EndToEndRealTest : TimedTest() {
 
     @Test
     fun `reorg gathers inputs and refiles the output by filename date, and a second run plans nothing`() {
-        // Output (the library): a misfiled image, an undated one, and a TODELETE that must never be entered.
+        // Output (the library): a misfiled image, an undated one, and a Trash folder that must never be entered.
         Files.write(yearDir.resolve("IMG_20190101_000100.jpg"), "b".toByteArray())
         Files.write(yearDir.resolve("mystery.jpg"), "c".toByteArray())
-        Files.createDirectory(yearDir.resolve("TODELETE"))
-        Files.write(yearDir.resolve("TODELETE").resolve("IMG_20150101_000000.jpg"), "e".toByteArray())
+        Files.createDirectories(libraryDir.resolve("Trash").resolve("2015").resolve("Dedupe"))
+        Files.write(trashedFile, "e".toByteArray())
         // Two inputs: one copied, one moved; the second holds a duplicate of the first's content.
         val camera = Files.createDirectory(tempInput("Camera"))
         val whatsapp = Files.createDirectory(tempInput("WhatsApp"))
@@ -134,12 +135,12 @@ class EndToEndRealTest : TimedTest() {
         assertFalse(Files.exists(whatsapp.resolve("IMG_20170425_152602.jpg")))
         assertTrue(Files.exists(libraryDir.resolve("2019").resolve("IMG_20190101_000100.jpg")))
         assertTrue(Files.exists(yearDir.resolve("mystery.jpg")))
-        assertTrue(Files.exists(yearDir.resolve("TODELETE").resolve("IMG_20150101_000000.jpg")))
+        assertTrue(Files.exists(trashedFile))
         assertEquals(emptyList<Any>(), planner.plan(output, listOf(sources[0])).items)
     }
 
     /** The real file system, except that deleting [name] fails: a Move that stopped after its verified copy. */
-    private class FailsToDelete(private val inner: FileSystemRepository, private val name: String) :
+    private class FailsToRemove(private val inner: FileSystemRepository, private val name: String) :
         FileSystemRepository by inner {
 
         override fun delete(entry: FileHandle) {
@@ -172,7 +173,7 @@ class EndToEndRealTest : TimedTest() {
         val camera = Files.createDirectory(tempInput("Camera"))
         Files.write(camera.resolve(inputName), "a".toByteArray())
         val output = PathHandle(libraryDir)
-        val interrupted = ReorgPlanner(FailsToDelete(fs, inputName), mediaMetadataReader)
+        val interrupted = ReorgPlanner(FailsToRemove(fs, inputName), mediaMetadataReader)
         val first = interrupted.apply(interrupted.plan(output, moveFrom(camera)), output)
         assertEquals(1, first.failures.size)
         assertTrue(Files.exists(camera.resolve(inputName)))
@@ -267,26 +268,4 @@ class EndToEndRealTest : TimedTest() {
     }
 
     private fun tempInput(name: String): Path = libraryDir.resolveSibling("${libraryDir.fileName}-$name")
-
-    @Test
-    fun `trash migration moves old TODELETE folders into Trash and a second run plans nothing`() {
-        Files.createDirectory(yearDir.resolve("TODELETE"))
-        Files.write(yearDir.resolve("TODELETE").resolve("a.jpg"), "a".toByteArray())
-        Files.createDirectory(yearDir.resolve("TODELETEDUPS"))
-        Files.write(yearDir.resolve("TODELETEDUPS").resolve("b.jpg"), "b".toByteArray())
-        Files.write(yearDir.resolve("keep.jpg"), "k".toByteArray())
-
-        val root = PathHandle(libraryDir)
-        val planner = TrashMigrationPlanner(fs)
-        assertTrue(planner.hasLegacy(root))
-        planner.apply(planner.plan(root), root) {}
-
-        assertTrue(Files.exists(libraryDir.resolve("Trash").resolve("2016").resolve("Dedupe").resolve("a.jpg")))
-        assertTrue(Files.exists(libraryDir.resolve("Trash").resolve("2016").resolve("VisualDupes").resolve("b.jpg")))
-        assertFalse(Files.exists(yearDir.resolve("TODELETE")))
-        assertFalse(Files.exists(yearDir.resolve("TODELETEDUPS")))
-        assertTrue(Files.exists(yearDir.resolve("keep.jpg")))
-        assertFalse(planner.hasLegacy(root))
-        assertEquals(emptyList<Any>(), planner.plan(root).moves)
-    }
 }

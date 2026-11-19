@@ -155,13 +155,20 @@ class ReorgPlannerTest {
     }
 
     @Test
-    fun `plan never reads the Trash or legacy TODELETE folders as sources`() {
+    fun `plan never reads the Trash folder as a source`() {
         file(fs.addFolder(fs.addFolder(output, "Trash"), "2016"), "t.jpg", 2018)
-        file(fs.addFolder(output, "TODELETEDUPS"), "d.jpg", 2018)
         file(fs.addFolder(camera, "Trash"), "c.jpg", 2018)
-        file(fs.addFolder(camera, "TODELETE"), "e.jpg", 2018)
 
         assertEquals(emptyList<ReorgItem>(), planner.plan(output, listOf(copyFrom(camera))).items)
+    }
+
+    @Test
+    fun `plan reads a folder whose name only starts with Trash`() {
+        file(fs.addFolder(camera, "Trashcan"), "t.jpg", 2018)
+
+        val items = planner.plan(output, listOf(copyFrom(camera))).items
+
+        assertEquals(listOf("Camera/Trashcan/t.jpg"), items.map { it.label })
     }
 
     @Test

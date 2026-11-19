@@ -51,7 +51,7 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
     @Test
     fun `list returns files and folders created directly under the given folder`() {
         Files.writeString(tempDir.resolve("photo.jpg"), "abc")
-        Files.createDirectory(tempDir.resolve("TODELETE"))
+        Files.createDirectory(tempDir.resolve("Albums"))
 
         val entries = repo.list(root())
 
@@ -59,7 +59,7 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
         val file = entries.single { it.name == "photo.jpg" }
         assertFalse(file.isDirectory)
         assertEquals(3L, file.sizeBytes)
-        assertTrue(entries.single { it.name == "TODELETE" }.isDirectory)
+        assertTrue(entries.single { it.name == "Albums" }.isDirectory)
     }
 
     @Test
@@ -95,28 +95,28 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
 
     @Test(expected = FileAlreadyExistsException::class)
     fun `move throws instead of overwriting an existing name in the destination`() {
-        val todelete = Files.createDirectory(tempDir.resolve("TODELETE"))
-        Files.writeString(todelete.resolve("photo.jpg"), "existing")
+        val albums = Files.createDirectory(tempDir.resolve("Albums"))
+        Files.writeString(albums.resolve("photo.jpg"), "existing")
         Files.writeString(tempDir.resolve("photo.jpg"), "extra")
         val extra = repo.list(root()).single { it.name == "photo.jpg" }
 
-        repo.move(extra.handle, PathHandle(todelete))
+        repo.move(extra.handle, PathHandle(albums))
     }
 
     @Test
     fun `createFolder is idempotent when the folder already exists`() {
-        repo.createFolder(root(), "TODELETE")
+        repo.createFolder(root(), "Albums")
 
-        repo.createFolder(root(), "TODELETE")
+        repo.createFolder(root(), "Albums")
 
-        assertEquals(listOf("TODELETE"), repo.list(root()).map { it.name })
+        assertEquals(listOf("Albums"), repo.list(root()).map { it.name })
     }
 
     @Test(expected = FileAlreadyExistsException::class)
     fun `createFolder throws when the name already exists as a file`() {
-        Files.writeString(tempDir.resolve("TODELETE"), "x")
+        Files.writeString(tempDir.resolve("Albums"), "x")
 
-        repo.createFolder(root(), "TODELETE")
+        repo.createFolder(root(), "Albums")
     }
 
     @Test

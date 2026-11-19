@@ -54,10 +54,10 @@ class DatesPlannerTest {
     }
 
     @Test
-    fun `plan skips the TODELETE folder entirely`() {
+    fun `plan ignores the files inside a subfolder`() {
         val fs = FakeFileSystemRepository()
-        val todelete = fs.addFolder(fs.root, "TODELETE")
-        fs.addFile(todelete, "IMG_20170425_152602.jpg")
+        val subfolder = fs.addFolder(fs.root, "subdir")
+        fs.addFile(subfolder, "IMG_20170425_152602.jpg")
         val planner = DatesPlanner(fs, FakeMediaMetadataReader())
 
         val plan = planner.plan(fs.root)

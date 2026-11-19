@@ -7,7 +7,6 @@ import androidx.compose.runtime.snapshots.Snapshot
 import app.osprey.actions.reorg.ReorgPlanner
 import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.trash.TrashLocation
-import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
@@ -36,7 +35,6 @@ enum class ActionTab(val label: String) {
     VISUAL("Visual Dupes"),
     DATES("Dates"),
     STANDARDIZE("Standardize"),
-    TRASH_MIGRATION("Migrate old trash"),
 }
 
 /** Top-level app state: the sidebar's library/year selection, plus one controller per tab. */
@@ -64,7 +62,6 @@ class AppState(
     var selectedYear by mutableStateOf<String?>(null)
     var selectedTab by mutableStateOf(ActionTab.REORG)
     var sidebarCollapsed by mutableStateOf(false)
-    var hasLegacyTrash by mutableStateOf(false)
 
     /** Whether the Trash screen is showing instead of the selected action. */
     var showsTrash by mutableStateOf(false)
@@ -81,10 +78,6 @@ class AppState(
     ) { refreshYears() }
     val rename = renameController(fs, jobs) { libraryLabel }
     val dedupe = dedupeController(fs, jobs, ::trashLocation) { libraryLabel }
-    val trashMigration = trashMigrationController(fs, jobs) {
-        refreshYears()
-        refreshLegacyTrash()
-    }
     val dates = datesController(fs, mediaMetadataReader, jobs) { libraryLabel }
     val standardize = standardizeController(fs, mediaMetadataReader, jobs) { libraryLabel }
     val trash = TrashController(fs, jobs, { libraryLabel }) { refreshYears() }
@@ -102,7 +95,6 @@ class AppState(
         libraryPath = path
         years = listYears(path)
         selectedYear = years.lastOrNull()
-        refreshLegacyTrash()
     }
 
     /** Opens the Trash screen, freshly read, or goes back to the actions when it is already open. */
@@ -130,19 +122,9 @@ class AppState(
         showsHistory = true
     }
 
-    /** The tabs to show: "Migrate old trash" only while an old `TODELETE*` folder is left. */
-    val visibleTabs: List<ActionTab>
-        get() = ActionTab.entries.filter { it != ActionTab.TRASH_MIGRATION || hasLegacyTrash }
-
     /** Where the selected year's trash lives; only called once a library and a year are chosen. */
     fun trashLocation(): TrashLocation =
         TrashLocation(checkNotNull(libraryHandle()), checkNotNull(selectedYear))
-
-    /** Re-checks the library for old `TODELETE*` folders. */
-    fun refreshLegacyTrash() {
-        val root = libraryHandle()
-        hasLegacyTrash = root != null && TrashMigrationPlanner(fs).hasLegacy(root)
-    }
 
     /** The library root itself, for the actions that run on the whole library; null until a library is chosen. */
     fun libraryHandle(): FileHandle? = libraryPath?.let { PathHandle(it) }

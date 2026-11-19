@@ -82,8 +82,8 @@ class DedupePlannerTest {
     }
 
     @Test
-    fun `plan ignores a legacy TODELETE folder inside the year`() {
-        fs.addFile(fs.addFolder(year, "TODELETE"), "b.jpg", "pre-existing".toByteArray())
+    fun `plan ignores a subfolder inside the year`() {
+        fs.addFile(fs.addFolder(year, "extras"), "b.jpg", "pre-existing".toByteArray())
         fs.addFile(year, "a.jpg", "dup content".toByteArray())
         fs.addFile(year, "b.jpg", "dup content".toByteArray())
 

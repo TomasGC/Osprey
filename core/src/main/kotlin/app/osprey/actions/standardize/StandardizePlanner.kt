@@ -31,8 +31,8 @@ class StandardizePlanner(
 ) {
 
     /**
-     * Scans `root`'s immediate files — `TODELETE`/`TODELETEDUPS` and other subfolders are never
-     * touched, since they simply aren't files. A non-image/video extension is skipped entirely
+     * Scans `root`'s immediate files — subfolders are never touched, since they simply
+     * aren't files. A non-image/video extension is skipped entirely
      * (not even considered for [StandardizePlan.unfixable]). An already-standardized name is a
      * silent no-op, never a false [StandardizePlan.unfixable] entry.
      */

@@ -49,7 +49,7 @@ class VisualDupePlanner(
 ) {
 
     /**
-     * Scans `root`'s immediate images/videos — subfolders, including `TODELETE`, are never
+     * Scans `root`'s immediate images/videos — subfolders are never
      * touched, since they simply aren't files. A file whose frame can't be decoded is silently
      * excluded (same as the POC's `None`-hash skip). Clusters of fewer than two files are
      * excluded entirely; the remaining groups are sorted largest-group-first.

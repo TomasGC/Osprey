@@ -85,18 +85,6 @@ class AppStateTest {
     }
 
     @Test
-    fun `the migration tab shows only while an old trash folder is left`() {
-        fs.addFolder(fs.addFolder(fs.root, "2019"), "TODELETE")
-        state.openLibrary(fs.root)
-        assertTrue(ActionTab.TRASH_MIGRATION in state.visibleTabs)
-
-        fs.delete(fs.list(fs.list(fs.root).single { it.name == "2019" }.handle).single().handle)
-        state.refreshLegacyTrash()
-
-        assertFalse(ActionTab.TRASH_MIGRATION in state.visibleTabs)
-    }
-
-    @Test
     fun `the Trash screen opens on a fresh read and closes on the second tap`() {
         state.openLibrary(fs.root)
 

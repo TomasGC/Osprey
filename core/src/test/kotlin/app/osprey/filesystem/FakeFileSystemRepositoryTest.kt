@@ -30,7 +30,7 @@ class FakeFileSystemRepositoryTest {
     fun `list returns every file and folder added directly under the given folder`() {
         val repo = FakeFileSystemRepository()
         repo.addFile(repo.root, "photo.jpg", byteArrayOf(1, 2, 3))
-        repo.addFolder(repo.root, "TODELETE")
+        repo.addFolder(repo.root, "Albums")
 
         val entries = repo.list(repo.root)
 
@@ -38,7 +38,7 @@ class FakeFileSystemRepositoryTest {
         val file = entries.single { it.name == "photo.jpg" }
         assertEquals(false, file.isDirectory)
         assertEquals(3L, file.sizeBytes)
-        val folder = entries.single { it.name == "TODELETE" }
+        val folder = entries.single { it.name == "Albums" }
         assertTrue(folder.isDirectory)
     }
 
@@ -77,32 +77,32 @@ class FakeFileSystemRepositoryTest {
     @Test
     fun `move can rename at the same time`() {
         val repo = FakeFileSystemRepository()
-        val todelete = repo.addFolder(repo.root, "TODELETE")
+        val albums = repo.addFolder(repo.root, "Albums")
         val extra = repo.addFile(repo.root, "photo.jpg")
 
-        repo.move(extra, todelete, newName = "photo__dup1.jpg")
+        repo.move(extra, albums, newName = "photo__dup1.jpg")
 
-        assertEquals(listOf("photo__dup1.jpg"), repo.list(todelete).map { it.name })
+        assertEquals(listOf("photo__dup1.jpg"), repo.list(albums).map { it.name })
     }
 
     @Test(expected = FileAlreadyExistsException::class)
     fun `move throws instead of overwriting an existing name in the destination folder`() {
         val repo = FakeFileSystemRepository()
-        val todelete = repo.addFolder(repo.root, "TODELETE")
-        repo.addFile(todelete, "photo.jpg")
+        val albums = repo.addFolder(repo.root, "Albums")
+        repo.addFile(albums, "photo.jpg")
         val extra = repo.addFile(repo.root, "photo.jpg")
 
-        repo.move(extra, todelete)
+        repo.move(extra, albums)
     }
 
     @Test
     fun `createFolder is idempotent when the folder already exists`() {
         val repo = FakeFileSystemRepository()
-        repo.createFolder(repo.root, "TODELETE")
+        repo.createFolder(repo.root, "Albums")
 
-        repo.createFolder(repo.root, "TODELETE")
+        repo.createFolder(repo.root, "Albums")
 
-        assertEquals(listOf("TODELETE"), repo.list(repo.root).map { it.name })
+        assertEquals(listOf("Albums"), repo.list(repo.root).map { it.name })
     }
 
     @Test
@@ -127,9 +127,9 @@ class FakeFileSystemRepositoryTest {
     @Test(expected = FileAlreadyExistsException::class)
     fun `createFolder throws when the name already exists as a file`() {
         val repo = FakeFileSystemRepository()
-        repo.addFile(repo.root, "TODELETE")
+        repo.addFile(repo.root, "Albums")
 
-        repo.createFolder(repo.root, "TODELETE")
+        repo.createFolder(repo.root, "Albums")
     }
 
     @Test

@@ -180,18 +180,12 @@ private fun rootActionFor(state: AndroidAppState, tab: ActionTab, root: FileHand
         { state.reorg.onScan(root) },
         { state.reorg.onApply(root) },
     )
-    ActionTab.TRASH_MIGRATION -> RootAction(
-        state.trashMigration.state,
-        { state.trashMigration.onScan(root) },
-        { state.trashMigration.onApply(root) },
-    )
     else -> null
 }
 
 private fun controllerFor(state: AndroidAppState, tab: ActionTab): SimpleActionController<*> = when (tab) {
     ActionTab.FLATTEN -> state.flatten
     ActionTab.REORG -> error("Reorg is handled separately above")
-    ActionTab.TRASH_MIGRATION -> error("Trash migration is handled separately above")
     ActionTab.RENAME -> state.rename
     ActionTab.DEDUPE -> state.dedupe
     ActionTab.STANDARDIZE -> state.standardize
@@ -221,7 +215,7 @@ fun DrawerContent(
         Spacer(Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(Modifier.height(8.dp))
-        state.visibleTabs.forEach { tab ->
+        ActionTab.entries.forEach { tab ->
             NavigationDrawerItem(
                 label = { Text(tab.label) },
                 selected = state.selectedTab == tab && !state.showsSettings && !state.showsTrash &&

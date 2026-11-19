@@ -86,7 +86,7 @@ class ReorgDuplicateIntegrationMockTest : TimedTest() {
         inputFile(INPUT_FILE, "one")
         inputFile("IMG_20180102_000001.jpg", "two")
         val launch = harness.launch()
-        val reorg = launch.review(controller(launch, FailsToDelete(harness.fs, INPUT_FILE)))
+        val reorg = launch.review(controller(launch, FailsToRemove(harness.fs, INPUT_FILE)))
         reorg.review.toggleInputColumn()
 
         launch.continueWith(reorg)

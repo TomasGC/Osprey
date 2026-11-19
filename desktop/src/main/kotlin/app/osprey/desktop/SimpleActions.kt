@@ -16,8 +16,6 @@ import app.osprey.actions.standardize.STANDARDIZE_RETRY
 import app.osprey.actions.standardize.StandardizePlan
 import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.actions.trash.TrashLocation
-import app.osprey.actions.trash.TrashMigrationPlan
-import app.osprey.actions.trash.TrashMigrationPlanner
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobQueue
 import app.osprey.media.MediaMetadataReader
@@ -100,25 +98,6 @@ fun datesController(
     },
     apply = { _, plan, control -> DatesPlanner(fs, mediaMetadataReader).apply(plan, control = control) },
     retry = RetryWiring("dates", library, DATES_RETRY),
-)
-
-/** Runs on the library root: moves the old `<year>/TODELETE*` folders into `Trash` (#38). */
-fun trashMigrationController(
-    fs: FileSystemRepository,
-    jobs: JobQueue,
-    onApplied: () -> Unit = {},
-) = SimpleActionController<TrashMigrationPlan>(
-    name = "Trash migration",
-    jobs = jobs,
-    scan = { root, control ->
-        val planner = TrashMigrationPlanner(fs)
-        val plan = planner.plan(root, control)
-        val lines = mutableListOf<String>()
-        val count = planner.describe(plan, lines::add)
-        ScanResult(plan, "count=$count  old_folders=${plan.folders.size}", lines, count + plan.folders.size)
-    },
-    apply = { root, plan, control -> TrashMigrationPlanner(fs).apply(plan, root, control) {} },
-    onApplied = onApplied,
 )
 
 fun standardizeController(

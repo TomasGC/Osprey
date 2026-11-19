@@ -28,7 +28,7 @@ class DatesPlanner(
 ) {
 
     /**
-     * Scans `root`'s immediate files — `TODELETE` and other subfolders are never touched, since
+     * Scans `root`'s immediate files — subfolders are never touched, since
      * they simply aren't files. Each file's date is resolved via [resolveMediaDate]; one that
      * resolves neither way ends up in [DatesPlan.unfixable].
      */
