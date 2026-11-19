@@ -37,14 +37,18 @@ class SameThreadTimeoutTest : TimedTest() {
     @Test
     fun `a test that waits past the limit fails as timed out, soon after the limit`() {
         val start = System.nanoTime()
-        val failure = assertThrows(TestTimedOutException::class.java) { runWithLimit(LIMIT_MS) { Thread.sleep(SLOW_MS) } }
+        val failure = assertThrows(TestTimedOutException::class.java) {
+            runWithLimit(LIMIT_MS) { Thread.sleep(SLOW_MS) }
+        }
         assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < SOON_MS)
         assertTrue(failure.message!!.contains("$LIMIT_MS milliseconds"))
     }
 
     @Test
     fun `the failure keeps the stack where the test was stuck`() {
-        val failure = assertThrows(TestTimedOutException::class.java) { runWithLimit(LIMIT_MS) { Thread.sleep(SLOW_MS) } }
+        val failure = assertThrows(TestTimedOutException::class.java) {
+            runWithLimit(LIMIT_MS) { Thread.sleep(SLOW_MS) }
+        }
         assertTrue(failure.stackTrace.any { it.methodName == "sleep" })
     }
 

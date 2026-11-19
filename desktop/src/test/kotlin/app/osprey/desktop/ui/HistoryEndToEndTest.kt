@@ -71,7 +71,9 @@ class HistoryEndToEndTest : TimedTest() {
 
     private fun waitForJobs(state: AppState) = runBlocking {
         withTimeout(WAIT_MS) {
-            state.jobs.entries.first { entries -> entries.isNotEmpty() && entries.all { it.state is JobState.Finished } }
+            state.jobs.entries.first { entries ->
+                entries.isNotEmpty() && entries.all { it.state is JobState.Finished }
+            }
         }
     }
 

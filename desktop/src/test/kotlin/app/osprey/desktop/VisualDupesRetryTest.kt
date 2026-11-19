@@ -97,7 +97,10 @@ class VisualDupesRetryTest : TimedTest() {
         val retried = retries().single()
         assertEquals(RunOrigin("visual-dupes", LIBRARY, "2019", retryOf = run.id), retried.origin)
         assertEquals(RunState.Done, retried.state)
-        assertTrue(retried.summary, retried.summary.startsWith("Retry of run #${run.id}: Visual Dupes 2019 retry: moved 1"))
+        assertTrue(
+            retried.summary,
+            retried.summary.startsWith("Retry of run #${run.id}: Visual Dupes 2019 retry: moved 1"),
+        )
     }
 
     @Test

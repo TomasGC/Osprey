@@ -236,7 +236,10 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
     fun `contentHash is the SHA-256 of the content`() {
         val file = tempDir.resolve("a.jpg").also { Files.writeString(it, "abc") }
 
-        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", repo.contentHash(PathHandle(file)))
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            repo.contentHash(PathHandle(file)),
+        )
     }
 
     @Test
@@ -312,7 +315,9 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
 
     @Test
     fun `replaceContent of a file that is missing throws and creates nothing`() {
-        assertThrows(IOException::class.java) { repo.replaceContent(PathHandle(tempDir.resolve("gone.png")), byteArrayOf(1)) }
+        assertThrows(IOException::class.java) {
+            repo.replaceContent(PathHandle(tempDir.resolve("gone.png")), byteArrayOf(1))
+        }
 
         assertTrue(repo.list(root()).isEmpty())
     }

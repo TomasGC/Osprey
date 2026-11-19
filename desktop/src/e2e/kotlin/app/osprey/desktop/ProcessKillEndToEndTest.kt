@@ -55,13 +55,12 @@ class ProcessKillEndToEndTest : TimedTest() {
                 lines.onEach { output += it }.any { it == "READY" }
             }
         }
-        try {
-            assertTrue("the app process never got mid-run:\n${output.joinToString("\n")}",
-                ready.get(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-        } catch (e: Exception) {
-            process.destroyForcibly()
-            throw e
-        }
+        runCatching {
+            assertTrue(
+                "the app process never got mid-run:\n${output.joinToString("\n")}",
+                ready.get(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
+            )
+        }.onFailure { process.destroyForcibly() }.getOrThrow()
         return process
     }
 

@@ -22,7 +22,12 @@ fun BufferedImage.toJpeg(orientation: Int? = null): ByteArray {
     val jpeg = encoded("jpg")
     if (orientation == null) return jpeg
     val exif = "Exif\u0000\u0000".toByteArray(Charsets.ISO_8859_1) + tiffWithOrientation(orientation)
-    val segment = byteArrayOf(0xFF.toByte(), APP1_MARKER.toByte(), 0, (exif.size + SEGMENT_LENGTH_BYTES).toByte()) + exif
+    val segment = byteArrayOf(
+        0xFF.toByte(),
+        APP1_MARKER.toByte(),
+        0,
+        (exif.size + SEGMENT_LENGTH_BYTES).toByte(),
+    ) + exif
     return jpeg.copyOfRange(0, 2) + segment + jpeg.copyOfRange(2, jpeg.size)
 }
 

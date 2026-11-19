@@ -113,6 +113,9 @@ class ActionHistoryRealPhotosTest : TimedTest() {
         assertEquals(listOf("olive.heic", "olive.jpg"), records.map { it.after?.name })
         assertEquals(listOf("olive (1).heic", "olive (1).jpg"), records.map { it.before?.name })
         assertEquals(sizes.sorted(), records.map { it.after?.size }.sortedBy { it })
-        assertEquals(bytes.sorted(), listOf("olive.jpg", "olive.heic").map { sha256(harness.year.resolve(it)) }.sorted())
+        assertEquals(
+            bytes.sorted(),
+            listOf("olive.jpg", "olive.heic").map { sha256(harness.year.resolve(it)) }.sorted(),
+        )
     }
 }

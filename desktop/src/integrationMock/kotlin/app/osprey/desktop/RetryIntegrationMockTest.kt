@@ -83,7 +83,10 @@ class RetryIntegrationMockTest : TimedTest() {
 
         assertTrue(Files.exists(harness.year.resolve("b.jpg")))
         assertTrue(Files.exists(harness.year.resolve("sub").resolve("c.jpg")))
-        assertEquals(listOf("2021/sub/b.jpg"), harness.runsAfterRestart().single { it.action == "Flatten 2021 retry" }.files.map { it.path })
+        assertEquals(
+            listOf("2021/sub/b.jpg"),
+            harness.runsAfterRestart().single { it.action == "Flatten 2021 retry" }.files.map { it.path },
+        )
     }
 
     @Test
@@ -96,7 +99,10 @@ class RetryIntegrationMockTest : TimedTest() {
         second.awaitJobs()
 
         val retry = harness.runsAfterRestart().single { it.action == "Flatten 2021 retry" }
-        assertEquals(listOf(FileRecord("2021/sub/b.jpg", FileResult.Skipped, "no longer there or already handled")), retry.files)
+        assertEquals(
+            listOf(FileRecord("2021/sub/b.jpg", FileResult.Skipped, "no longer there or already handled")),
+            retry.files,
+        )
         assertEquals(RunState.Done, retry.state)
     }
 
@@ -145,7 +151,11 @@ class RetryIntegrationMockTest : TimedTest() {
         first.awaitJobs()
         val run = harness.runsAfterRestart().single { it.action == "Trash delete" }
         val second = harness.launch()
-        val retry = TrashRetryController(harness.fs, second.jobs, TrashController(harness.fs, second.jobs, { label })) { label }
+        val retry = TrashRetryController(
+            harness.fs,
+            second.jobs,
+            TrashController(harness.fs, second.jobs, { label }),
+        ) { label }
 
         val question = retry.question(root, run)
         retry.retry(root, run)
@@ -176,7 +186,11 @@ class RetryIntegrationMockTest : TimedTest() {
         val run = harness.runsAfterRestart().single { it.action == "Trash restore" }
         Files.writeString(harness.year.resolve("a.jpg"), "taken meanwhile")
         val second = harness.launch()
-        val retry = TrashRetryController(harness.fs, second.jobs, TrashController(harness.fs, second.jobs, { label })) { label }
+        val retry = TrashRetryController(
+            harness.fs,
+            second.jobs,
+            TrashController(harness.fs, second.jobs, { label }),
+        ) { label }
 
         retry.retry(root, run)
         second.awaitJobs()
@@ -218,7 +232,11 @@ class RetryIntegrationMockTest : TimedTest() {
         assertEquals(
             listOf(
                 FileRecord("Trash/2021/Dedupe/IMG_001.jpg", FileResult.Done, "restored"),
-                FileRecord("Trash/2021/VisualDupes/IMG_001.jpg", FileResult.Done, "restored as IMG_001_VisualDupes.jpg"),
+                FileRecord(
+                    "Trash/2021/VisualDupes/IMG_001.jpg",
+                    FileResult.Done,
+                    "restored as IMG_001_VisualDupes.jpg",
+                ),
             ),
             retried.files,
         )

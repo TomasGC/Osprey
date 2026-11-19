@@ -158,7 +158,10 @@ class TurnSaverIntegrationRealTest : TimedTest() {
         assertEquals(before.width, after.height)
         for (y in 0 until after.height) {
             for (x in 0 until after.width) {
-                assertEquals(before.pixels[(before.height - 1 - x) * before.width + y], after.pixels[y * after.width + x])
+                assertEquals(
+                    before.pixels[(before.height - 1 - x) * before.width + y],
+                    after.pixels[y * after.width + x],
+                )
             }
         }
         assertEquals(ExifOrientation.NORMAL, DesktopOrientationSource().orientationOf(PathHandle(path)))

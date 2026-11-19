@@ -124,7 +124,12 @@ class AppStateTest : TimedTest() {
     @Test
     fun `a job queued through the app state is recorded in its history`() {
         val history = InMemoryJobHistoryStore()
-        val state = AppState(DesktopFileSystemRepository(), DesktopMediaMetadataReader(), FakeSettingsStore(), history = history)
+        val state = AppState(
+            DesktopFileSystemRepository(),
+            DesktopMediaMetadataReader(),
+            FakeSettingsStore(),
+            history = history,
+        )
 
         runBlocking {
             withTimeout(WAIT_MS) { state.jobs.enqueue("Probe") { JobOutcome("Probe: 1 done") }.await() }

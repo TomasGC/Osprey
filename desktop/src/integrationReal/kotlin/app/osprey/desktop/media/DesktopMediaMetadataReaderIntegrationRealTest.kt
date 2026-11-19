@@ -171,7 +171,7 @@ class DesktopMediaMetadataReaderIntegrationRealTest : TimedTest() {
             it.inputStream.readBytes()
             it.waitFor() == 0
         }
-    } catch (e: java.io.IOException) {
+    } catch (ignored: java.io.IOException) {
         false
     }
 }

@@ -64,7 +64,9 @@ class RealPhotoEndToEndTest : TimedTest() {
         if (::root.isInitialized) root.toFile().deleteRecursively()
     }
 
-    private fun file(name: String) = root.resolve("Library").resolve("Trash").resolve("2026").resolve("Dedupe").resolve(name)
+    private fun file(name: String) = root.resolve("Library").resolve("Trash").resolve("2026").resolve("Dedupe").resolve(
+        name,
+    )
 
     private fun decoded(name: String): PixelBuffer? = decodeHeicPixelBuffer(file(name))
 
@@ -73,7 +75,9 @@ class RealPhotoEndToEndTest : TimedTest() {
         height,
         width,
         IntArray(pixels.size).also { turned ->
-            for (y in 0 until height) for (x in 0 until width) turned[x * height + (height - 1 - y)] = pixels[y * width + x]
+            for (y in 0 until height) {
+                for (x in 0 until width) turned[x * height + (height - 1 - y)] = pixels[y * width + x]
+            }
         },
     )
 
@@ -113,8 +117,12 @@ class RealPhotoEndToEndTest : TimedTest() {
         assertEquals("$name: the picture after the save", before!!.turnedRight(), after)
         assertEquals("$name: the file keeps its HEIC signature", "ftyp", String(Files.readAllBytes(file(name)), 4, 4))
         assertTrue("$name shrank: ${Files.size(file(name))} < $originalSize", Files.size(file(name)) >= originalSize)
-        assertArrayEquals("$name: nothing else in the folder changed", arrayOf(WITH_ROTATION_PROPERTY, WITHOUT_ROTATION_PROPERTY),
-            Files.list(file(name).parent).use { it.map { path -> path.fileName.toString() }.sorted().toList() }.toTypedArray())
+        assertArrayEquals(
+            "$name: nothing else in the folder changed",
+            arrayOf(WITH_ROTATION_PROPERTY, WITHOUT_ROTATION_PROPERTY),
+            Files.list(file(name).parent).use { it.map { path -> path.fileName.toString() }.sorted().toList() }
+                .toTypedArray(),
+        )
     }
 
     @Test

@@ -73,7 +73,10 @@ class VisualDupeGroupUiTest : TimedTest() {
 
     @Test
     fun `each group gets a 1-based index in scan order`() {
-        val groups = listOf(listOf(member("a.jpg", 1), member("a2.jpg", 1)), listOf(member("b.jpg", 1), member("b2.jpg", 1)))
+        val groups = listOf(
+            listOf(member("a.jpg", 1), member("a2.jpg", 1)),
+            listOf(member("b.jpg", 1), member("b2.jpg", 1)),
+        )
 
         val ui = toUiGroups(groups)
 

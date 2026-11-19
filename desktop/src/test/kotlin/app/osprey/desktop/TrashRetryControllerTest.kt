@@ -45,7 +45,9 @@ class TrashRetryControllerTest : TimedTest() {
         Files.createDirectories(trashed("a.jpg").parent)
         Files.writeString(trashed("a.jpg"), "a")
         Files.writeString(trashed("b.jpg"), "b")
-        val locked = { handle: Any? -> if ((handle as PathHandle).path.fileName.toString() == "a.jpg") IOException("locked") else null }
+        val locked = { handle: Any? ->
+            if ((handle as PathHandle).path.fileName.toString() == "a.jpg") IOException("locked") else null
+        }
         fs.failDelete = locked
         fs.failMove = locked
     }

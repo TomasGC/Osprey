@@ -112,7 +112,9 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
 
         assertTrue(Files.exists(harness.year.resolve("a.jpg")))
         assertFalse(Files.exists(harness.year.resolve("bb.jpg")))
-        val trashed = Files.walk(harness.library.resolve("Trash")).use { it.filter { p -> p.fileName.toString() == "bb.jpg" }.toList() }
+        val trashed = Files.walk(harness.library.resolve("Trash")).use { it.filter { p ->
+            p.fileName.toString() == "bb.jpg" }.toList()
+        }
         assertEquals(1, trashed.size)
         val record = applyRun("Dedupe 2021 apply").files.single()
         assertEquals("2021/bb.jpg", record.path)

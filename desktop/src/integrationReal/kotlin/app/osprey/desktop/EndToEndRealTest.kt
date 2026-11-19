@@ -231,7 +231,10 @@ class EndToEndRealTest : TimedTest() {
 
         assertEquals(2, result.trashed)
         assertFalse(Files.exists(camera.resolve(inputName)))
-        assertEquals(setOf(inputName, libraryName), Files.list(reorgTrash()).use { l -> l.map { it.fileName.toString() }.toList().toSet() })
+        assertEquals(
+            setOf(inputName, libraryName),
+            Files.list(reorgTrash()).use { l -> l.map { it.fileName.toString() }.toList().toSet() },
+        )
     }
 
     @Test

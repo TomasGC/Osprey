@@ -151,7 +151,9 @@ class ReorgRetryControllerTest : TimedTest() {
         Files.createDirectory(output.resolve("2018"))
         Files.writeString(output.resolve("2018").resolve(PAIR), "same bytes")
         Files.writeString(camera.resolve(PAIR), "same bytes")
-        fs.failCopy = { if ((it as PathHandle).path.parent.fileName.toString() == "Camera") IOException("locked") else null }
+        fs.failCopy = {
+            if ((it as PathHandle).path.parent.fileName.toString() == "Camera") IOException("locked") else null
+        }
         controller.onScan(PathHandle(output))
         controller.onApply(PathHandle(output))
         controller.review.toggleInput(0)
@@ -174,7 +176,9 @@ class ReorgRetryControllerTest : TimedTest() {
         Files.createDirectory(output.resolve("2019"))
         Files.writeString(output.resolve("2019").resolve(MISFILED), "same bytes")
         Files.writeString(camera.resolve(MISFILED), "same bytes")
-        fs.failMove = { if ((it as PathHandle).path.parent.fileName.toString() == "2019") IOException("locked") else null }
+        fs.failMove = {
+            if ((it as PathHandle).path.parent.fileName.toString() == "2019") IOException("locked") else null
+        }
         controller.onScan(PathHandle(output))
         controller.onApply(PathHandle(output))
         controller.review.toggleLibrary(0)

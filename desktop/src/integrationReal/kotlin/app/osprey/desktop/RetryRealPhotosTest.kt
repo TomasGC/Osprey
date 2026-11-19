@@ -100,8 +100,14 @@ class RetryRealPhotosTest : TimedTest() {
 
     @Test
     fun `a dates run that could not stamp a real heic stamps it on retry and leaves both photos' bytes alone`() {
-        val jpeg = Files.copy(photos.resolve("jpg").resolve("gull_1.jpg"), harness.year.resolve("IMG_20170425_152602.jpg"))
-        val heic = Files.copy(photos.resolve("heic").resolve("gull_1.heic"), harness.year.resolve("IMG_20170426_101010.heic"))
+        val jpeg = Files.copy(
+            photos.resolve("jpg").resolve("gull_1.jpg"),
+            harness.year.resolve("IMG_20170425_152602.jpg"),
+        )
+        val heic = Files.copy(
+            photos.resolve("heic").resolve("gull_1.heic"),
+            harness.year.resolve("IMG_20170426_101010.heic"),
+        )
         val bytes = listOf(jpeg, heic).associateWith { sha256(it) }
         val first = harness.launch()
         val failing = FailsToStamp(harness.fs, heic.fileName.toString())
@@ -110,10 +116,15 @@ class RetryRealPhotosTest : TimedTest() {
         val jpegStamp = Files.getLastModifiedTime(jpeg).toMillis()
         val second = harness.launch()
 
-        datesController(harness.fs, reader, second.jobs) { harness.libraryLabel }.onRetry(harness.yearHandle(), run, "2021")
+        datesController(harness.fs, reader, second.jobs) { harness.libraryLabel }.onRetry(
+            harness.yearHandle(),
+            run,
+            "2021",
+        )
         second.awaitJobs()
 
-        val expected = LocalDateTime.of(2017, 4, 26, 10, 10, 10).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val expected =
+            LocalDateTime.of(2017, 4, 26, 10, 10, 10).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(RunState.Failed, run.state)
         assertEquals(expected, Files.getLastModifiedTime(heic).toMillis())
         assertEquals(jpegStamp, Files.getLastModifiedTime(jpeg).toMillis())
@@ -125,9 +136,15 @@ class RetryRealPhotosTest : TimedTest() {
     }
 
     @Test
-    fun `a standardize run that could not rename a real heic renames it on retry and leaves both photos' bytes alone`() {
-        val jpeg = Files.copy(photos.resolve("jpg").resolve("duck_1.jpg"), harness.year.resolve("download_20160828_193034.jpg"))
-        val heic = Files.copy(photos.resolve("heic").resolve("duck_1.heic"), harness.year.resolve("download_20160829_101010.heic"))
+    fun `a standardize that could not rename a real heic renames it on retry and leaves both photos' bytes alone`() {
+        val jpeg = Files.copy(
+            photos.resolve("jpg").resolve("duck_1.jpg"),
+            harness.year.resolve("download_20160828_193034.jpg"),
+        )
+        val heic = Files.copy(
+            photos.resolve("heic").resolve("duck_1.heic"),
+            harness.year.resolve("download_20160829_101010.heic"),
+        )
         val bytes = mapOf("IMG_2016-08-28_19-30-34.jpg" to sha256(jpeg), "IMG_2016-08-29_10-10-10.heic" to sha256(heic))
         val first = harness.launch()
         val failing = FailsToRename(harness.fs, heic.fileName.toString())
