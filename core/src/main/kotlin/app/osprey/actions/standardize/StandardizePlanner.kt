@@ -19,6 +19,9 @@ import java.time.format.DateTimeFormatter
 
 private val STANDARDIZED_NAME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
 
+// Between a standardized name and its number when two files get the same name: IMG_..._15-26-02__dup2.jpg.
+private const val COLLISION_MARKER = "__dup"
+
 /**
  * Renames every image/video directly inside `root` to `IMG_YYYY-MM-DD_HH-MM-SS` / `VID_...`,
  * resolving its own capture date independently of whether the Dates action (#6) has already run
@@ -124,9 +127,14 @@ class StandardizePlanner(
         val suffix = splitStemAndSuffix(sourceName).second
         val baseName = "${prefix}_${resolved.dateTime.format(STANDARDIZED_NAME_FORMAT)}"
         val target = "$baseName$suffix"
-        if (target == sourceName) return target
+        if (target == sourceName || isCollisionCopy(sourceName, baseName, suffix)) return sourceName
         return firstFreeName(baseName, suffix, target, existingNames, claimed)
     }
+
+    // A file Standardize already gave a collision number to stays as it is (#84): its own name counts as taken, so
+    // every run would otherwise move it to the next free number (__dup2, __dup3, ...).
+    private fun isCollisionCopy(sourceName: String, baseName: String, suffix: String): Boolean =
+        Regex("${Regex.escape(baseName)}$COLLISION_MARKER\\d+${Regex.escape(suffix)}").matches(sourceName)
 
     // Starts at __dup2, not __dup1 like Dedupe's/Flatten's collision suffix -- carried over
     // from the POC as-is, a known inconsistency, not silently "fixed" during the port (#7).
@@ -140,7 +148,7 @@ class StandardizePlanner(
         var target = firstCandidate
         var n = 2
         while (target in existingNames || target in claimed) {
-            target = "${baseName}__dup$n$suffix"
+            target = "$baseName$COLLISION_MARKER$n$suffix"
             n++
         }
         return target

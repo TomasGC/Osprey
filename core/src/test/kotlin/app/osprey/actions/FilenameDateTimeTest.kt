@@ -78,4 +78,80 @@ class FilenameDateTimeTest {
         assertNull(filenameDateTime("123456789012"))
         assertNull(filenameDateTime("12345678901234"))
     }
+
+    @Test
+    fun `filenameWallClock reads the camera patterns with a time of day`() {
+        assertEquals(LocalDateTime.of(2020, 7, 10, 11, 0, 0), filenameWallClock("VID_20200710_110000"))
+        assertEquals(LocalDateTime.of(2020, 7, 10, 11, 0, 0), filenameWallClock("Screenshot_20200710-110000"))
+    }
+
+    @Test
+    fun `filenameWallClock ignores date-only and epoch names`() {
+        assertNull(filenameWallClock("VID-20200710-WA0001"))
+        assertNull(filenameWallClock("1594368000000"))
+    }
+
+    @Test
+    fun `filenameWallClock returns null for an impossible date and for no match`() {
+        assertNull(filenameWallClock("VID_20201310_110000"))
+        assertNull(filenameWallClock("holiday"))
+    }
+
+    @Test
+    fun `filenameWallClock reads a standardized name`() {
+        assertEquals(LocalDateTime.of(2020, 7, 10, 13, 0, 0), filenameWallClock("VID_2020-07-10_13-00-00"))
+        assertEquals(LocalDateTime.of(2020, 7, 10, 13, 0, 0), filenameWallClock("IMG_2020-07-10_13-00-00__dup2"))
+    }
+
+    @Test
+    fun `filenameWallClock rejects other prefixes, separators and impossible dates in the standardized form`() {
+        assertNull(filenameWallClock("Screenshot_2020-07-10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10 13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_13:00:00"))
+        assertNull(filenameWallClock("VID_2020-13-10_13-00-00"))
+    }
+
+    @Test
+    fun `filenameWallClock reads every field of a standardized name from its own place`() {
+        assertEquals(LocalDateTime.of(2021, 8, 17, 13, 45, 21), filenameWallClock("VID_2021-08-17_13-45-21"))
+    }
+
+    @Test
+    fun `filenameWallClock needs a standardized name to start with its prefix`() {
+        assertNull(filenameWallClock("holiday_VID_2020-07-10_13-00-00"))
+    }
+
+    @Test
+    fun `filenameWallClock needs the exact separators of a standardized name`() {
+        assertNull(filenameWallClock("VID-2020-07-10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020.07-10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07.10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_13.00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_13-00.00"))
+    }
+
+    @Test
+    fun `filenameWallClock needs every field of a standardized name at its full width`() {
+        assertNull(filenameWallClock("VID_20-07-10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-7-10_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-1_13-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_1-00-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_13-0-00"))
+        assertNull(filenameWallClock("VID_2020-07-10_13-00-0"))
+    }
+
+    // Standardize reads back what it wrote (#84): a renamed photo or video with no metadata keeps its date.
+    @Test
+    fun `filenameDateTime reads a standardized name`() {
+        assertEquals(LocalDateTime.of(2016, 8, 28, 19, 30, 34), filenameDateTime("IMG_2016-08-28_19-30-34"))
+        assertEquals(LocalDateTime.of(2016, 8, 28, 19, 30, 34), filenameDateTime("VID_2016-08-28_19-30-34__dup2"))
+    }
+
+    @Test
+    fun `filenameDateTime rejects other prefixes, separators and impossible dates in the standardized form`() {
+        assertNull(filenameDateTime("Screenshot_2016-08-28_19-30-34"))
+        assertNull(filenameDateTime("VID_2016-08-28 19-30-34"))
+        assertNull(filenameDateTime("VID_2016-08-28_19:30:34"))
+        assertNull(filenameDateTime("VID_2016-13-28_19-30-34"))
+    }
 }

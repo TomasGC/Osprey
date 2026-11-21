@@ -17,6 +17,10 @@ private val fullDatetimePatterns = listOf(
     Regex("""^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"""),
     Regex("""(?:Screenshot|SmartSelect)_(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})"""),
     Regex("""CameraZOOM-(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})"""),
+    // What Standardize (#7) names a file: IMG_ or VID_, then yyyy-MM-dd_HH-mm-ss, with a collision suffix possibly
+    // after it. Read back like a camera's own name, so a file with no metadata keeps its date and a video its time
+    // after the first run (#84).
+    Regex("""^(?:IMG|VID)_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})"""),
 )
 
 // WhatsApp's IMG-YYYYMMDD-WA#### naming carries no time of day.
@@ -26,6 +30,17 @@ private val dateOnlyPatterns = listOf(
 
 private val epochMillisPattern = Regex("""^\d{13}$""")
 
+private fun fullDatetimeMatch(stem: String): MatchResult? = fullDatetimePatterns.firstNotNullOfOrNull { it.find(stem) }
+
+/**
+ * The wall-clock time a camera wrote into [stem] (#84), or Standardize wrote back from it: only the patterns that
+ * carry a time of day. A date-only name reads as midnight and an epoch-millis name is an instant shown in the
+ * machine's zone, so neither says what the clock at the place of shooting showed. Null when no such pattern matches
+ * or its date is impossible.
+ */
+fun filenameWallClock(stem: String): LocalDateTime? =
+    fullDatetimeMatch(stem)?.let { dateTimeFromGroups(it.groupValues) }
+
 /**
  * Parses a capture datetime out of [stem] (a filename without its extension), trying each known
  * camera/sync-app naming convention in turn, then a bare 13-digit epoch-millis timestamp.
@@ -34,10 +49,7 @@ private val epochMillisPattern = Regex("""^\d{13}$""")
  * included: once a pattern matches, its result (valid or not) is final, no other pattern is tried.
  */
 fun filenameDateTime(stem: String): LocalDateTime? {
-    for (pattern in fullDatetimePatterns) {
-        val match = pattern.find(stem) ?: continue
-        return dateTimeFromGroups(match.groupValues)
-    }
+    fullDatetimeMatch(stem)?.let { return dateTimeFromGroups(it.groupValues) }
     for (pattern in dateOnlyPatterns) {
         val match = pattern.find(stem) ?: continue
         return dateOnlyFromGroups(match.groupValues)
