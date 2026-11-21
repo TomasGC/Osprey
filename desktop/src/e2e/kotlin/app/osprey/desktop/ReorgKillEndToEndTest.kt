@@ -11,8 +11,6 @@ import app.osprey.jobs.NoJobControl
 import app.osprey.settings.InputMode
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,7 +18,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-private const val START_TIMEOUT_SECONDS = 90L
 private const val PHOTO = "IMG_20180101_000000.jpg"
 
 /**
@@ -48,25 +45,11 @@ class ReorgKillEndToEndTest : TimedTest() {
     }
 
     /** Starts the app process and returns once it is inside the delete; its output is kept for a failure. */
-    private fun startAndWaitUntilMidMove(output: MutableList<String>): Process {
-        val java = Path.of(System.getProperty("java.home"), "bin", "java").toString()
-        val process = ProcessBuilder(
-            java, "-cp", System.getProperty("osprey.e2e.classpath"), "app.osprey.desktop.KilledMidMoveKt",
-            library.toString(), camera.toString(),
-        ).redirectErrorStream(true).start()
-        val ready = CompletableFuture.supplyAsync {
-            process.inputStream.bufferedReader().useLines { lines ->
-                lines.onEach { output += it }.any { it == "READY" }
-            }
-        }
-        runCatching {
-            assertTrue(
-                "the app process never got mid-move:\n${output.joinToString("\n")}",
-                ready.get(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-            )
-        }.onFailure { process.destroyForcibly() }.getOrThrow()
-        return process
-    }
+    private fun startAndWaitUntilMidMove(output: MutableList<String>): Process = startUntilReady(
+        appCommand("app.osprey.desktop.KilledMidMoveKt", library.toString(), camera.toString()),
+        "mid-move",
+        output,
+    )
 
     @Test
     fun `a Move killed after its verified copy leaves a pair the next launch offers and can settle`() {

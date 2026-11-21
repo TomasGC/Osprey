@@ -8,8 +8,6 @@ import app.osprey.history.RunState
 import app.osprey.history.openHistory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +16,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-private const val START_TIMEOUT_SECONDS = 90L
 
 /**
  * A real process killed in the middle of a run (#79): the History written to disk by a child JVM must show the run as
@@ -44,25 +41,11 @@ class ProcessKillEndToEndTest : TimedTest() {
     }
 
     /** Starts the app process and returns once it is inside its second move; its output is kept for a failure. */
-    private fun startAndWaitUntilMidRun(output: MutableList<String>): Process {
-        val java = Path.of(System.getProperty("java.home"), "bin", "java").toString()
-        val process = ProcessBuilder(
-            java, "-cp", System.getProperty("osprey.e2e.classpath"), "app.osprey.desktop.KilledMidRunKt",
-            library.toString(), historyDir.toString(),
-        ).redirectErrorStream(true).start()
-        val ready = CompletableFuture.supplyAsync {
-            process.inputStream.bufferedReader().useLines { lines ->
-                lines.onEach { output += it }.any { it == "READY" }
-            }
-        }
-        runCatching {
-            assertTrue(
-                "the app process never got mid-run:\n${output.joinToString("\n")}",
-                ready.get(START_TIMEOUT_SECONDS, TimeUnit.SECONDS),
-            )
-        }.onFailure { process.destroyForcibly() }.getOrThrow()
-        return process
-    }
+    private fun startAndWaitUntilMidRun(output: MutableList<String>): Process = startUntilReady(
+        appCommand("app.osprey.desktop.KilledMidRunKt", library.toString(), historyDir.toString()),
+        "mid-run",
+        output,
+    )
 
     @Test
     fun `a run the app process is killed in is Interrupted after a restart and keeps the file it had finished`() {
