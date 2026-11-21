@@ -10,6 +10,7 @@ private const val REPOSITORY_MARKER = "settings.gradle.kts"
 private const val HEIC_FOLDER = "heic"
 private const val JPEG_FOLDER = "jpg"
 private const val PNG_FOLDER = "png"
+private const val MP4_FOLDER = "mp4"
 private const val REQUIRED = "1"
 
 /**
@@ -48,6 +49,9 @@ object Photos {
 
     /** The HEIC photos of [folder], in name order. */
     fun heic(folder: Path): List<Path> = listing(folder, HEIC_FOLDER, heicExtensions)
+
+    /** The MP4 videos of [folder], in name order: phone and WhatsApp clips, trimmed to a few seconds (#84). */
+    fun mp4(folder: Path): List<Path> = listing(folder, MP4_FOLDER, setOf(".mp4"))
 
     private fun listing(folder: Path, name: String, extensions: Set<String>): List<Path> {
         val directory = folder.resolve(name)

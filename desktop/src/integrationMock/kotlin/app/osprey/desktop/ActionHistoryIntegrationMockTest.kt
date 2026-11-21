@@ -1,10 +1,14 @@
 package app.osprey.desktop
 
+import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.history.FileResult
 import app.osprey.history.RunState
+import app.osprey.media.MediaDate
+import app.osprey.media.MediaDateSource
+import app.osprey.media.utcToLocal
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -79,6 +83,48 @@ class ActionHistoryIntegrationMockTest : TimedTest() {
         assertEquals("download_20160828_193034.jpeg", record.before?.name)
         assertEquals("IMG_2016-08-28_19-30-34.jpeg", record.after?.name)
         assertEquals(5L, record.after?.size)
+    }
+
+    @Test
+    fun `Standardize run twice leaves a video shot in another timezone named after its own time`() {
+        val container = MediaDate(utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0)), MediaDateSource.VIDEO_METADATA)
+        harness.reader.setCaptureDateTime(PathHandle(harness.file("VID_20200710_134500.mp4", "video")), container)
+        harness.reader.setCaptureDateTime(PathHandle(harness.year.resolve("VID_2020-07-10_13-45-00.mp4")), container)
+
+        for (run in 1..2) {
+            val launch = harness.launch()
+            launch.scanAndApply(standardizeController(harness.fs, harness.reader, launch.jobs) { harness.libraryLabel })
+        }
+
+        val names = Files.list(harness.year).use { entries -> entries.map { it.fileName.toString() }.toList() }
+        assertEquals(listOf("VID_2020-07-10_13-45-00.mp4"), names)
+    }
+
+    @Test
+    fun `Standardize run twice changes nothing for files that collided and files with no metadata`() {
+        harness.file("IMG_20170425_152602.jpg", "one")
+        harness.file("IMG_20170425_152602_1.jpg", "two")
+        harness.file("IMG_2016-08-28_19-30-34.jpg", "three")
+        harness.file("VID-20180314-WA0073.mp4", "four")
+
+        for (run in 1..2) {
+            val launch = harness.launch()
+            launch.scanAndApply(standardizeController(harness.fs, harness.reader, launch.jobs) { harness.libraryLabel })
+        }
+
+        val names = Files.list(harness.year).use { entries -> entries.map { it.fileName.toString() }.toList() }
+        assertEquals(
+            listOf(
+                "IMG_2016-08-28_19-30-34.jpg",
+                "IMG_2017-04-25_15-26-02.jpg",
+                "IMG_2017-04-25_15-26-02__dup2.jpg",
+                "VID_2018-03-14_00-00-00.mp4",
+            ),
+            names.sorted(),
+        )
+        val third = StandardizePlanner(harness.fs, harness.reader).plan(harness.yearHandle())
+        assertEquals(emptyList<Any>(), third.renames)
+        assertEquals(emptyList<Any>(), third.unfixable)
     }
 
     @Test
