@@ -10,8 +10,10 @@ import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
+import app.osprey.media.utcToLocal
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,6 +53,190 @@ class StandardizePlannerTest {
 
         assertEquals("VID_2017-04-25_15-26-02.mp4", rename.targetName)
         assertEquals(MediaDateSource.FILENAME, rename.source)
+    }
+
+    @Test
+    fun `plan names a video shot in another timezone after the time in its name`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20200710_134500.mp4")
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+
+        val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
+
+        assertEquals("VID_2020-07-10_13-45-00.mp4", rename.targetName)
+        assertEquals(LocalDateTime.of(2020, 7, 10, 13, 45, 0), rename.dateTime)
+        assertEquals(MediaDateSource.FILENAME, rename.source)
+    }
+
+    @Test
+    fun `plan keeps the container time for a video whose name is no offset of it`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20200710_135500.mp4")
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+
+        val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
+
+        val containerName = container.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
+        assertEquals("VID_$containerName.mp4", rename.targetName)
+        assertEquals(MediaDateSource.VIDEO_METADATA, rename.source)
+    }
+
+    @Test
+    fun `plan leaves a video alone once it is renamed after another timezone`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20200710_134500.mp4")
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+        val planner = StandardizePlanner(fs, reader)
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(listOf("VID_2020-07-10_13-45-00.mp4"), fs.list(fs.root).map { it.name })
+        assertEquals(emptyList<Any>(), second.renames)
+        assertEquals(emptyList<Any>(), second.unfixable)
+    }
+
+    @Test
+    fun `plan leaves a video alone once it is renamed after its container`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20200710_135500.mp4")
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+        val planner = StandardizePlanner(fs, reader)
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(emptyList<Any>(), second.renames)
+        assertEquals(emptyList<Any>(), second.unfixable)
+    }
+
+    @Test
+    fun `plan leaves a renamed photo with no metadata alone and does not call it unfixable`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_2016-08-28_19-30-34.jpg")
+
+        val plan = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root)
+
+        assertEquals(emptyList<Any>(), plan.renames)
+        assertEquals(emptyList<Any>(), plan.unfixable)
+    }
+
+    @Test
+    fun `plan leaves a WhatsApp video alone once it is renamed`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "VID-20180314-WA0073.mp4")
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(listOf("VID_2018-03-14_00-00-00.mp4"), fs.list(fs.root).map { it.name })
+        assertEquals(emptyList<Any>(), second.renames)
+        assertEquals(emptyList<Any>(), second.unfixable)
+    }
+
+    // Photos that all say 2017-04-25 15:26:02 in their EXIF, so their standard names collide and the planner never
+    // depends on reading a date back from a name: only on leaving a collision copy where it is.
+    private fun collidingPhotos(fs: FakeFileSystemRepository, vararg names: String): FakeMediaMetadataReader {
+        val reader = FakeMediaMetadataReader()
+        val taken = MediaDate(LocalDateTime.of(2017, 4, 25, 15, 26, 2), MediaDateSource.EXIF)
+        names.forEach { reader.setCaptureDateTime(fs.addFile(fs.root, it), taken) }
+        return reader
+    }
+
+    @Test
+    fun `plan leaves two files that collided alone on the next run`() {
+        val fs = FakeFileSystemRepository()
+        val planner = StandardizePlanner(fs, collidingPhotos(fs, "IMG_0001.jpg", "IMG_0002.jpg"))
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(
+            listOf("IMG_2017-04-25_15-26-02.jpg", "IMG_2017-04-25_15-26-02__dup2.jpg"),
+            fs.list(fs.root).map { it.name }.sorted(),
+        )
+        assertEquals(emptyList<Any>(), second.renames)
+        assertEquals(emptyList<Any>(), second.unfixable)
+    }
+
+    @Test
+    fun `plan leaves two files with no metadata that collided alone on the next run`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_20170425_152602.jpg")
+        fs.addFile(fs.root, "IMG_20170425_152602_1.jpg")
+        val planner = StandardizePlanner(fs, FakeMediaMetadataReader())
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(emptyList<Any>(), second.renames)
+        assertEquals(emptyList<Any>(), second.unfixable)
+    }
+
+    @Test
+    fun `plan leaves three files that collided alone on the next run`() {
+        val fs = FakeFileSystemRepository()
+        val planner = StandardizePlanner(fs, collidingPhotos(fs, "IMG_0001.jpg", "IMG_0002.jpg", "IMG_0003.jpg"))
+
+        planner.apply(planner.plan(fs.root))
+        val second = planner.plan(fs.root)
+
+        assertEquals(
+            listOf(
+                "IMG_2017-04-25_15-26-02.jpg",
+                "IMG_2017-04-25_15-26-02__dup2.jpg",
+                "IMG_2017-04-25_15-26-02__dup3.jpg",
+            ),
+            fs.list(fs.root).map { it.name }.sorted(),
+        )
+        assertEquals(emptyList<Any>(), second.renames)
+    }
+
+    @Test
+    fun `plan renames a collision copy whose own date is another one`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val copy = fs.addFile(fs.root, "IMG_2017-04-25_15-26-02__dup2.jpg")
+        reader.setCaptureDateTime(copy, MediaDate(LocalDateTime.of(2018, 1, 1, 10, 0, 0), MediaDateSource.EXIF))
+
+        val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
+
+        assertEquals("IMG_2018-01-01_10-00-00.jpg", rename.targetName)
+    }
+
+    @Test
+    fun `plan renames a name whose collision number is no number`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_2017-04-25_15-26-02__dupX.jpg")
+        fs.addFile(fs.root, "IMG_2018-01-01_10-00-00__dup.jpg")
+
+        val renames = StandardizePlanner(fs, FakeMediaMetadataReader()).plan(fs.root).renames
+
+        assertEquals(
+            setOf("IMG_2017-04-25_15-26-02.jpg", "IMG_2018-01-01_10-00-00.jpg"),
+            renames.map { it.targetName }.toSet(),
+        )
+    }
+
+    @Test
+    fun `plan renames a file that only contains a collision name`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val file = fs.addFile(fs.root, "holiday_IMG_2017-04-25_15-26-02__dup2.jpg")
+        reader.setCaptureDateTime(file, MediaDate(LocalDateTime.of(2017, 4, 25, 15, 26, 2), MediaDateSource.EXIF))
+
+        val rename = StandardizePlanner(fs, reader).plan(fs.root).renames.single()
+
+        assertEquals("IMG_2017-04-25_15-26-02.jpg", rename.targetName)
     }
 
     @Test

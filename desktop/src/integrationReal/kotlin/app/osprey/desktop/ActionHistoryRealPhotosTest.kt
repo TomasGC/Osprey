@@ -1,14 +1,19 @@
 package app.osprey.desktop
 
+import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.desktop.media.DesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
 import app.osprey.history.FileResult
+import app.osprey.media.utcToLocal
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -97,6 +102,47 @@ class ActionHistoryRealPhotosTest : TimedTest() {
         )
         assertEquals(bytes, bytes.keys.associateWith { sha256(harness.year.resolve(it)) })
         assertTrue(Files.notExists(harness.year.resolve("download_20160828_193034.jpg")))
+    }
+
+    @Test
+    fun `Standardize names real phone videos after their camera clock and a second run changes nothing`() {
+        val videos = listOf(
+            "20190629_151754.mp4",
+            "20190629_151754_1.mp4", // the same video again: its standard name collides with the first one's
+            "20190629_153748.mp4",
+            "MOV_0058.mp4",
+            "VID-20180314-WA0073.mp4", // no container date, so the name is all there is on the next run
+        )
+        videos.forEach { copy("mp4", it, it) }
+        val bytes = videos.associateWith { sha256(harness.year.resolve(it)) }
+        // The two camera videos were shot at UTC+2, their names 17 s and 11 s off the container. A machine at that
+        // offset shows the container's time and agrees with the names, so the container's time stays; at any other
+        // offset (CI, an emulator) the container shows another hour and the name, the camera's clock, wins (#84).
+        val shotZone = ZoneId.systemDefault().rules.getOffset(Instant.parse("2019-06-29T13:18:11Z")) ==
+            ZoneOffset.ofHours(2)
+        val phone = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+        val noName = utcToLocal(LocalDateTime.of(2018, 12, 2, 9, 37, 57)).format(phone)
+        val first = if (shotZone) "VID_2019-06-29_15-18-11" else "VID_2019-06-29_15-17-54"
+        val expected = mapOf(
+            "20190629_151754.mp4" to "$first.mp4",
+            "20190629_151754_1.mp4" to "${first}__dup2.mp4",
+            "20190629_153748.mp4" to if (shotZone) "VID_2019-06-29_15-37-59.mp4" else "VID_2019-06-29_15-37-48.mp4",
+            "MOV_0058.mp4" to "VID_$noName.mp4",
+            "VID-20180314-WA0073.mp4" to "VID_2018-03-14_00-00-00.mp4",
+        )
+
+        repeat(2) {
+            val launch = harness.launch()
+            launch.scanAndApply(standardizeController(harness.fs, reader, launch.jobs) { harness.libraryLabel })
+        }
+
+        val names = Files.list(harness.year).use { entries -> entries.map { it.fileName.toString() }.toList() }
+        assertEquals(expected.values.sorted(), names.sorted())
+        // The two copies hold the same bytes, so which of them kept the plain name does not matter.
+        assertEquals(bytes, expected.entries.associate { (from, to) -> from to sha256(harness.year.resolve(to)) })
+        val third = StandardizePlanner(harness.fs, reader).plan(harness.yearHandle())
+        assertEquals(emptyList<Any>(), third.renames)
+        assertEquals(emptyList<Any>(), third.unfixable)
     }
 
     @Test

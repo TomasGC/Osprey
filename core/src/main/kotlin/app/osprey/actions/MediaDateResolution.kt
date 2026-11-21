@@ -5,6 +5,7 @@ import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
 import app.osprey.media.MediaMetadataReader
 import java.time.LocalDateTime
+import java.time.ZoneId
 
 private const val EARLIEST_CAPTURE_YEAR = 1970
 
@@ -19,12 +20,30 @@ private val EARLIEST_CAPTURE_DATE: LocalDateTime = LocalDateTime.of(EARLIEST_CAP
  * as an unset placeholder, so it falls through to the filename. Shared by the Dates (#6) and
  * Standardize (#7) actions, which each resolve it independently rather than one reading the
  * other's result — a POC invariant, not an accident of shared code.
+ *
+ * One exception (#84): a video shot in another timezone has a container time shown in [zone], the machine's, while
+ * its name holds the local time of the place of shooting. When the name's time is the container's instant at a real
+ * UTC offset ([isContainerAtOtherOffset]), the name's time wins, reported as [MediaDateSource.FILENAME].
  */
-fun resolveMediaDate(entry: FileHandle, name: String, reader: MediaMetadataReader): MediaDate? {
-    reader.captureDateTime(entry)?.takeIf { it.dateTime >= EARLIEST_CAPTURE_DATE }?.let { return it }
+fun resolveMediaDate(
+    entry: FileHandle,
+    name: String,
+    reader: MediaMetadataReader,
+    zone: ZoneId = ZoneId.systemDefault(),
+): MediaDate? {
     val stem = splitStemAndSuffix(name).first
+    reader.captureDateTime(entry)?.takeIf { it.dateTime >= EARLIEST_CAPTURE_DATE }?.let {
+        return videoNameTime(it, stem, zone) ?: it
+    }
     val dateTime = filenameDateTime(stem) ?: return null
     return MediaDate(dateTime, MediaDateSource.FILENAME)
+}
+
+private fun videoNameTime(container: MediaDate, stem: String, zone: ZoneId): MediaDate? {
+    if (container.source != MediaDateSource.VIDEO_METADATA) return null
+    val nameTime = filenameWallClock(stem) ?: return null
+    if (!isContainerAtOtherOffset(container.dateTime, nameTime, zone)) return null
+    return MediaDate(nameTime, MediaDateSource.FILENAME)
 }
 
 /** The POC's display strings for a [MediaDateSource], used in `SET`/`RENAME` log lines. */

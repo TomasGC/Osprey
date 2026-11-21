@@ -1,9 +1,11 @@
 package app.osprey.desktop.media
 
 import app.osprey.actions.dates.DatesPlanner
+import app.osprey.actions.standardize.StandardizePlanner
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.testing.TimedTest
+import app.osprey.fixtures.Photos
 import app.osprey.media.MediaDateSource
 import app.osprey.media.utcToLocal
 import java.awt.image.BufferedImage
@@ -13,11 +15,13 @@ import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.imageio.ImageIO
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assume
 import org.junit.Before
 import org.junit.Test
@@ -115,6 +119,79 @@ class DesktopMediaMetadataReaderIntegrationRealTest : TimedTest() {
 
         // The container time is UTC, so it comes back as this machine's local time.
         assertEquals(utcToLocal(LocalDateTime.of(2020, 5, 1, 10, 30, 0)), date?.dateTime)
+    }
+
+    @Test
+    fun `Standardize names a real video shot in another timezone after the time in its name`() {
+        Assume.assumeTrue("ffmpeg/ffprobe not on PATH", isToolOnPath("ffmpeg") && isToolOnPath("ffprobe"))
+        generateTestVideo("VID_20200710_134500.mp4", creationTime = "2020-07-10T08:00:00.000000Z")
+        val planner = StandardizePlanner(DesktopFileSystemRepository(), reader)
+
+        val rename = planner.plan(PathHandle(tempDir)).renames.single()
+
+        assertEquals("VID_2020-07-10_13-45-00.mp4", rename.targetName)
+        assertEquals(MediaDateSource.FILENAME, rename.source)
+    }
+
+    @Test
+    fun `Standardize keeps the container time for a real video whose name is no offset of it`() {
+        Assume.assumeTrue("ffmpeg/ffprobe not on PATH", isToolOnPath("ffmpeg") && isToolOnPath("ffprobe"))
+        generateTestVideo("VID_20200710_135500.mp4", creationTime = "2020-07-10T08:00:00.000000Z")
+        val planner = StandardizePlanner(DesktopFileSystemRepository(), reader)
+
+        val rename = planner.plan(PathHandle(tempDir)).renames.single()
+
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        val containerName = container.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"))
+        assertEquals("VID_$containerName.mp4", rename.targetName)
+        assertEquals(MediaDateSource.VIDEO_METADATA, rename.source)
+    }
+
+    @Test
+    fun `Standardize leaves a real video alone once it is renamed after another timezone`() {
+        Assume.assumeTrue("ffmpeg/ffprobe not on PATH", isToolOnPath("ffmpeg") && isToolOnPath("ffprobe"))
+        generateTestVideo("VID_20200710_134500.mp4", creationTime = "2020-07-10T08:00:00.000000Z")
+        val planner = StandardizePlanner(DesktopFileSystemRepository(), reader)
+
+        planner.apply(planner.plan(PathHandle(tempDir)))
+        val second = planner.plan(PathHandle(tempDir))
+
+        assertEquals(listOf("VID_2020-07-10_13-45-00.mp4"), tempDir.toFile().list()!!.toList())
+        assertEquals(emptyList<Any>(), second.renames)
+    }
+
+    @Test
+    fun `Standardize leaves a real video alone once it is renamed after its container`() {
+        Assume.assumeTrue("ffmpeg/ffprobe not on PATH", isToolOnPath("ffmpeg") && isToolOnPath("ffprobe"))
+        generateTestVideo("VID_20200710_135500.mp4", creationTime = "2020-07-10T08:00:00.000000Z")
+        val planner = StandardizePlanner(DesktopFileSystemRepository(), reader)
+
+        planner.apply(planner.plan(PathHandle(tempDir)))
+        val second = planner.plan(PathHandle(tempDir))
+
+        assertEquals(1, tempDir.toFile().list()!!.size)
+        assertEquals(emptyList<Any>(), second.renames)
+    }
+
+    @Test
+    fun `captureDateTime reads the creation_time of a real phone video`() {
+        Assume.assumeTrue("ffprobe not on PATH", isToolOnPath("ffprobe"))
+        val video = Photos.mp4(Photos.need()).single { it.fileName.toString() == "20190629_151754.mp4" }
+
+        val date = reader.captureDateTime(PathHandle(video))
+
+        assertEquals(utcToLocal(LocalDateTime.of(2019, 6, 29, 13, 18, 11)), date?.dateTime)
+        assertEquals(MediaDateSource.VIDEO_METADATA, date?.source)
+    }
+
+    @Test
+    fun `captureDateTime finds no date in a real WhatsApp video`() {
+        Assume.assumeTrue("ffprobe not on PATH", isToolOnPath("ffprobe"))
+        val video = Photos.mp4(Photos.need()).single { it.fileName.toString() == "VID-20180314-WA0073.mp4" }
+
+        val date = reader.captureDateTime(PathHandle(video))
+
+        assertTrue("a WhatsApp video carries no creation time: $date", date == null || date.dateTime.year < 1970)
     }
 
     @Test

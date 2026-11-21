@@ -133,6 +133,22 @@ class PhotosTest {
     }
 
     @Test
+    fun `mp4 lists only the mp4 files of the mp4 folder, in name order`() {
+        val folder = Files.createDirectories(tmp.resolve("Osprey-fixtures"))
+        val mp4 = Files.createDirectories(folder.resolve("mp4"))
+        listOf("b_1.mp4", "a_1.mp4", "c_1.MP4", "note.txt").forEach { Files.writeString(mp4.resolve(it), "x") }
+        Files.createDirectories(folder.resolve("heic"))
+        Files.writeString(folder.resolve("heic").resolve("z_1.mp4"), "x")
+
+        assertEquals(listOf("a_1.mp4", "b_1.mp4", "c_1.MP4"), Photos.mp4(folder).map { it.fileName.toString() })
+    }
+
+    @Test
+    fun `a folder with no mp4 folder has no videos`() {
+        assertEquals(emptyList<Path>(), Photos.mp4(Files.createDirectories(tmp.resolve("Osprey-fixtures"))))
+    }
+
+    @Test
     fun `a folder with no heic folder has no heic photos`() {
         assertEquals(emptyList<Path>(), Photos.heic(Files.createDirectories(tmp.resolve("Osprey-fixtures"))))
     }

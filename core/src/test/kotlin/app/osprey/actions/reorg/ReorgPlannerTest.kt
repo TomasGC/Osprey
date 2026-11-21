@@ -14,6 +14,7 @@ import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
+import app.osprey.media.utcToLocal
 import app.osprey.settings.InputMode
 import java.io.IOException
 import java.time.LocalDateTime
@@ -95,6 +96,44 @@ class ReorgPlannerTest {
     @Test
     fun `plan resolves the year from the file name when there is no metadata`() {
         file(camera, "IMG_20160828_193034.jpg", null)
+
+        assertEquals(2016, planner.plan(output, listOf(copyFrom(camera))).items.single().year)
+    }
+
+    /**
+     * The years the planner gives two videos shot in 2020, whatever zone the machine is in (#84): one shot at UTC+14
+     * just after New Year, which this machine reads as 2019 in any zone west of UTC+12:30, and one shot at UTC-12 just
+     * before the year ends, which it reads as 2021 in any zone east of UTC-10:30. So at least one of them has a
+     * container year that differs from its name's, and only the name's time gives it 2020.
+     */
+    private fun yearsOfTwoVideosShotAtTheEdgesOfAYear(newYearName: String, newYearsEveName: String): List<Int> {
+        val newYear = file(camera, newYearName, null)
+        val newYearsEve = file(camera, newYearsEveName, null)
+        val shotAtPlus14 = utcToLocal(LocalDateTime.of(2019, 12, 31, 11, 30, 0))
+        val shotAtMinus12 = utcToLocal(LocalDateTime.of(2021, 1, 1, 10, 30, 0))
+        reader.setCaptureDateTime(newYear, MediaDate(shotAtPlus14, MediaDateSource.VIDEO_METADATA))
+        reader.setCaptureDateTime(newYearsEve, MediaDate(shotAtMinus12, MediaDateSource.VIDEO_METADATA))
+
+        return planner.plan(output, listOf(copyFrom(camera))).items.map { it.year }
+    }
+
+    @Test
+    fun `plan takes the year of a video shot in another timezone from its name, in any machine zone`() {
+        val years = yearsOfTwoVideosShotAtTheEdgesOfAYear("VID_20200101_013000.mp4", "VID_20201231_223000.mp4")
+
+        assertEquals(listOf(2020, 2020), years)
+    }
+
+    @Test
+    fun `plan takes the year of a renamed video from its standardized name, in any machine zone`() {
+        val years = yearsOfTwoVideosShotAtTheEdgesOfAYear("VID_2020-01-01_01-30-00.mp4", "VID_2020-12-31_22-30-00.mp4")
+
+        assertEquals(listOf(2020, 2020), years)
+    }
+
+    @Test
+    fun `plan resolves the year of a standardized photo with no metadata from its name`() {
+        file(camera, "IMG_2016-08-28_19-30-34.jpg", null)
 
         assertEquals(2016, planner.plan(output, listOf(copyFrom(camera))).items.single().year)
     }

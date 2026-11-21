@@ -13,6 +13,7 @@ import app.osprey.history.FileState
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
 import app.osprey.media.MediaDateSource
+import app.osprey.media.utcToLocal
 import java.time.Instant
 import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
@@ -50,6 +51,49 @@ class DatesPlannerTest {
         val fix = plan.fixes.single()
         assertEquals("IMG_20170425_152602.jpg", fix.name)
         assertEquals(LocalDateTime.of(2017, 4, 25, 15, 26, 2), fix.dateTime)
+        assertEquals(MediaDateSource.FILENAME, fix.source)
+    }
+
+    @Test
+    fun `plan dates a video shot in another timezone with the time in its name`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val video = fs.addFile(fs.root, "VID_20200710_134500.mp4")
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+        val planner = DatesPlanner(fs, reader)
+
+        val plan = planner.plan(fs.root)
+
+        val fix = plan.fixes.single()
+        assertEquals(LocalDateTime.of(2020, 7, 10, 13, 45, 0), fix.dateTime)
+        assertEquals(MediaDateSource.FILENAME, fix.source)
+        assertEquals(0 to 1, planner.describe(plan) {})
+    }
+
+    @Test
+    fun `plan dates a video the same before and after Standardize renamed it`() {
+        val fs = FakeFileSystemRepository()
+        val reader = FakeMediaMetadataReader()
+        val container = MediaDate(utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0)), MediaDateSource.VIDEO_METADATA)
+        reader.setCaptureDateTime(fs.addFile(fs.root, "VID_20200710_134500.mp4"), container)
+        reader.setCaptureDateTime(fs.addFile(fs.root, "VID_2020-07-10_13-45-00.mp4"), container)
+
+        val fixes = DatesPlanner(fs, reader).plan(fs.root).fixes
+
+        assertEquals(2, fixes.size)
+        assertEquals(setOf(LocalDateTime.of(2020, 7, 10, 13, 45, 0)), fixes.map { it.dateTime }.toSet())
+        assertEquals(setOf(MediaDateSource.FILENAME), fixes.map { it.source }.toSet())
+    }
+
+    @Test
+    fun `plan dates a standardized photo with no metadata from its name`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "IMG_2016-08-28_19-30-34.jpg")
+
+        val fix = DatesPlanner(fs, FakeMediaMetadataReader()).plan(fs.root).fixes.single()
+
+        assertEquals(LocalDateTime.of(2016, 8, 28, 19, 30, 34), fix.dateTime)
         assertEquals(MediaDateSource.FILENAME, fix.source)
     }
 

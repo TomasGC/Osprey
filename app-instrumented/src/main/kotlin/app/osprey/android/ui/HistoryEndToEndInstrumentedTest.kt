@@ -3,6 +3,7 @@ package app.osprey.android.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -22,11 +23,15 @@ import app.osprey.history.openHistory
 import app.osprey.jobs.JobQueue
 import app.osprey.jobs.JobState
 import app.osprey.media.FakeMediaMetadataReader
+import app.osprey.media.MediaDate
+import app.osprey.media.MediaDateSource
+import app.osprey.media.utcToLocal
 import app.osprey.settings.MediaSettings
 import app.osprey.settings.SettingsStore
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.time.LocalDateTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +41,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -86,11 +92,12 @@ class HistoryEndToEndInstrumentedTest {
     /** A launch of the app over [fs] (default: 2021/sub/{a,b,c}.jpg), and the history opened from its folder. */
     private fun launch(
         fs: FakeFileSystemRepository = FakeFileSystemRepository().also(::seedFlattenLibrary),
+        reader: FakeMediaMetadataReader = FakeMediaMetadataReader(),
     ): AndroidAppState {
         val history = openHistory(historyDir)
         // As OspreyApplication does: the queue records into the same history the screens read.
         val jobs = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default), RunRecorder(history))
-        return AndroidAppState(fs, FakeMediaMetadataReader(), settings, jobs, { null }, {}, history)
+        return AndroidAppState(fs, reader, settings, jobs, { null }, {}, history)
             .also { it.openLibrary(fs.root) }
     }
 
@@ -166,6 +173,44 @@ class HistoryEndToEndInstrumentedTest {
         composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Done (2)").assertExists()
+    }
+
+    @Test
+    fun aStandardizeRunLeavesAVideoShotInAnotherTimezoneAloneOnTheNextScan() {
+        val fs = FakeFileSystemRepository()
+        val year = fs.addFolder(fs.root, "2021")
+        val video = fs.addFile(year, "VID_20200710_134500.mp4")
+        // Two photos with no metadata whose standard names collide: the next scan must leave them alone too.
+        fs.addFile(year, "IMG_20170425_152602.jpg")
+        fs.addFile(year, "IMG_20170425_152602_1.jpg")
+        val reader = FakeMediaMetadataReader()
+        val container = utcToLocal(LocalDateTime.of(2020, 7, 10, 8, 0, 0))
+        reader.setCaptureDateTime(video, MediaDate(container, MediaDateSource.VIDEO_METADATA))
+        val state = launch(fs, reader)
+        composeRule.setContent { OspreyApp(state) }
+
+        openDrawer()
+        click("Standardize")
+        click("Scan")
+        waitForJobs(state)
+        composeRule.waitForIdle()
+        click("Apply")
+        waitForJobs(state)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Standardize 2021 apply: 3 done").assertExists()
+        click("Scan")
+        waitForJobs(state)
+        composeRule.waitForIdle()
+
+        assertEquals(
+            listOf("IMG_2017-04-25_15-26-02.jpg", "IMG_2017-04-25_15-26-02__dup2.jpg", "VID_2020-07-10_13-45-00.mp4"),
+            fs.list(year).map { it.name }.sorted(),
+        )
+        assertTrue(
+            "the second scan does not say there is nothing left",
+            composeRule.onAllNodesWithText("count=0  unfixable=0", substring = true).fetchSemanticsNodes().isNotEmpty(),
+        )
+        composeRule.onNodeWithText("Apply").assertIsNotEnabled()
     }
 
     @Test
