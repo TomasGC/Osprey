@@ -39,10 +39,10 @@ class ChildProcessEndToEndTest : TimedTest() {
     }
 
     @Test
-    fun `a child that never says READY is destroyed when the timeout passes and the start fails`() {
+    fun `a child that never says READY is destroyed when the timeout passes and the start fails with what it said`() {
         val begun = System.nanoTime()
 
-        assertThrows(TimeoutException::class.java) {
+        val failure = assertThrows(AssertionError::class.java) {
             startUntilReady(
                 appCommand(CHILD, "hang"),
                 "ready",
@@ -53,6 +53,10 @@ class ChildProcessEndToEndTest : TimedTest() {
 
         val seconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - begun)
         assertTrue("the start waited $seconds s: the timeout was not used", seconds < WELL_UNDER_THE_DEFAULT_SECONDS)
+        val message = failure.message!!
+        assertTrue("the message lacks the timeout: $message", message.contains("in $SHORT_TIMEOUT_SECONDS s"))
+        assertTrue("the message lacks what the child said: $message", message.contains("starting"))
+        assertTrue("the timeout is not the cause: ${failure.cause}", failure.cause is TimeoutException)
         val dead = started.single().waitFor(DEATH_WAIT_SECONDS, TimeUnit.SECONDS)
         assertTrue("the child is still running after the failed start", dead)
     }
