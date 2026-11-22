@@ -32,20 +32,25 @@ fun blockAfterSaying(line: String) {
  * Starts [command] and returns once the child prints [READY] on a line of its own. A child that does not get there
  * within [timeoutSeconds], or ends without it, is destroyed, so it cannot outlive the test, and the start fails with an
  * [AssertionError] that holds the stage, the timeout and what the child said, whether it hung or ended. [onStart] sees
- * the process before the wait, since a failed start returns none (#124).
+ * the process before the wait, since a failed start returns none; [onLine] sees each line the child prints, before it
+ * is kept, which a test uses to slow the reader down (#124).
  */
 fun startUntilReady(
     command: List<String>,
     stage: String,
     timeoutSeconds: Long = START_TIMEOUT_SECONDS,
     onStart: (Process) -> Unit = {},
+    onLine: (String) -> Unit = {},
 ): Process {
     val process = ProcessBuilder(command).redirectErrorStream(true).start()
     onStart(process)
     val output = CopyOnWriteArrayList<String>()
     val ready = CompletableFuture.supplyAsync {
         process.inputStream.bufferedReader().useLines { lines ->
-            lines.onEach { output += it }.any { it == READY }
+            lines.onEach { line ->
+                onLine(line)
+                output += line
+            }.any { it == READY }
         }
     }
     val outcome = runCatching { ready.get(timeoutSeconds, TimeUnit.SECONDS) }
