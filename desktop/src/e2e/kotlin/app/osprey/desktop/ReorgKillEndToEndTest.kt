@@ -44,16 +44,15 @@ class ReorgKillEndToEndTest : TimedTest() {
         root.toFile().deleteRecursively()
     }
 
-    /** Starts the app process and returns once it is inside the delete; its output is kept for a failure. */
-    private fun startAndWaitUntilMidMove(output: MutableList<String>): Process = startUntilReady(
+    /** Starts the app process and returns once it is inside the delete. */
+    private fun startAndWaitUntilMidMove(): Process = startUntilReady(
         appCommand("app.osprey.desktop.KilledMidMoveKt", library.toString(), camera.toString()),
         "mid-move",
-        output,
     )
 
     @Test
     fun `a Move killed after its verified copy leaves a pair the next launch offers and can settle`() {
-        val process = startAndWaitUntilMidMove(mutableListOf())
+        val process = startAndWaitUntilMidMove()
 
         process.destroyForcibly().waitFor()
 

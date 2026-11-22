@@ -4,19 +4,18 @@ import app.osprey.desktop.testing.TimedTest
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private const val CHILD = "app.osprey.desktop.NotReadyChildKt"
+private const val CHILD = "app.osprey.desktop.StubChildKt"
 private const val SHORT_TIMEOUT_SECONDS = 2L
 private const val WELL_UNDER_THE_DEFAULT_SECONDS = 20L
 private const val DEATH_WAIT_SECONDS = 10L
 
 /**
  * The start helper of the kill tests (#124), on the path they never take: a child that does not get to READY must not
- * outlive the test, whether it hangs or ends.
+ * outlive the test, whether it hangs or ends, and only a line that is READY counts.
  */
 class ChildProcessEndToEndTest : TimedTest() {
 
@@ -30,12 +29,16 @@ class ChildProcessEndToEndTest : TimedTest() {
 
     @Test
     fun `a child that says READY is returned while it runs`() {
-        val output = mutableListOf<String>()
-
-        val process = startUntilReady(appCommand(CHILD, "ready"), "ready", output, onStart = { started += it })
+        val process = startUntilReady(appCommand(CHILD, "ready"), "ready", onStart = { started += it })
 
         assertTrue("the child is not running", process.isAlive)
-        assertEquals(listOf("READY"), output)
+    }
+
+    @Test
+    fun `a child that says READY after other lines is returned while it runs`() {
+        val process = startUntilReady(appCommand(CHILD, "late"), "ready", onStart = { started += it })
+
+        assertTrue("the child is not running", process.isAlive)
     }
 
     @Test
@@ -59,6 +62,21 @@ class ChildProcessEndToEndTest : TimedTest() {
         assertTrue("the timeout is not the cause: ${failure.cause}", failure.cause is TimeoutException)
         val dead = started.single().waitFor(DEATH_WAIT_SECONDS, TimeUnit.SECONDS)
         assertTrue("the child is still running after the failed start", dead)
+    }
+
+    @Test
+    fun `a line that only starts with READY is not READY`() {
+        val failure = assertThrows(AssertionError::class.java) {
+            startUntilReady(
+                appCommand(CHILD, "almost"),
+                "ready",
+                timeoutSeconds = SHORT_TIMEOUT_SECONDS,
+                onStart = { started += it },
+            )
+        }
+
+        assertTrue("the message lacks the child's line: ${failure.message}", failure.message!!.contains("READY now"))
+        assertTrue("the child is still running", started.single().waitFor(DEATH_WAIT_SECONDS, TimeUnit.SECONDS))
     }
 
     @Test

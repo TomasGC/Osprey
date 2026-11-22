@@ -40,17 +40,15 @@ class ProcessKillEndToEndTest : TimedTest() {
         root.toFile().deleteRecursively()
     }
 
-    /** Starts the app process and returns once it is inside its second move; its output is kept for a failure. */
-    private fun startAndWaitUntilMidRun(output: MutableList<String>): Process = startUntilReady(
+    /** Starts the app process and returns once it is inside its second move. */
+    private fun startAndWaitUntilMidRun(): Process = startUntilReady(
         appCommand("app.osprey.desktop.KilledMidRunKt", library.toString(), historyDir.toString()),
         "mid-run",
-        output,
     )
 
     @Test
     fun `a run the app process is killed in is Interrupted after a restart and keeps the file it had finished`() {
-        val output = mutableListOf<String>()
-        val process = startAndWaitUntilMidRun(output)
+        val process = startAndWaitUntilMidRun()
 
         process.destroyForcibly().waitFor()
         val runs = openHistory(historyDir.toFile()).runs()

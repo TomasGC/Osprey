@@ -17,18 +17,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 private const val YEAR = "2021"
-private const val READY = "READY"
 
 /** The real file system, except that the second move says it is ready, then never returns: the app is "mid-run". */
 private class BlocksOnSecondMove(private val inner: FileSystemRepository) : FileSystemRepository by inner {
     private var moves = 0
 
     override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
-        if (++moves == 2) {
-            println(READY)
-            System.out.flush()
-            Thread.sleep(Long.MAX_VALUE)
-        }
+        if (++moves == 2) blockAfterSaying(READY)
         return inner.move(entry, destFolder, newName)
     }
 }

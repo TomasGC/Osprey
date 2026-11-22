@@ -10,16 +10,10 @@ import app.osprey.filesystem.FileSystemRepository
 import app.osprey.settings.InputMode
 import java.nio.file.Path
 
-private const val READY = "READY"
-
 /** The real file system, except that the first delete says it is ready, then never returns: a Move stopped mid-run. */
 private class BlocksOnFirstDelete(private val inner: FileSystemRepository) : FileSystemRepository by inner {
 
-    override fun delete(entry: FileHandle) {
-        println(READY)
-        System.out.flush()
-        Thread.sleep(Long.MAX_VALUE)
-    }
+    override fun delete(entry: FileHandle) = blockAfterSaying(READY)
 }
 
 /**
