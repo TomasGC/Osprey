@@ -83,6 +83,16 @@ class MixGeneratorTest {
     }
 
     @Test
+    fun `container offsets reach both ends of -12 00 to +14 00 and never go past them`() {
+        val wide = (0L until 4000L).flatMap { MixGenerator.mix(it) }
+            .map { it.metadata }.filterIsInstance<SpecMetadata.Container>().map { it.offsetSeconds }
+
+        assertTrue("-12:00 reached", -43_200 in wide)
+        assertTrue("+14:00 reached", 50_400 in wide)
+        assertTrue("nothing below -12:00 but the machine's own", wide.none { it < -43_200 })
+    }
+
+    @Test
     fun `a mix reaches the paths the planners' invariants guard`() {
         val renames = mixes.map { mix ->
             val lib = MixedFolder()
