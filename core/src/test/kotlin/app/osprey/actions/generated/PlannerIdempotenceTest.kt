@@ -22,7 +22,7 @@ class PlannerIdempotenceTest {
     @Test
     fun `Standardize planned again after it ran finds nothing, loses nothing and overwrites nothing`() =
         GeneratedMixes.check { mix ->
-            val lib = MixedFolder().also { it.addAll(mix) }
+            val lib = MixedFolder().also { it.addSpread(mix) }
             val before = lib.contents()
             val planner = StandardizePlanner(lib.fs, lib.reader)
             val first = planner.plan(lib.root)
@@ -48,7 +48,7 @@ class PlannerIdempotenceTest {
     fun `Dates planned again after it ran gives the same plan and leaves every time as it was`() =
         GeneratedMixes.check { mix ->
             val lib = MixedFolder()
-            val handles = lib.addAll(mix)
+            val handles = lib.addSpread(mix)
             val before = lib.contents()
             val planner = DatesPlanner(lib.fs, lib.reader)
             val first = planner.plan(lib.root)
@@ -76,7 +76,7 @@ class PlannerIdempotenceTest {
 
     private fun timestampsAfter(mix: List<FileSpec>, standardizeFirst: Boolean): Map<Int, FileTimestamps> {
         val lib = MixedFolder()
-        val handles = lib.addAll(mix)
+        val handles = lib.addSpread(mix)
         val dates = DatesPlanner(lib.fs, lib.reader)
         val standardize = StandardizePlanner(lib.fs, lib.reader)
         val runDates = { dates.apply(dates.plan(lib.root)) }

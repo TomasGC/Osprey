@@ -117,7 +117,7 @@ object MixGenerator {
             NameKind.EPOCH -> wall.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
             NameKind.NONE -> "photo_$id"
             NameKind.IMPOSSIBLE -> "IMG_20201301_120000"
-            NameKind.NOT_MEDIA -> "notes_$id"
+            NameKind.NOT_MEDIA -> error("a non-media file is made in spec()")
         }
     }
 }

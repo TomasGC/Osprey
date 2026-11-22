@@ -21,6 +21,12 @@ class MixedFolder {
     fun addAll(mix: List<FileSpec>, parent: FileHandle = root): Map<Int, FileHandle> =
         mix.associate { it.id to add(parent, it) }
 
+    /** Adds the specs with an odd id in a subfolder of the root and the others in the root itself. */
+    fun addSpread(mix: List<FileSpec>): Map<Int, FileHandle> {
+        val sub = fs.addFolder(root, "sub")
+        return mix.associate { it.id to add(if (it.id % 2 == 1) sub else root, it) }
+    }
+
     /** The content of every file under the root, sorted: what must survive any action. */
     fun contents(): List<String> = filesUnder(root).map { String(fs.readBytes(it)) }.sorted()
 
