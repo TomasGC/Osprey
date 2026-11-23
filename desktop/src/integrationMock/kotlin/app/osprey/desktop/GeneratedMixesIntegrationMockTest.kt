@@ -43,6 +43,9 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
         }
     }
 
+    /** The date a planner must give this file, or null when it has none or the rules that choose decide it. */
+    private fun clearDate(spec: FileSpec): ExpectedDate.At? = spec.expectedDate() as? ExpectedDate.At
+
     private fun write(folder: Path, spec: FileSpec) {
         Files.createDirectories(folder)
         Files.write(folder.resolve(spec.name), spec.content)
@@ -96,6 +99,14 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                 )
                 assertEquals("unfixable", unfixable, third.unfixable.map { it.name }.toSet())
                 assertEquals("contents", before, contents(harness))
+                mix.forEach { spec ->
+                    val expected = clearDate(spec) ?: return@forEach
+                    val file = generatedFiles(harness).single { String(Files.readAllBytes(it)) == String(spec.content) }
+                    val name = file.fileName.toString()
+                    val start = spec.standardizedStart(expected.time)
+                    val message = "${spec.describe()}: named $name, expected a name starting $start"
+                    assertTrue(message, name.startsWith(start))
+                }
             }
         }
 
@@ -124,7 +135,7 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                 }
                 assertEquals("contents", before, contents(harness))
                 mix.forEach { spec ->
-                    val expected = spec.expectedDate() as? ExpectedDate.At ?: return@forEach
+                    val expected = clearDate(spec) ?: return@forEach
                     val file = harness.year.resolve(spec.name)
                     assertEquals(
                         "modified time of ${spec.describe()}",
@@ -166,7 +177,7 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
             mix.forEach { spec ->
-                val expected = spec.expectedDate() as? ExpectedDate.At ?: return@forEach
+                val expected = clearDate(spec) ?: return@forEach
                 assertEquals(
                     "year folder of ${spec.describe()}",
                     expected.time.year.toString(),
