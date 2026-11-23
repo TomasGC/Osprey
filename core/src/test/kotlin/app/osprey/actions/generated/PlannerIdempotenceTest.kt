@@ -158,6 +158,31 @@ class PlannerIdempotenceTest {
         assertDatesAsExpected(lib, mix, handles)
     }
 
+    @Test
+    fun `Standardize names every file whose date is clear with that date and leaves the others alone`() =
+        GeneratedMixes.check { mix ->
+            val lib = MixedFolder()
+            val handles = lib.addAll(mix)
+            val standardize = StandardizePlanner(lib.fs, lib.reader)
+
+            standardize.apply(standardize.plan(lib.root))
+
+            val names = lib.fs.list(lib.root).associate { it.handle to it.name }
+            mix.forEach { spec ->
+                val name = names.getValue(handles.getValue(spec.id))
+                when (val expected = spec.expectedDate()) {
+                    ExpectedDate.Unclear -> Unit
+                    ExpectedDate.Undated ->
+                        assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
+                    is ExpectedDate.At -> {
+                        val start = spec.standardizedStart(expected.time)
+                        val message = "${spec.describe()}: named $name, expected a name starting $start"
+                        assertTrue(message, name.startsWith(start))
+                    }
+                }
+            }
+        }
+
     // The dates are checked against what each spec stands for (FileSpec.expectedDate), not against another run.
     private fun assertDatesAsExpected(lib: MixedFolder, mix: List<FileSpec>, handles: Map<Int, FileHandle>) {
         val dates = DatesPlanner(lib.fs, lib.reader).plan(lib.root)

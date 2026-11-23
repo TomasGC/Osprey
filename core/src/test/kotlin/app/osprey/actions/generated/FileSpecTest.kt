@@ -38,6 +38,13 @@ class FileSpecTest {
     }
 
     @Test
+    fun `Standardize starts a name with IMG for an image and VID for a video, then the time`() {
+        assertEquals("IMG_2020-07-10_08-15-00", FileSpec(1, "a.HEIC", SpecMetadata.None).standardizedStart(time))
+        assertEquals("VID_2020-07-10_08-15-00", FileSpec(2, "a.MOV", SpecMetadata.None).standardizedStart(time))
+        assertEquals("VID_2020-07-10_08-15-00", FileSpec(3, "a.mp4", SpecMetadata.None).standardizedStart(time))
+    }
+
+    @Test
     fun `each id has its own content`() {
         val a = FileSpec(1, "a.jpg", SpecMetadata.None)
         val b = FileSpec(2, "a.jpg", SpecMetadata.None)

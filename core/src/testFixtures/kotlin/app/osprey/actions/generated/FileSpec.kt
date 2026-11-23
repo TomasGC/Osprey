@@ -6,6 +6,7 @@ import app.osprey.media.utcToLocal
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /** What a generated file's metadata says: what the media reader would return for it. */
 sealed interface SpecMetadata {
@@ -31,6 +32,9 @@ fun SpecMetadata.asMediaDate(): MediaDate? = when (this) {
     is SpecMetadata.Container -> MediaDate(utcToLocal(utc), MediaDateSource.VIDEO_METADATA)
     SpecMetadata.UnsetContainer -> MediaDate(UNSET_CONTAINER_TIME, MediaDateSource.VIDEO_METADATA)
 }
+
+private val STANDARDIZED_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+private val VIDEO_SUFFIXES = setOf("mp4", "mov")
 
 /** The machine's offset from UTC, in seconds, at the UTC instant [utc]. */
 fun machineOffsetSeconds(utc: LocalDateTime): Int =
@@ -62,6 +66,12 @@ data class FileSpec(
     val content: ByteArray get() = "spec-$id".toByteArray()
 
     fun describe(): String = "#$id $name  $metadata"
+
+    /** How Standardize starts this file's name for [time]: IMG_ or VID_ by its extension, then the time. */
+    fun standardizedStart(time: LocalDateTime): String {
+        val prefix = if (name.substringAfterLast('.').lowercase() in VIDEO_SUFFIXES) "VID" else "IMG"
+        return "${prefix}_${time.format(STANDARDIZED_TIME)}"
+    }
 
     /**
      * What a planner must resolve this file to. EXIF is read first, whatever the name says. A container is shown on
