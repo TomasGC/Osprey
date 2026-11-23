@@ -27,9 +27,12 @@ private val LEAKS = linkedMapOf(
 internal object FixtureScrub {
 
     fun problems(name: String, file: ByteArray): List<String> {
+        val extension = name.substringAfterLast('.').lowercase()
+        // A video keeps the camera's own name and its container's creation time: for a video those are what the
+        // tests compare (#84), so only what is inside the file is checked (#131).
+        if (extension == "mp4") return Mp4Scrub.problems(file) + leaks(Mp4Scrub.moovText(file))
         val found = mutableListOf<String>()
         if (CAMERA_NAME.containsMatchIn(name)) found += "the name looks like a camera file name or a capture date"
-        val extension = name.substringAfterLast('.').lowercase()
         return found + when (extension) {
             "jpg", "jpeg" -> JpegScrub.problems(file)
             "png" -> PngScrub.problems(file)
@@ -50,12 +53,11 @@ internal object FixtureScrub {
         if (unexpected.isNotEmpty()) found += "unexpected top-level boxes: ${unexpected.joinToString(", ")}"
         val exif = exifRange(file, layout)
         found += exifProblems(file, layout, exif)
-        val text = String(metadata(file, layout), Charsets.ISO_8859_1)
-        LEAKS.forEach { (label, pattern) ->
-            if (pattern.containsMatchIn(text)) found += "$label text found in the metadata"
-        }
-        return found
+        return found + leaks(String(metadata(file, layout), Charsets.ISO_8859_1))
     }
+
+    private fun leaks(text: String): List<String> =
+        LEAKS.filterValues { it.containsMatchIn(text) }.keys.map { "$it text found in the metadata" }
 
     private fun exifRange(file: ByteArray, layout: HeicLayout): IntRange? {
         val at = (layout.exif as? ExifTarget.At)?.offset ?: return null
