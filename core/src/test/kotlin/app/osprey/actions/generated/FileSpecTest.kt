@@ -38,11 +38,69 @@ class FileSpecTest {
     }
 
     @Test
+    fun `Standardize starts a name with IMG for an image and VID for a video, then the time`() {
+        assertEquals("IMG_2020-07-10_08-15-00", FileSpec(1, "a.HEIC", SpecMetadata.None).standardizedStart(time))
+        assertEquals("VID_2020-07-10_08-15-00", FileSpec(2, "a.MOV", SpecMetadata.None).standardizedStart(time))
+        assertEquals("VID_2020-07-10_08-15-00", FileSpec(3, "a.mp4", SpecMetadata.None).standardizedStart(time))
+    }
+
+    @Test
     fun `each id has its own content`() {
         val a = FileSpec(1, "a.jpg", SpecMetadata.None)
         val b = FileSpec(2, "a.jpg", SpecMetadata.None)
 
         assertNotEquals(String(a.content), String(b.content))
         assertEquals(String(a.content), String(a.copy(name = "other.jpg").content))
+    }
+
+    private val machine get() = machineOffsetSeconds(time)
+
+    private fun spec(metadata: SpecMetadata, nameTime: LocalDateTime? = null, wallClock: Boolean = false) =
+        FileSpec(1, "a.mp4", metadata, nameTime, wallClock)
+
+    @Test
+    fun `EXIF is the expected date whatever the name says`() {
+        val named = time.plusHours(5)
+
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.Exif(time), named, wallClock = true).expectedDate())
+    }
+
+    @Test
+    fun `a container at the machine's own offset is the expected date`() {
+        val container = SpecMetadata.Container(time, machine)
+
+        val expected = ExpectedDate.At(utcToLocal(time))
+
+        assertEquals(expected, spec(container, utcToLocal(time), wallClock = true).expectedDate())
+    }
+
+    @Test
+    fun `a container at another offset is the expected date when the name holds no clock time`() {
+        val container = SpecMetadata.Container(time, machine + 3600)
+
+        assertEquals(ExpectedDate.At(utcToLocal(time)), spec(container, nameTime = null).expectedDate())
+    }
+
+    @Test
+    fun `a container at another offset under a name with a clock time is the container or the name`() {
+        val container = SpecMetadata.Container(time, machine + 3600)
+        val expected = ExpectedDate.OneOf(utcToLocal(time), time.plusHours(1))
+
+        assertEquals(expected, spec(container, time.plusHours(1), wallClock = true).expectedDate())
+        assertEquals(listOf(utcToLocal(time), time.plusHours(1)), expected.candidates())
+    }
+
+    @Test
+    fun `candidates are none for an undated file and the one time otherwise`() {
+        assertEquals(emptyList<LocalDateTime>(), ExpectedDate.Undated.candidates())
+        assertEquals(listOf(time), ExpectedDate.At(time).candidates())
+    }
+
+    @Test
+    fun `no metadata, or an unset container, is dated by the name, or undated without a date in it`() {
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.None, time, wallClock = true).expectedDate())
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.UnsetContainer, time).expectedDate())
+        assertEquals(ExpectedDate.Undated, spec(SpecMetadata.None).expectedDate())
+        assertEquals(ExpectedDate.Undated, spec(SpecMetadata.UnsetContainer).expectedDate())
     }
 }

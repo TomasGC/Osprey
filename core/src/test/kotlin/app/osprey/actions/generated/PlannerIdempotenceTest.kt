@@ -9,6 +9,7 @@ import app.osprey.filesystem.FileTimestamps
 import app.osprey.settings.InputMode
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -138,4 +139,67 @@ class PlannerIdempotenceTest {
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
         }
+
+    @Test
+    fun `Dates and Reorg give every file whose date is clear that date, or none when it has no date`() =
+        GeneratedMixes.check { mix ->
+            val lib = MixedFolder()
+            assertDatesAsExpected(lib, mix, lib.addAll(mix))
+        }
+
+    @Test
+    fun `a file keeps its date after Standardize renamed it`() = GeneratedMixes.check { mix ->
+        val lib = MixedFolder()
+        val handles = lib.addAll(mix)
+        val standardize = StandardizePlanner(lib.fs, lib.reader)
+
+        standardize.apply(standardize.plan(lib.root))
+
+        assertDatesAsExpected(lib, mix, handles)
+    }
+
+    @Test
+    fun `Standardize names every file whose date is clear with that date and leaves the others alone`() =
+        GeneratedMixes.check { mix ->
+            val lib = MixedFolder()
+            val handles = lib.addAll(mix)
+            val standardize = StandardizePlanner(lib.fs, lib.reader)
+
+            standardize.apply(standardize.plan(lib.root))
+
+            val names = lib.fs.list(lib.root).associate { it.handle to it.name }
+            mix.forEach { spec ->
+                val name = names.getValue(handles.getValue(spec.id))
+                val starts = spec.expectedDate().candidates().map(spec::standardizedStart)
+                if (starts.isEmpty()) {
+                    assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
+                } else {
+                    val wanted = starts.joinToString(" or ")
+                    val message = "${spec.describe()}: named $name, expected a name starting $wanted"
+                    assertTrue(message, starts.any(name::startsWith))
+                }
+            }
+        }
+
+    // The dates are checked against what each spec stands for (FileSpec.expectedDate), not against another run.
+    private fun assertDatesAsExpected(lib: MixedFolder, mix: List<FileSpec>, handles: Map<Int, FileHandle>) {
+        val dates = DatesPlanner(lib.fs, lib.reader).plan(lib.root)
+        val fixed = dates.fixes.associate { it.entry to it.dateTime }
+        val unfixable = dates.unfixable.map { it.handle }.toSet()
+        val reorg = ReorgPlanner(lib.fs, lib.reader).plan(lib.root, emptyList())
+        val years = reorg.items.associate { it.source to it.year }
+        mix.forEach { spec ->
+            val handle = handles.getValue(spec.id)
+            val candidates = spec.expectedDate().candidates()
+            if (candidates.isEmpty()) {
+                assertTrue("${spec.describe()}: Dates should list it unfixable", handle in unfixable)
+                assertFalse("${spec.describe()}: Reorg should not file it", handle in years)
+            } else {
+                val dated = "${spec.describe()}: Dates time ${fixed[handle]}, expected one of $candidates"
+                assertTrue(dated, fixed[handle] in candidates)
+                val filed = "${spec.describe()}: Reorg year ${years[handle]}, expected one of $candidates"
+                assertTrue(filed, years[handle] in candidates.map { it.year })
+            }
+        }
+    }
 }

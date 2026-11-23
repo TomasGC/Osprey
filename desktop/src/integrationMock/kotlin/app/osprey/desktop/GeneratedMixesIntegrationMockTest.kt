@@ -1,6 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.actions.dates.DatesPlanner
+import app.osprey.actions.generated.candidates
 import app.osprey.actions.generated.FileSpec
 import app.osprey.actions.generated.GeneratedMixes
 import app.osprey.actions.generated.MixGenerator
@@ -95,6 +96,18 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                 )
                 assertEquals("unfixable", unfixable, third.unfixable.map { it.name }.toSet())
                 assertEquals("contents", before, contents(harness))
+                mix.forEach { spec ->
+                    val file = generatedFiles(harness).single { String(Files.readAllBytes(it)) == String(spec.content) }
+                    val name = file.fileName.toString()
+                    val starts = spec.expectedDate().candidates().map(spec::standardizedStart)
+                    if (starts.isEmpty()) {
+                        assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
+                    } else {
+                        val wanted = starts.joinToString(" or ")
+                        val message = "${spec.describe()}: named $name, expected a name starting $wanted"
+                        assertTrue(message, starts.any(name::startsWith))
+                    }
+                }
             }
         }
 
@@ -122,6 +135,13 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                     assertEquals("modified time of ${it.name}", expected, Files.getLastModifiedTime(file).toInstant())
                 }
                 assertEquals("contents", before, contents(harness))
+                mix.forEach { spec ->
+                    val candidates = spec.expectedDate().candidates()
+                    if (candidates.isEmpty()) return@forEach
+                    val modified = Files.getLastModifiedTime(harness.year.resolve(spec.name)).toInstant()
+                    val message = "modified time $modified of ${spec.describe()}, expected one of $candidates"
+                    assertTrue(message, modified in candidates.map { it.atZone(ZoneId.systemDefault()).toInstant() })
+                }
             }
         }
 
@@ -155,6 +175,19 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
             assertEquals("items planned again", emptyList<String>(), second.items.map { it.label })
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
+            mix.forEach { spec ->
+                val years = spec.expectedDate().candidates().map { it.year.toString() }
+                if (years.isEmpty()) return@forEach
+                val message = "year folder of ${spec.describe()}, expected one of $years"
+                assertTrue(message, yearFolderOf(harness, spec) in years)
+            }
         }
     }
+
+    /** The name of the folder, under the library, that holds the file with this spec's content. */
+    private fun yearFolderOf(harness: ActionHarness, spec: FileSpec): String? =
+        Files.walk(harness.library).use { paths ->
+            paths.filter { it.isRegularFile() && String(Files.readAllBytes(it)) == String(spec.content) }
+                .map { it.parent.fileName.toString() }.toList().singleOrNull()
+        }
 }

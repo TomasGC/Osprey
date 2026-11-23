@@ -1,10 +1,13 @@
 package app.osprey.actions.generated
 
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.random.Random
+
+/** A generated name stem, the time it reads as, and whether it holds the clock of the place of shooting. */
+private data class Stem(val text: String, val time: LocalDateTime?, val wallClock: Boolean)
 
 private enum class NameKind {
     CAMERA, STANDARDIZED, DUP, WHATSAPP, EPOCH, NONE, IMPOSSIBLE, NOT_MEDIA
@@ -81,7 +84,8 @@ object MixGenerator {
         } else {
             instant
         }
-        return FileSpec(id, stem(kind, id, wall, video, random) + extension, metadata)
+        val stem = stem(kind, id, wall, video, random)
+        return FileSpec(id, stem.text + extension, metadata, stem.time, stem.wallClock)
     }
 
     private fun photoMetadata(random: Random, instant: LocalDateTime): SpecMetadata = when {
@@ -99,7 +103,7 @@ object MixGenerator {
 
     // The machine's own offset, one a few minutes off it, or any quarter hour from -12:00 to +14:00.
     private fun offsetSeconds(random: Random, utc: LocalDateTime): Int {
-        val machine = ZoneId.systemDefault().rules.getOffset(utc.toInstant(ZoneOffset.UTC)).totalSeconds
+        val machine = machineOffsetSeconds(utc)
         return when (random.nextInt(5)) {
             0 -> machine
             1 -> machine + random.nextInt(FEW_MINUTES_FROM, FEW_MINUTES_TO + 1)
@@ -107,17 +111,30 @@ object MixGenerator {
         }
     }
 
-    private fun stem(kind: NameKind, id: Int, wall: LocalDateTime, video: Boolean, random: Random): String {
+    private fun stem(kind: NameKind, id: Int, wall: LocalDateTime, video: Boolean, random: Random): Stem {
         val prefix = if (video) "VID" else "IMG"
         return when (kind) {
-            NameKind.CAMERA -> wall.format(CAMERA_FORMATS.random(random))
-            NameKind.STANDARDIZED -> "${prefix}_${wall.format(STANDARDIZED_FORMAT)}"
-            NameKind.DUP -> "${prefix}_${wall.format(STANDARDIZED_FORMAT)}__dup${random.nextInt(2, 5)}"
-            NameKind.WHATSAPP -> "$prefix-${wall.format(DATE_ONLY_FORMAT)}-WA${"%04d".format(id)}"
-            NameKind.EPOCH -> wall.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli().toString()
-            NameKind.NONE -> "photo_$id"
-            NameKind.IMPOSSIBLE -> "IMG_20201301_120000"
+            NameKind.CAMERA -> Stem(wall.format(CAMERA_FORMATS.random(random)), wall, true)
+            NameKind.STANDARDIZED -> Stem("${prefix}_${wall.format(STANDARDIZED_FORMAT)}", wall, true)
+            NameKind.DUP -> {
+                val text = "${prefix}_${wall.format(STANDARDIZED_FORMAT)}__dup${random.nextInt(2, 5)}"
+                Stem(text, wall, true)
+            }
+            NameKind.WHATSAPP -> {
+                val text = "$prefix-${wall.format(DATE_ONLY_FORMAT)}-WA${"%04d".format(id)}"
+                Stem(text, wall.toLocalDate().atStartOfDay(), false)
+            }
+            NameKind.EPOCH -> epochStem(wall)
+            NameKind.NONE -> Stem("photo_$id", null, false)
+            NameKind.IMPOSSIBLE -> Stem("IMG_20201301_120000", null, false)
             NameKind.NOT_MEDIA -> error("a non-media file is made in spec()")
         }
+    }
+
+    // An epoch name is an instant: it reads back as that instant on the machine, which in a clock change is not wall.
+    private fun epochStem(wall: LocalDateTime): Stem {
+        val millis = wall.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val time = LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.systemDefault())
+        return Stem(millis.toString(), time, false)
     }
 }
