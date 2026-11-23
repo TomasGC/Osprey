@@ -93,15 +93,15 @@ class MixGeneratorTest {
     }
 
     @Test
-    fun `most files have a clear expected date, some are undated, and few are unclear`() {
+    fun `most files have one expected date, some are undated, and few can be one of two`() {
         val expected = specs.map { it.expectedDate() }
         val at = expected.count { it is ExpectedDate.At }
         val undated = expected.count { it == ExpectedDate.Undated }
-        val unclear = expected.count { it == ExpectedDate.Unclear }
+        val oneOf = expected.count { it is ExpectedDate.OneOf }
 
         assertTrue("dated files: $at of ${specs.size}", at > specs.size / 2)
         assertTrue("undated files: $undated", undated > specs.size / 10)
-        assertTrue("unclear files: $unclear of ${specs.size}", unclear in 1..specs.size / 10)
+        assertTrue("files with two dates: $oneOf of ${specs.size}", oneOf in 1..specs.size / 10)
     }
 
     @Test

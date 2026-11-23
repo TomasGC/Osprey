@@ -1,7 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.actions.dates.DatesPlanner
-import app.osprey.actions.generated.ExpectedDate
+import app.osprey.actions.generated.candidates
 import app.osprey.actions.generated.FileSpec
 import app.osprey.actions.generated.GeneratedMixes
 import app.osprey.actions.generated.MixGenerator
@@ -42,9 +42,6 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
             harness.delete()
         }
     }
-
-    /** The date a planner must give this file, or null when it has none or the rules that choose decide it. */
-    private fun clearDate(spec: FileSpec): ExpectedDate.At? = spec.expectedDate() as? ExpectedDate.At
 
     private fun write(folder: Path, spec: FileSpec) {
         Files.createDirectories(folder)
@@ -100,12 +97,16 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                 assertEquals("unfixable", unfixable, third.unfixable.map { it.name }.toSet())
                 assertEquals("contents", before, contents(harness))
                 mix.forEach { spec ->
-                    val expected = clearDate(spec) ?: return@forEach
                     val file = generatedFiles(harness).single { String(Files.readAllBytes(it)) == String(spec.content) }
                     val name = file.fileName.toString()
-                    val start = spec.standardizedStart(expected.time)
-                    val message = "${spec.describe()}: named $name, expected a name starting $start"
-                    assertTrue(message, name.startsWith(start))
+                    val starts = spec.expectedDate().candidates().map(spec::standardizedStart)
+                    if (starts.isEmpty()) {
+                        assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
+                    } else {
+                        val wanted = starts.joinToString(" or ")
+                        val message = "${spec.describe()}: named $name, expected a name starting $wanted"
+                        assertTrue(message, starts.any(name::startsWith))
+                    }
                 }
             }
         }
@@ -135,13 +136,11 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                 }
                 assertEquals("contents", before, contents(harness))
                 mix.forEach { spec ->
-                    val expected = clearDate(spec) ?: return@forEach
-                    val file = harness.year.resolve(spec.name)
-                    assertEquals(
-                        "modified time of ${spec.describe()}",
-                        expected.time.atZone(ZoneId.systemDefault()).toInstant(),
-                        Files.getLastModifiedTime(file).toInstant(),
-                    )
+                    val candidates = spec.expectedDate().candidates()
+                    if (candidates.isEmpty()) return@forEach
+                    val modified = Files.getLastModifiedTime(harness.year.resolve(spec.name)).toInstant()
+                    val message = "modified time $modified of ${spec.describe()}, expected one of $candidates"
+                    assertTrue(message, modified in candidates.map { it.atZone(ZoneId.systemDefault()).toInstant() })
                 }
             }
         }
@@ -177,12 +176,10 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
             mix.forEach { spec ->
-                val expected = clearDate(spec) ?: return@forEach
-                assertEquals(
-                    "year folder of ${spec.describe()}",
-                    expected.time.year.toString(),
-                    yearFolderOf(harness, spec),
-                )
+                val years = spec.expectedDate().candidates().map { it.year.toString() }
+                if (years.isEmpty()) return@forEach
+                val message = "year folder of ${spec.describe()}, expected one of $years"
+                assertTrue(message, yearFolderOf(harness, spec) in years)
             }
         }
     }

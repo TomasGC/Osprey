@@ -40,15 +40,25 @@ private val VIDEO_SUFFIXES = setOf("mp4", "mov")
 fun machineOffsetSeconds(utc: LocalDateTime): Int =
     ZoneId.systemDefault().rules.getOffset(utc.toInstant(ZoneOffset.UTC)).totalSeconds
 
-/** The date a file must resolve to, where one answer is clear without the rules that choose between sources (#136). */
+/** The date a file must resolve to, without writing into a test the rules that choose between two sources (#136). */
 sealed interface ExpectedDate {
     /** No metadata and no date in the name: nothing to date it by. */
     data object Undated : ExpectedDate
 
     data class At(val time: LocalDateTime) : ExpectedDate
 
-    /** A video shot at another offset, whose name holds a time: #84's rule chooses, and its own tests cover it. */
-    data object Unclear : ExpectedDate
+    /**
+     * A video shot at another offset, under a name with a clock time: the container shown on the machine or the name,
+     * and #84's rule (with its own tests) chooses. Any other time is wrong.
+     */
+    data class OneOf(val container: LocalDateTime, val name: LocalDateTime) : ExpectedDate
+}
+
+/** Every time a planner may give the file: none when it is undated. */
+fun ExpectedDate.candidates(): List<LocalDateTime> = when (this) {
+    ExpectedDate.Undated -> emptyList()
+    is ExpectedDate.At -> listOf(time)
+    is ExpectedDate.OneOf -> listOf(container, name)
 }
 
 /**
@@ -75,15 +85,16 @@ data class FileSpec(
 
     /**
      * What a planner must resolve this file to. EXIF is read first, whatever the name says. A container is shown on
-     * the machine; it wins when it is at the machine's own offset (the name agrees) or the name holds no clock time.
-     * With neither, the name's date is used, or the file is undated.
+     * the machine; it wins when it is at the machine's own offset (the name agrees) or the name holds no clock time;
+     * at another offset under a clock-time name it is one of the two. Without metadata the name's date is used, or the
+     * file is undated.
      */
     fun expectedDate(): ExpectedDate = when (metadata) {
         is SpecMetadata.Exif -> ExpectedDate.At(metadata.local)
         is SpecMetadata.Container -> when {
             metadata.offsetSeconds == machineOffsetSeconds(metadata.utc) || !wallClockName ->
                 ExpectedDate.At(utcToLocal(metadata.utc))
-            else -> ExpectedDate.Unclear
+            else -> ExpectedDate.OneOf(utcToLocal(metadata.utc), checkNotNull(nameTime))
         }
         SpecMetadata.None, SpecMetadata.UnsetContainer -> nameTime?.let { ExpectedDate.At(it) } ?: ExpectedDate.Undated
     }

@@ -82,10 +82,18 @@ class FileSpecTest {
     }
 
     @Test
-    fun `a container at another offset under a name with a clock time is unclear`() {
+    fun `a container at another offset under a name with a clock time is the container or the name`() {
         val container = SpecMetadata.Container(time, machine + 3600)
+        val expected = ExpectedDate.OneOf(utcToLocal(time), time.plusHours(1))
 
-        assertEquals(ExpectedDate.Unclear, spec(container, time.plusHours(1), wallClock = true).expectedDate())
+        assertEquals(expected, spec(container, time.plusHours(1), wallClock = true).expectedDate())
+        assertEquals(listOf(utcToLocal(time), time.plusHours(1)), expected.candidates())
+    }
+
+    @Test
+    fun `candidates are none for an undated file and the one time otherwise`() {
+        assertEquals(emptyList<LocalDateTime>(), ExpectedDate.Undated.candidates())
+        assertEquals(listOf(time), ExpectedDate.At(time).candidates())
     }
 
     @Test

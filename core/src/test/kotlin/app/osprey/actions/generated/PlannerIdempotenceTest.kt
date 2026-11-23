@@ -170,15 +170,13 @@ class PlannerIdempotenceTest {
             val names = lib.fs.list(lib.root).associate { it.handle to it.name }
             mix.forEach { spec ->
                 val name = names.getValue(handles.getValue(spec.id))
-                when (val expected = spec.expectedDate()) {
-                    ExpectedDate.Unclear -> Unit
-                    ExpectedDate.Undated ->
-                        assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
-                    is ExpectedDate.At -> {
-                        val start = spec.standardizedStart(expected.time)
-                        val message = "${spec.describe()}: named $name, expected a name starting $start"
-                        assertTrue(message, name.startsWith(start))
-                    }
+                val starts = spec.expectedDate().candidates().map(spec::standardizedStart)
+                if (starts.isEmpty()) {
+                    assertEquals("${spec.describe()}: an undated file keeps its name", spec.name, name)
+                } else {
+                    val wanted = starts.joinToString(" or ")
+                    val message = "${spec.describe()}: named $name, expected a name starting $wanted"
+                    assertTrue(message, starts.any(name::startsWith))
                 }
             }
         }
@@ -192,16 +190,15 @@ class PlannerIdempotenceTest {
         val years = reorg.items.associate { it.source to it.year }
         mix.forEach { spec ->
             val handle = handles.getValue(spec.id)
-            when (val expected = spec.expectedDate()) {
-                ExpectedDate.Unclear -> Unit
-                ExpectedDate.Undated -> {
-                    assertTrue("${spec.describe()}: Dates should list it unfixable", handle in unfixable)
-                    assertFalse("${spec.describe()}: Reorg should not file it", handle in years)
-                }
-                is ExpectedDate.At -> {
-                    assertEquals("${spec.describe()}: Dates time", expected.time, fixed[handle])
-                    assertEquals("${spec.describe()}: Reorg year", expected.time.year, years[handle])
-                }
+            val candidates = spec.expectedDate().candidates()
+            if (candidates.isEmpty()) {
+                assertTrue("${spec.describe()}: Dates should list it unfixable", handle in unfixable)
+                assertFalse("${spec.describe()}: Reorg should not file it", handle in years)
+            } else {
+                val dated = "${spec.describe()}: Dates time ${fixed[handle]}, expected one of $candidates"
+                assertTrue(dated, fixed[handle] in candidates)
+                val filed = "${spec.describe()}: Reorg year ${years[handle]}, expected one of $candidates"
+                assertTrue(filed, years[handle] in candidates.map { it.year })
             }
         }
     }
