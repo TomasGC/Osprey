@@ -93,6 +93,18 @@ class MixGeneratorTest {
     }
 
     @Test
+    fun `most files have a clear expected date, some are undated, and few are unclear`() {
+        val expected = specs.map { it.expectedDate() }
+        val at = expected.count { it is ExpectedDate.At }
+        val undated = expected.count { it == ExpectedDate.Undated }
+        val unclear = expected.count { it == ExpectedDate.Unclear }
+
+        assertTrue("dated files: $at of ${specs.size}", at > specs.size / 2)
+        assertTrue("undated files: $undated", undated > specs.size / 10)
+        assertTrue("unclear files: $unclear of ${specs.size}", unclear in 1..specs.size / 10)
+    }
+
+    @Test
     fun `a mix reaches the paths the planners' invariants guard`() {
         val renames = mixes.map { mix ->
             val lib = MixedFolder()

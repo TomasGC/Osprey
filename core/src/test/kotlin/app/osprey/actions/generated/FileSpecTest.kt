@@ -45,4 +45,47 @@ class FileSpecTest {
         assertNotEquals(String(a.content), String(b.content))
         assertEquals(String(a.content), String(a.copy(name = "other.jpg").content))
     }
+
+    private val machine get() = machineOffsetSeconds(time)
+
+    private fun spec(metadata: SpecMetadata, nameTime: LocalDateTime? = null, wallClock: Boolean = false) =
+        FileSpec(1, "a.mp4", metadata, nameTime, wallClock)
+
+    @Test
+    fun `EXIF is the expected date whatever the name says`() {
+        val named = time.plusHours(5)
+
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.Exif(time), named, wallClock = true).expectedDate())
+    }
+
+    @Test
+    fun `a container at the machine's own offset is the expected date`() {
+        val container = SpecMetadata.Container(time, machine)
+
+        val expected = ExpectedDate.At(utcToLocal(time))
+
+        assertEquals(expected, spec(container, utcToLocal(time), wallClock = true).expectedDate())
+    }
+
+    @Test
+    fun `a container at another offset is the expected date when the name holds no clock time`() {
+        val container = SpecMetadata.Container(time, machine + 3600)
+
+        assertEquals(ExpectedDate.At(utcToLocal(time)), spec(container, nameTime = null).expectedDate())
+    }
+
+    @Test
+    fun `a container at another offset under a name with a clock time is unclear`() {
+        val container = SpecMetadata.Container(time, machine + 3600)
+
+        assertEquals(ExpectedDate.Unclear, spec(container, time.plusHours(1), wallClock = true).expectedDate())
+    }
+
+    @Test
+    fun `no metadata, or an unset container, is dated by the name, or undated without a date in it`() {
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.None, time, wallClock = true).expectedDate())
+        assertEquals(ExpectedDate.At(time), spec(SpecMetadata.UnsetContainer, time).expectedDate())
+        assertEquals(ExpectedDate.Undated, spec(SpecMetadata.None).expectedDate())
+        assertEquals(ExpectedDate.Undated, spec(SpecMetadata.UnsetContainer).expectedDate())
+    }
 }
