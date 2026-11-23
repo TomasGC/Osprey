@@ -1,6 +1,7 @@
 package app.osprey.desktop
 
 import app.osprey.actions.dates.DatesPlanner
+import app.osprey.actions.generated.ExpectedDate
 import app.osprey.actions.generated.FileSpec
 import app.osprey.actions.generated.GeneratedMixes
 import app.osprey.actions.generated.MixGenerator
@@ -122,6 +123,15 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                     assertEquals("modified time of ${it.name}", expected, Files.getLastModifiedTime(file).toInstant())
                 }
                 assertEquals("contents", before, contents(harness))
+                mix.forEach { spec ->
+                    val expected = spec.expectedDate() as? ExpectedDate.At ?: return@forEach
+                    val file = harness.year.resolve(spec.name)
+                    assertEquals(
+                        "modified time of ${spec.describe()}",
+                        expected.time.atZone(ZoneId.systemDefault()).toInstant(),
+                        Files.getLastModifiedTime(file).toInstant(),
+                    )
+                }
             }
         }
 
@@ -155,6 +165,21 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
             assertEquals("items planned again", emptyList<String>(), second.items.map { it.label })
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
+            mix.forEach { spec ->
+                val expected = spec.expectedDate() as? ExpectedDate.At ?: return@forEach
+                assertEquals(
+                    "year folder of ${spec.describe()}",
+                    expected.time.year.toString(),
+                    yearFolderOf(harness, spec),
+                )
+            }
         }
     }
+
+    /** The name of the folder, under the library, that holds the file with this spec's content. */
+    private fun yearFolderOf(harness: ActionHarness, spec: FileSpec): String? =
+        Files.walk(harness.library).use { paths ->
+            paths.filter { it.isRegularFile() && String(Files.readAllBytes(it)) == String(spec.content) }
+                .map { it.parent.fileName.toString() }.toList().singleOrNull()
+        }
 }
