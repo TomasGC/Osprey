@@ -44,7 +44,7 @@ class AndroidFileSystemRepositoryInstrumentedTest {
 
     @Before
     fun setUp() {
-        testRoot = SafGrant.workFolder(context, "osprey_instrumented_test")
+        testRoot = SafGrant.workFolder(context, "osprey_filesystem_instrumented_test")
         assumeTrue(SafGrant.SKIP_REASON, testRoot != null)
     }
 
