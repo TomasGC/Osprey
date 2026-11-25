@@ -1,5 +1,6 @@
 package app.osprey.actions.rename
 
+import app.osprey.actions.TakenNames
 import app.osprey.actions.splitStemAndSuffix
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
@@ -26,18 +27,16 @@ class RenamePlanner(private val fs: FileSystemRepository) {
      */
     fun plan(root: FileHandle, control: JobControl = NoJobControl): RenamePlan {
         val entries = fs.list(root).sortedBy { it.name }
-        val existingNames = entries.map { it.name }.toSet()
-        val claimed = mutableSetOf<String>()
+        val names = TakenNames(entries.map { it.name })
         val renames = mutableListOf<RenameAction>()
         val skips = mutableListOf<RenameAction>()
 
         control.forEachUntilStopped(entries.filterNot { it.isDirectory }, FileEntry::name) { entry ->
-            val action = candidateRename(entry)
-            when {
-                action == null -> Unit
-                action.targetName in existingNames || action.targetName in claimed -> skips += action
-                else -> {
-                    claimed += action.targetName
+            candidateRename(entry)?.let { action ->
+                if (action.targetName in names) {
+                    skips += action
+                } else {
+                    names.claim(action.targetName)
                     renames += action
                 }
             }

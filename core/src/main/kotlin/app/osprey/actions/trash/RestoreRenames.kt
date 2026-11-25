@@ -13,7 +13,7 @@ internal fun restoreRenames(direct: List<TrashEntry>, libraryNames: Map<String, 
     val renames = mutableMapOf<String, String>()
     for ((year, ofYear) in direct.groupBy { it.year }) {
         val taken = (libraryNames.getValue(year) + ofYear.map { it.name }).toMutableSet()
-        for (sameName in ofYear.groupBy { it.name }.values) {
+        for (sameName in ofYear.groupBy { it.name.lowercase() }.values) {
             for (later in sameName.sortedBy { it.action }.drop(1)) {
                 val (stem, suffix) = splitStemAndSuffix(later.name)
                 val name = freeTrashName("${stem}_${later.action.folderName}$suffix", taken)

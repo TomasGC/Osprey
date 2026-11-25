@@ -10,22 +10,22 @@ import java.time.ZoneId
 // (it only has 3 groups) -- it's a dead branch there. Modeled explicitly below as
 // dateOnlyPatterns instead, same net behavior, without the dead check.
 private val fullDatetimePatterns = listOf(
-    Regex("""(?:IMG|VID|MOV)_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"""),
-    Regex("""Ultimate_HDR_Camera_Original_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"""),
-    Regex("""AR_EFFECT_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})"""),
-    Regex("""download_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"""),
-    Regex("""^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})"""),
-    Regex("""(?:Screenshot|SmartSelect)_(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})"""),
-    Regex("""CameraZOOM-(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})"""),
+    Regex("""(?:IMG|VID|MOV)_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""Ultimate_HDR_Camera_Original_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""AR_EFFECT_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""download_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""(?:Screenshot|SmartSelect)_(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
+    Regex("""CameraZOOM-(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})""", RegexOption.IGNORE_CASE),
     // What Standardize (#7) names a file: IMG_ or VID_, then yyyy-MM-dd_HH-mm-ss, with a collision suffix possibly
     // after it. Read back like a camera's own name, so a file with no metadata keeps its date and a video its time
     // after the first run (#84).
-    Regex("""^(?:IMG|VID)_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})"""),
+    Regex("""^(?:IMG|VID)_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})""", RegexOption.IGNORE_CASE),
 )
 
 // WhatsApp's IMG-YYYYMMDD-WA#### naming carries no time of day.
 private val dateOnlyPatterns = listOf(
-    Regex("""(?:IMG|VID)-(\d{4})(\d{2})(\d{2})-WA\d+"""),
+    Regex("""(?:IMG|VID)-(\d{4})(\d{2})(\d{2})-WA\d+""", RegexOption.IGNORE_CASE),
 )
 
 private val epochMillisPattern = Regex("""^\d{13}$""")

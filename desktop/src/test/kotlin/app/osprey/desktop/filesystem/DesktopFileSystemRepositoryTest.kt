@@ -1,6 +1,7 @@
 package app.osprey.desktop.filesystem
 
 import app.osprey.desktop.testing.TimedTest
+import app.osprey.desktop.testing.ignoresCase
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
@@ -79,6 +80,62 @@ class DesktopFileSystemRepositoryTest : TimedTest() {
         val target = repo.list(root()).single { it.name == "photo (2).jpg" }
 
         repo.rename(target.handle, "photo.jpg")
+    }
+
+    private fun contents(folder: Path = tempDir): Map<String, String> = Files.list(folder).use { entries ->
+        entries.filter { Files.isRegularFile(it) }.toList().associate { it.fileName.toString() to Files.readString(it) }
+    }
+
+    private fun written(name: String, content: String, folder: Path = tempDir): FileHandle =
+        PathHandle(Files.writeString(folder.resolve(name), content))
+
+    @Test
+    fun `rename to its own name in another case changes the name on disk`() {
+        val entry = written("img_a.jpg", "one")
+
+        val renamed = repo.rename(entry, "IMG_a.jpg")
+
+        assertEquals(mapOf("IMG_a.jpg" to "one"), contents())
+        assertEquals("IMG_a.jpg", (renamed as PathHandle).path.fileName.toString())
+    }
+
+    @Test
+    fun `rename never overwrites another file whose name differs only by case from the new one`() {
+        val entry = written("a.jpg", "one")
+        written("b.jpg", "two")
+
+        if (ignoresCase(tempDir)) {
+            assertThrows(FileAlreadyExistsException::class.java) { repo.rename(entry, "B.JPG") }
+            assertEquals(mapOf("a.jpg" to "one", "b.jpg" to "two"), contents())
+        } else {
+            repo.rename(entry, "B.JPG")
+            assertEquals(mapOf("B.JPG" to "one", "b.jpg" to "two"), contents())
+        }
+    }
+
+    @Test
+    fun `rename never overwrites a sibling that differs from the file only by case`() {
+        assumeFalse("only a case-sensitive file system holds both", ignoresCase(tempDir))
+        val entry = written("a.jpg", "one")
+        written("A.jpg", "two")
+
+        assertThrows(FileAlreadyExistsException::class.java) { repo.rename(entry, "A.jpg") }
+
+        assertEquals(mapOf("a.jpg" to "one", "A.jpg" to "two"), contents())
+    }
+
+    @Test
+    fun `move and copyTo never overwrite a file whose name differs only by case`() {
+        assumeTrue("nothing collides on a case-sensitive file system", ignoresCase(tempDir))
+        val sub = Files.createDirectory(tempDir.resolve("sub"))
+        val entry = written("a.jpg", "source", sub)
+        written("A.JPG", "kept")
+
+        assertThrows(FileAlreadyExistsException::class.java) { repo.move(entry, root()) }
+        assertThrows(FileAlreadyExistsException::class.java) { repo.copyTo(entry, root()) }
+
+        assertEquals(mapOf("A.JPG" to "kept"), contents())
+        assertEquals(mapOf("a.jpg" to "source"), contents(sub))
     }
 
     @Test

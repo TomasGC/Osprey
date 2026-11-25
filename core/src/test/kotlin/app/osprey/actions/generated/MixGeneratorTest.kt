@@ -105,6 +105,64 @@ class MixGeneratorTest {
     }
 
     @Test
+    fun `capital extensions change the case of some extensions and nothing else`() {
+        val changed = GeneratedMixes.SEEDS.flatMap { seed ->
+            val mix = MixGenerator.mix(seed)
+            val capitals = mix.withUppercaseExtensions()
+            assertEquals(capitals, mix.withUppercaseExtensions())
+            mix.zip(capitals).map { (before, after) ->
+                assertEquals(before.copy(name = ""), after.copy(name = ""))
+                assertEquals(before.name.substringBeforeLast('.'), after.name.substringBeforeLast('.'))
+                assertTrue(after.name, after.name.equals(before.name, ignoreCase = true))
+                before.name != after.name
+            }
+        }
+
+        assertTrue("some in capitals", changed.count { it } > changed.size / 3)
+        assertTrue("some as they were", changed.count { !it } > changed.size / 3)
+    }
+
+    // The shrinker drops files: what is left must keep its names, or the failure it is shrinking goes away.
+    @Test
+    fun `a file gets the same capitals whatever else the mix holds`() {
+        GeneratedMixes.SEEDS.forEach { seed ->
+            val mix = MixGenerator.mix(seed)
+            val together = mix.withUppercaseExtensions()
+            val alone = mix.map { listOf(it).withUppercaseExtensions().single() }
+
+            assertEquals(together, alone)
+        }
+    }
+
+    @Test
+    fun `case twins are new files under the same name with the extension in capitals`() {
+        GeneratedMixes.SEEDS.forEach { seed ->
+            val mix = MixGenerator.mix(seed)
+            val twins = mix.caseTwins()
+
+            assertEquals(mix.size, twins.size)
+            assertTrue(twins.map { it.id }.none { id -> mix.any { it.id == id } })
+            mix.zip(twins).forEach { (file, twin) ->
+                assertTrue(twin.name, twin.name.equals(file.name, ignoreCase = true) && twin.name != file.name)
+                assertEquals(file.metadata, twin.metadata)
+            }
+        }
+    }
+
+    @Test
+    fun `capital extensions make files meet under names that differ only by case`() {
+        val met = GeneratedMixes.SEEDS.count { seed ->
+            val lib = MixedFolder(ignoreCase = true)
+            lib.addAll(MixGenerator.mix(seed).withUppercaseExtensions())
+            val targets = StandardizePlanner(lib.fs, lib.reader).plan(lib.root).renames.map { it.targetName }
+            val plain = targets.map { it.replace(Regex("__dup\\d+"), "") }
+            plain.groupBy { it.lowercase() }.values.any { it.toSet().size > 1 }
+        }
+
+        assertTrue("seeds with such a pair: $met", met > 0)
+    }
+
+    @Test
     fun `a mix reaches the paths the planners' invariants guard`() {
         val renames = mixes.map { mix ->
             val lib = MixedFolder()

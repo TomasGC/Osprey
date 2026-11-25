@@ -28,6 +28,7 @@ class TrashRestorer(private val fs: FileSystemRepository) {
         for (entry in entries) {
             val names = libraryNames.getOrPut(entry.year) { namesInYear(libraryRoot, entry.year) }
             val existing = names[entry.name]
+                ?: names.values.firstOrNull { it.name.equals(entry.name, ignoreCase = true) }
             if (existing == null) direct += entry else conflicts += RestoreConflict(entry, existing)
         }
         return RestorePlan(direct, conflicts, restoreRenames(direct, libraryNames.mapValues { it.value.keys }))
@@ -80,13 +81,15 @@ class TrashRestorer(private val fs: FileSystemRepository) {
         val location = TrashLocation(libraryRoot, entry.year)
         val folders = TrashFolders(fs)
         val replacedFolder = folders.ensure(location, TrashAction.REPLACED)
-        val replacedName = freeTrashName(entry.name, folders.existingNames(location, TrashAction.REPLACED))
+        // The library file keeps its own name, which may differ from the Trash file's by case (#132).
+        val libraryName = conflict.existing.name
+        val replacedName = freeTrashName(libraryName, folders.existingNames(location, TrashAction.REPLACED))
         val yearFolder = fs.createFolder(libraryRoot, entry.year)
         val parked = fs.move(conflict.existing.handle, replacedFolder, replacedName)
         try {
             fs.move(file.handle, yearFolder)
         } catch (e: FileAlreadyExistsException) {
-            fs.move(parked, yearFolder, entry.name)
+            fs.move(parked, yearFolder, libraryName)
             throw e
         }
     }

@@ -14,6 +14,7 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.filesystem.FileTransfer
 import app.osprey.filesystem.FileTimestamps
+import app.osprey.filesystem.ProviderMove
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.time.Instant
@@ -47,38 +48,47 @@ class AndroidFileSystemRepository(
 
     override fun rename(entry: FileHandle, newName: String): FileHandle {
         val doc = entry.documentFile()
-        if (doc.parentFile?.findFile(newName) != null) {
+        if (doc.name == newName || doc.parentFile?.hasOther(newName, doc) == true) {
             throw FileAlreadyExistsException("$newName already exists")
         }
-        check(doc.renameTo(newName)) { "rename failed: ${doc.name} -> $newName" }
+        doc.renaming().to(newName)
         return AndroidFileHandle(doc)
     }
 
     override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
         val doc = entry.documentFile()
         val destDoc = destFolder.documentFile()
-        val targetName = newName ?: doc.name.orEmpty()
-        if (destDoc.findFile(targetName) != null) {
+        val name = doc.name.orEmpty()
+        val targetName = newName ?: name
+        if (destDoc.findIgnoringCase(targetName) != null) {
             throw FileAlreadyExistsException("$targetName already exists in ${destDoc.name}")
         }
-        // Rename before moving, while `doc` is still the tree-rooted DocumentFile reached via
-        // list(): DocumentFile.fromSingleUri() (the shape moveDocument's result Uri would need)
-        // returns a wrapper whose renameTo() unconditionally throws UnsupportedOperationException,
-        // so a post-move rename on that result is never safe. Re-deriving the final handle via
-        // destDoc.findFile() afterwards keeps it tree-rooted and avoids fromSingleUri entirely.
-        if (newName != null && newName != doc.name) {
-            check(doc.renameTo(newName)) { "pre-move rename failed: ${doc.name} -> $newName" }
-        }
-        val sourceParentUri = doc.parentFile?.uri ?: error("cannot move ${doc.name}: no parent")
-        DocumentsContract.moveDocument(context.contentResolver, doc.uri, sourceParentUri, destDoc.uri)
-            ?: error("move failed: ${doc.name} -> ${destDoc.name}")
+        val sourceParent = doc.parentFile ?: error("cannot move $name: no parent")
+        // Renames happen on `doc` while it is still the tree-rooted DocumentFile reached via list(), or on the one
+        // found in `destDoc` afterwards: DocumentFile.fromSingleUri() (the shape moveDocument's result Uri would
+        // need) returns a wrapper whose renameTo() always throws.
+        var during = name
+        ProviderMove(
+            renameSource = {
+                doc.renaming().to(it)
+                during = it
+            },
+            move = {
+                DocumentsContract.moveDocument(context.contentResolver, doc.uri, sourceParent.uri, destDoc.uri)
+                    ?: error("move failed: $name -> ${destDoc.name}")
+            },
+            renameMoved = {
+                val moved = destDoc.findFile(during) ?: error("move produced no document")
+                moved.renaming().to(it)
+            },
+        ).run(name, targetName) { sourceParent.hasOther(targetName, doc) }
         val moved = destDoc.findFile(targetName) ?: error("move produced no document")
         return AndroidFileHandle(moved)
     }
 
     override fun createFolder(parent: FileHandle, name: String): FileHandle {
         val parentDoc = parent.documentFile()
-        val existing = parentDoc.findFile(name)
+        val existing = parentDoc.findIgnoringCase(name)
         if (existing != null) {
             if (existing.isDirectory) return AndroidFileHandle(existing)
             throw FileAlreadyExistsException("$name already exists as a file")

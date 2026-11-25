@@ -1,5 +1,6 @@
 package app.osprey.actions.standardize
 
+import app.osprey.actions.TakenNames
 import app.osprey.actions.displayName
 import app.osprey.actions.imageExtensions
 import app.osprey.actions.resolveMediaDate
@@ -40,15 +41,14 @@ class StandardizePlanner(
      * silent no-op, never a false [StandardizePlan.unfixable] entry.
      */
     fun plan(root: FileHandle, control: JobControl = NoJobControl): StandardizePlan {
-        val existingNames = fs.list(root).map { it.name }.toSet()
-        val claimed = mutableSetOf<String>()
+        val names = TakenNames(fs.list(root).map { it.name })
         val renames = mutableListOf<StandardizeRename>()
         val unfixable = mutableListOf<FileEntry>()
 
         control.forEachUntilStopped(fs.list(root).filterNot { it.isDirectory }, FileEntry::name) { entry ->
-            when (val outcome = classify(entry, existingNames, claimed)) {
+            when (val outcome = classify(entry, names)) {
                 is EntryOutcome.Rename -> {
-                    claimed += outcome.rename.targetName
+                    names.claim(outcome.rename.targetName)
                     renames += outcome.rename
                 }
                 EntryOutcome.Unfixable -> unfixable += entry
@@ -64,10 +64,10 @@ class StandardizePlanner(
         data object Skip : EntryOutcome
     }
 
-    private fun classify(entry: FileEntry, existingNames: Set<String>, claimed: Set<String>): EntryOutcome {
+    private fun classify(entry: FileEntry, names: TakenNames): EntryOutcome {
         val prefix = prefixFor(entry.name) ?: return EntryOutcome.Skip
         val resolved = resolveMediaDate(entry.handle, entry.name, mediaMetadataReader) ?: return EntryOutcome.Unfixable
-        val targetName = targetNameFor(entry.name, prefix, resolved, existingNames, claimed)
+        val targetName = targetNameFor(entry.name, prefix, resolved, names)
         if (targetName == entry.name) return EntryOutcome.Skip
         val rename = StandardizeRename(
             entry.handle,
@@ -121,20 +121,23 @@ class StandardizePlanner(
         sourceName: String,
         prefix: String,
         resolved: MediaDate,
-        existingNames: Set<String>,
-        claimed: Set<String>,
+        names: TakenNames,
     ): String {
         val suffix = splitStemAndSuffix(sourceName).second
         val baseName = "${prefix}_${resolved.dateTime.format(STANDARDIZED_NAME_FORMAT)}"
-        val target = "$baseName$suffix"
-        if (target == sourceName || isCollisionCopy(sourceName, baseName, suffix)) return sourceName
-        return firstFreeName(baseName, suffix, target, existingNames, claimed)
+        // The name this file should have if no other file does: a collision copy keeps its number.
+        val number = collisionNumber(sourceName, baseName, suffix)
+        val wanted = if (number == null) "$baseName$suffix" else "$baseName$COLLISION_MARKER$number$suffix"
+        if (wanted == sourceName) return sourceName
+        return firstFreeName(baseName, suffix, wanted, sourceName, names)
     }
 
     // A file Standardize already gave a collision number to stays as it is (#84): its own name counts as taken, so
     // every run would otherwise move it to the next free number (__dup2, __dup3, ...).
-    private fun isCollisionCopy(sourceName: String, baseName: String, suffix: String): Boolean =
-        Regex("${Regex.escape(baseName)}$COLLISION_MARKER\\d+${Regex.escape(suffix)}").matches(sourceName)
+    private fun collisionNumber(sourceName: String, baseName: String, suffix: String): String? = Regex(
+        "${Regex.escape(baseName)}$COLLISION_MARKER(\\d+)${Regex.escape(suffix)}",
+        RegexOption.IGNORE_CASE,
+    ).matchEntire(sourceName)?.let { it.groupValues[1] }
 
     // Starts at __dup2, not __dup1 like Dedupe's/Flatten's collision suffix -- carried over
     // from the POC as-is, a known inconsistency, not silently "fixed" during the port (#7).
@@ -142,12 +145,12 @@ class StandardizePlanner(
         baseName: String,
         suffix: String,
         firstCandidate: String,
-        existingNames: Set<String>,
-        claimed: Set<String>,
+        sourceName: String,
+        names: TakenNames,
     ): String {
         var target = firstCandidate
         var n = 2
-        while (target in existingNames || target in claimed) {
+        while (names.takenByAnother(target, sourceName)) {
             target = "$baseName$COLLISION_MARKER$n$suffix"
             n++
         }

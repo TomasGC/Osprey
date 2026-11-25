@@ -1,5 +1,6 @@
 package app.osprey.actions.flatten
 
+import app.osprey.actions.TakenNames
 import app.osprey.actions.splitStemAndSuffix
 import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileHandle
@@ -24,30 +25,25 @@ class FlattenPlanner(private val fs: FileSystemRepository) {
      */
     fun plan(root: FileHandle, control: JobControl = NoJobControl): FlattenPlan {
         val folders = collectNestedFolders(root)
-        val existingNames = fs.list(root).map { it.name }.toMutableSet()
-        val reserved = mutableSetOf<String>()
+        val names = TakenNames(fs.list(root).map { it.name })
         val moves = mutableListOf<FlattenMove>()
 
         control.forEachUntilStopped(folders, FlattenFolder::relativePath) { folder ->
             for (entry in fs.list(folder.handle)) {
                 if (entry.isDirectory) continue
-                val (destName, note) = resolveDestination(entry.name, existingNames, reserved)
-                reserved += destName
+                val (destName, note) = resolveDestination(entry.name, names)
+                names.claim(destName)
                 moves += FlattenMove(entry.handle, "${folder.relativePath}/${entry.name}", destName, note)
             }
         }
         return FlattenPlan(moves, folders)
     }
 
-    private fun resolveDestination(
-        name: String,
-        existingNames: Set<String>,
-        reserved: Set<String>,
-    ): Pair<String, String> {
-        if (name !in existingNames && name !in reserved) return name to ""
+    private fun resolveDestination(name: String, names: TakenNames): Pair<String, String> {
+        if (name !in names) return name to ""
         var n = 1
         var candidate = flatCandidateName(name, n)
-        while (candidate in existingNames || candidate in reserved) {
+        while (candidate in names) {
             n++
             candidate = flatCandidateName(name, n)
         }
