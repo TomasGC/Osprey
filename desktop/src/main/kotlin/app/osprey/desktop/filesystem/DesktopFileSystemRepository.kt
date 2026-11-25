@@ -12,6 +12,7 @@ import app.osprey.filesystem.FileTimestamps
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributeView
 import java.nio.file.attribute.BasicFileAttributes
@@ -36,8 +37,16 @@ class DesktopFileSystemRepository(
         return Files.newDirectoryStream(path).use { stream -> stream.map { it.toEntry() } }
     }
 
-    override fun rename(entry: FileHandle, newName: String): FileHandle =
-        moveWithoutOverwrite(entry.path(), entry.path().resolveSibling(newName))
+    override fun rename(entry: FileHandle, newName: String): FileHandle {
+        val source = entry.path()
+        val target = source.resolveSibling(newName)
+        return if (changesOwnCaseOnly(source, newName)) {
+            // A plain move sees the same file on both sides and does nothing (#132).
+            PathHandle(Files.move(source, target, StandardCopyOption.ATOMIC_MOVE))
+        } else {
+            moveWithoutOverwrite(source, target)
+        }
+    }
 
     override fun move(entry: FileHandle, destFolder: FileHandle, newName: String?): FileHandle {
         val targetName = newName ?: entry.path().fileName.toString()
@@ -92,6 +101,18 @@ class DesktopFileSystemRepository(
             timestamps.created?.let { FileTime.from(it) },
         )
     }
+}
+
+/**
+ * Whether [newName] is the name of [source] in another case on a file system that takes both for one: the new name
+ * resolves to a file, yet the folder lists nothing called exactly that. An atomic move replaces what it finds, so
+ * nothing else may reach it.
+ */
+private fun changesOwnCaseOnly(source: Path, newName: String): Boolean {
+    val name = source.fileName.toString()
+    if (name == newName || !name.equals(newName, ignoreCase = true)) return false
+    if (!Files.exists(source.resolveSibling(newName))) return false
+    return Files.newDirectoryStream(source.parent).use { stream -> stream.none { it.fileName.toString() == newName } }
 }
 
 private fun moveWithoutOverwrite(source: Path, target: Path): FileHandle = try {
