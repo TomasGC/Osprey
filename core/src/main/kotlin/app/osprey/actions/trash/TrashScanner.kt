@@ -2,6 +2,7 @@ package app.osprey.actions.trash
 
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.childFolder
 
 private const val TRASH = "Trash"
 
@@ -14,20 +15,17 @@ class TrashScanner(private val fs: FileSystemRepository) {
 
     /** The files currently in the Trash of [libraryRoot]; nothing on disk changes. */
     fun scan(libraryRoot: FileHandle): TrashContents {
-        val trash = fs.list(libraryRoot).firstOrNull { it.isDirectory && it.name == TRASH }
-            ?: return TrashContents(emptyList())
-        val entries = fs.list(trash.handle)
+        val trash = fs.childFolder(libraryRoot, TRASH) ?: return TrashContents(emptyList())
+        val entries = fs.list(trash)
             .filter { it.isDirectory && isYear(it.name) }
             .flatMap { year -> entriesOfYear(year.name, year.handle) }
         return TrashContents(entries)
     }
 
     private fun entriesOfYear(year: String, folder: FileHandle): List<TrashEntry> {
-        val actionFolders = fs.list(folder).filter { it.isDirectory }.associateBy { it.name }
         return TrashAction.entries.flatMap { action ->
-            val actionFolder = actionFolders[action.folderName]
-            actionFolder?.let { found ->
-                fs.list(found.handle).filterNot { it.isDirectory }
+            fs.childFolder(folder, action.folderName)?.let { found ->
+                fs.list(found).filterNot { it.isDirectory }
                     .map { TrashEntry(year, action, it.handle, it.name, it.sizeBytes) }
             }.orEmpty()
         }

@@ -6,6 +6,7 @@ import app.osprey.actions.generated.FileSpec
 import app.osprey.actions.generated.GeneratedMixes
 import app.osprey.actions.generated.MixGenerator
 import app.osprey.actions.generated.asMediaDate
+import app.osprey.actions.generated.withUppercaseExtensions
 import app.osprey.actions.reorg.ReorgPlanner
 import app.osprey.actions.reorg.ReorgSource
 import app.osprey.actions.standardize.StandardizePlanner
@@ -108,6 +109,26 @@ class GeneratedMixesIntegrationMockTest : TimedTest() {
                         assertTrue(message, starts.any(name::startsWith))
                     }
                 }
+            }
+        }
+
+    @Test
+    fun `Standardize on real files with extensions in capitals renames every file it planned`() =
+        GeneratedMixes.check(seeds) { drawn ->
+            val mix = drawn.withUppercaseExtensions()
+            withHarness { harness ->
+                mix.forEach { write(harness.year, it) }
+                register(harness, mix)
+                val before = contents(harness)
+                val planner = StandardizePlanner(harness.fs, harness.reader)
+                val first = planner.plan(harness.yearHandle())
+
+                val renamed = planner.apply(first)
+                register(harness, mix)
+
+                assertEquals("files renamed", first.renames.size, renamed)
+                assertEquals("renames planned again", emptyList<Any>(), planner.plan(harness.yearHandle()).renames)
+                assertEquals("contents", before, contents(harness))
             }
         }
 

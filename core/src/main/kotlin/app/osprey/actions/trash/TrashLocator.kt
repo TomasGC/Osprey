@@ -4,6 +4,7 @@ import app.osprey.filesystem.DirectoryNotEmptyException
 import app.osprey.filesystem.FileEntry
 import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
+import app.osprey.filesystem.childFolder
 
 private const val TRASH = "Trash"
 
@@ -45,8 +46,7 @@ internal class TrashLocator(private val fs: FileSystemRepository, private val li
 
     private fun trashFolder(): FileHandle? = child(libraryRoot, TRASH)
 
-    private fun child(parent: FileHandle, name: String): FileHandle? =
-        fs.list(parent).firstOrNull { it.isDirectory && it.name == name }?.handle
+    private fun child(parent: FileHandle, name: String): FileHandle? = fs.childFolder(parent, name)
 
     private fun removeIfEmpty(folder: FileHandle): Boolean {
         if (fs.list(folder).isNotEmpty()) return false

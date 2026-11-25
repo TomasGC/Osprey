@@ -8,8 +8,10 @@ import java.time.Instant
  * In-memory [FileSystemRepository], backing every `:core` planner's unit tests from here on.
  * Seeded and inspected through [addFile]/[addFolder]/[root] — those are fake-only test
  * scaffolding, not part of the interface under test.
+ *
+ * With [ignoreCase] two names that differ only by case are one name, as on Windows and Android's shared storage (#132).
  */
-class FakeFileSystemRepository : FileSystemRepository {
+class FakeFileSystemRepository(private val ignoreCase: Boolean = false) : FileSystemRepository {
 
     private class Node(
         var name: String,
@@ -64,7 +66,7 @@ class FakeFileSystemRepository : FileSystemRepository {
 
     override fun createFolder(parent: FileHandle, name: String): FileHandle {
         val parentId = parent.id()
-        val existing = nodes.entries.find { it.value.parentId == parentId && it.value.name == name }
+        val existing = nodes.entries.find { it.value.parentId == parentId && it.value.name.equals(name, ignoreCase) }
         if (existing != null) {
             if (existing.value.isDirectory) return Handle(existing.key)
             throw FileAlreadyExistsException("$name already exists as a file")
@@ -141,7 +143,7 @@ class FakeFileSystemRepository : FileSystemRepository {
 
     private fun requireNoCollision(parentId: Long, name: String, exceptId: Long) {
         val collision = nodes.entries.any { (id, node) ->
-            id != exceptId && node.parentId == parentId && node.name == name
+            id != exceptId && node.parentId == parentId && node.name.equals(name, ignoreCase)
         }
         if (collision) throw FileAlreadyExistsException("$name already exists")
     }

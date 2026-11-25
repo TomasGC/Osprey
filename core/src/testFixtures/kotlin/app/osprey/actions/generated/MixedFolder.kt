@@ -6,8 +6,8 @@ import app.osprey.filesystem.FileTimestamps
 import app.osprey.media.FakeMediaMetadataReader
 
 /** A fake file system and reader holding generated files, content and metadata as their specs say. */
-class MixedFolder {
-    val fs = FakeFileSystemRepository()
+class MixedFolder(ignoreCase: Boolean = false) {
+    val fs = FakeFileSystemRepository(ignoreCase)
     val reader = FakeMediaMetadataReader()
     val root: FileHandle = fs.root
 

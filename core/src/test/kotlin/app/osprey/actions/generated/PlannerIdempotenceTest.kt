@@ -46,6 +46,21 @@ class PlannerIdempotenceTest {
         }
 
     @Test
+    fun `Standardize never meets a taken name where case does not tell names apart`() = GeneratedMixes.check { mix ->
+        val capitals = mix.withUppercaseExtensions()
+        val lib = MixedFolder(ignoreCase = true).also { it.addSpread(capitals) }
+        val before = lib.contents()
+        val planner = StandardizePlanner(lib.fs, lib.reader)
+        val first = planner.plan(lib.root)
+
+        val renamed = planner.apply(first)
+
+        assertEquals("files renamed", first.renames.size, renamed)
+        assertEquals("renames planned again", emptyList<Any>(), planner.plan(lib.root).renames)
+        assertEquals("contents", before, lib.contents())
+    }
+
+    @Test
     fun `Dates planned again after it ran gives the same plan and leaves every time as it was`() =
         GeneratedMixes.check { mix ->
             val lib = MixedFolder()
@@ -139,6 +154,31 @@ class PlannerIdempotenceTest {
             assertTrue("every content is still there", after.toSet().containsAll(before))
             assertEquals("files", before.size + result.copied, after.size)
         }
+
+    // Each file has a twin in another folder under its name in another case, so the two meet in one year folder.
+    @Test
+    fun `Reorg never meets a taken name where case does not tell names apart`() = GeneratedMixes.check { mix ->
+        val lib = MixedFolder(ignoreCase = true)
+        val output = lib.fs.addFolder(lib.root, "Library")
+        val camera = lib.fs.addFolder(lib.root, "Camera")
+        val whatsapp = lib.fs.addFolder(lib.root, "WhatsApp")
+        val twins = mix.caseTwins()
+        mix.forEach { lib.add(camera, it) }
+        twins.forEach { lib.add(whatsapp, it) }
+        val sources = listOf(
+            ReorgSource(camera, "Camera", InputMode.COPY),
+            ReorgSource(whatsapp, "WhatsApp", InputMode.MOVE),
+        )
+        val before = lib.contents()
+        val planner = ReorgPlanner(lib.fs, lib.reader)
+
+        val result = planner.apply(planner.plan(output, sources), output)
+        lib.readMetadataFromContent(mix + twins)
+
+        assertEquals("failures", emptyList<Any>(), result.failures)
+        assertEquals("items planned again", emptyList<Any>(), planner.plan(output, sources).items)
+        assertTrue("every content is still there", lib.contents().toSet().containsAll(before))
+    }
 
     @Test
     fun `Dates and Reorg give every file whose date is clear that date, or none when it has no date`() =
