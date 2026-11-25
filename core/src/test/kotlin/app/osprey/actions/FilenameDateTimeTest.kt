@@ -154,4 +154,18 @@ class FilenameDateTimeTest {
         assertNull(filenameDateTime("VID_2016-08-28_19:30:34"))
         assertNull(filenameDateTime("VID_2016-13-28_19-30-34"))
     }
+
+    // A file system that ignores case does not tell `img_` from `IMG_`, and neither does the date (#132).
+    @Test
+    fun `filenameDateTime reads every convention whatever the case of its letters`() {
+        val shot = LocalDateTime.of(2017, 4, 25, 15, 26, 2)
+        listOf(
+            "img_20170425_152602", "vid_20170425_152602", "mov_20170425_152602",
+            "ultimate_hdr_camera_original_20170425_152602", "ar_effect_20170425152602", "DOWNLOAD_20170425_152602",
+            "screenshot_20170425-152602", "smartselect_20170425-152602", "camerazoom-20170425152602",
+            "img_2017-04-25_15-26-02", "Vid_2017-04-25_15-26-02__dup2",
+        ).forEach { assertEquals(it, shot, filenameDateTime(it)) }
+        val day = LocalDateTime.of(2017, 4, 25, 0, 0)
+        listOf("img-20170425-wa0001", "VID-20170425-Wa0002").forEach { assertEquals(it, day, filenameDateTime(it)) }
+    }
 }
