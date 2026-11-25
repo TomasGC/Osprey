@@ -21,7 +21,7 @@ class AndroidFileTransfer(private val context: Context) : FileTransfer {
         val source = (entry as AndroidFileHandle).documentFile
         val destDoc = (destFolder as AndroidFileHandle).documentFile
         val targetName = newName ?: source.name.orEmpty()
-        if (destDoc.findFile(targetName) != null) {
+        if (destDoc.findIgnoringCase(targetName) != null) {
             throw FileAlreadyExistsException("$targetName already exists in ${destDoc.name}")
         }
         val partial = destDoc.createFile(PARTIAL_MIME_TYPE, targetName + PARTIAL_SUFFIX)
@@ -29,7 +29,7 @@ class AndroidFileTransfer(private val context: Context) : FileTransfer {
         var finished = false
         try {
             streamCopy(source, partial)
-            check(partial.renameTo(targetName)) { "copy failed: cannot rename to $targetName" }
+            partial.renaming().to(targetName)
             finished = true
         } finally {
             if (!finished) partial.delete()

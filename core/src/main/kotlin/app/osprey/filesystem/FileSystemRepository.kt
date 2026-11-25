@@ -17,7 +17,9 @@ interface FileSystemRepository : FileTransfer, ContentReplacer {
 
     /**
      * Renames [entry] to [newName], within its current parent folder.
-     * Never overwrites: throws [FileAlreadyExistsException] if [newName] is already taken there.
+     * Never overwrites: throws [FileAlreadyExistsException] if [newName] is already taken there. Where the storage
+     * takes two names that differ only by case for one (Windows, Android's shared storage), such a name of another
+     * file is taken, for [move] and `copyTo` too; [entry]'s own name in another case is a rename that happens (#132).
      */
     fun rename(entry: FileHandle, newName: String): FileHandle
 

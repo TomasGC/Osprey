@@ -18,6 +18,7 @@ import app.osprey.filesystem.FakeFileSystemRepository
 import app.osprey.filesystem.FaultyFileSystemRepository
 import app.osprey.filesystem.FileAlreadyExistsException
 import app.osprey.filesystem.FileHandle
+import app.osprey.filesystem.temporaryName
 import app.osprey.jobs.RecordingJobControl
 import app.osprey.media.FakeMediaMetadataReader
 import app.osprey.media.MediaDate
@@ -122,6 +123,16 @@ class CaseOnlyNamesTest {
         standardize(sensitive)
 
         assertEquals(setOf("$STANDARD.png=one", "${STANDARD}__dup2.png=two"), tree(sensitive.root, on = sensitive))
+    }
+
+    // What an app killed between Android's two rename steps leaves behind.
+    @Test
+    fun `Standardize gives a file left under a temporary name its standard name back`() {
+        file(temporaryName("$STANDARD.png"), "one")
+
+        standardize()
+
+        assertEquals(setOf("$STANDARD.png=one"), tree())
     }
 
     @Test
