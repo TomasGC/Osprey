@@ -241,4 +241,38 @@ class VisualDupePlannerTest {
 
         assertEquals(emptyList<List<VisualDupeMember>>(), plan.groups)
     }
+
+    @Test
+    fun `plan never unions two files of one burst, whatever the case of their names`() {
+        for ((first, second) in listOf(
+            "dscpdc_0000_burst1.jpg" to "dscpdc_0001_burst1.jpg",
+            "DSCPDC_0000_BURST1.JPG" to "dscpdc_0001_burst1.jpg",
+        )) {
+            val fs = FakeFileSystemRepository()
+            val reader = FakeMediaMetadataReader()
+            val buffer = noisePixelBuffer(seed = 1)
+            reader.setFrame(fs.addFile(fs.root, first), buffer)
+            reader.setFrame(fs.addFile(fs.root, second), buffer)
+
+            val plan = VisualDupePlanner(fs, reader).plan(fs.root)
+
+            assertEquals("$first, $second", emptyList<List<VisualDupeMember>>(), plan.groups)
+        }
+    }
+
+    @Test
+    fun `describe keeps every frame of a lowercase burst set`() {
+        val fs = FakeFileSystemRepository()
+        val names = listOf("img_0000_burst1.jpg", "img_0001_burst1.jpg", "dsc_0815.jpg")
+        val group = names.mapIndexed { i, name -> VisualDupeMember(fs.addFile(fs.root, name), name, 100L - i) }
+        val logs = mutableListOf<String>()
+
+        val (_, extraCount) = VisualDupePlanner(fs, FakeMediaMetadataReader())
+            .describe(VisualDupePlan(groups = listOf(group)), logs::add)
+
+        assertEquals(1, extraCount)
+        assertTrue(logs.any { it.contains("BURST SET, keeping all 2 frames") })
+        assertTrue(logs.any { it.contains("KEEP (burst frame) img_0001_burst1.jpg") })
+        assertTrue(logs.any { it.contains("~dup (matches the burst) dsc_0815.jpg") })
+    }
 }
