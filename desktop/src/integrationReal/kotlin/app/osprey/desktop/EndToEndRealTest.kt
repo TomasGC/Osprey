@@ -114,6 +114,16 @@ class EndToEndRealTest : TimedTest() {
     }
 
     @Test
+    fun `rename strips a French copy suffix from a real file`() {
+        Files.write(yearDir.resolve("photo - Copie.jpg"), "a".toByteArray())
+        val planner = RenamePlanner(fs)
+
+        planner.apply(planner.plan(PathHandle(yearDir)))
+
+        assertEquals(listOf("photo.jpg"), fs.list(PathHandle(yearDir)).map { it.name })
+    }
+
+    @Test
     fun `reorg gathers inputs and refiles the output by filename date, and a second run plans nothing`() {
         // Output (the library): a misfiled image, an undated one, and a Trash folder that must never be entered.
         Files.write(yearDir.resolve("IMG_20190101_000100.jpg"), "b".toByteArray())

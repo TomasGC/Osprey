@@ -214,4 +214,17 @@ class RenamePlannerTest {
 
         assertEquals("photo.jpg", plan.renames.single().targetName)
     }
+
+    @Test
+    fun `plan renames a French copy once and a second scan finds nothing`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "photo - Copie (2).jpg")
+        val planner = RenamePlanner(fs)
+
+        val plan = planner.plan(fs.root)
+        planner.apply(plan)
+
+        assertEquals("photo.jpg", plan.renames.single().targetName)
+        assertEquals(emptyList<RenameAction>(), planner.plan(fs.root).renames)
+    }
 }

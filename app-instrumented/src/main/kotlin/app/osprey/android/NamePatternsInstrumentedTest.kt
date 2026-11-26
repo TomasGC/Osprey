@@ -27,4 +27,10 @@ class NamePatternsInstrumentedTest {
         assertEquals("photo", cleanStem("photo - COPY (2)"))
         assertEquals("photo", cleanStem("photo COPY 2"))
     }
+
+    @Test
+    fun aFrenchCopySuffixIsStrippedButNotAPhotocopy() {
+        assertEquals("photo", cleanStem("photo - COPIE (2)"))
+        assertEquals("photo-copie", cleanStem("photo-copie"))
+    }
 }
