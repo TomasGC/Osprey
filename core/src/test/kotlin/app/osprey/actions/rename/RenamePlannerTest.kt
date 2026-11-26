@@ -204,4 +204,14 @@ class RenamePlannerTest {
         assertEquals("locked", control.files.first().message)
         assertEquals(listOf("a (1).jpg", "b.jpg"), fs.list(inner.root).map { it.name }.sorted())
     }
+
+    @Test
+    fun `plan renames a file whose copy suffix is in capitals`() {
+        val fs = FakeFileSystemRepository()
+        fs.addFile(fs.root, "photo - COPY (2).jpg")
+
+        val plan = RenamePlanner(fs).plan(fs.root)
+
+        assertEquals("photo.jpg", plan.renames.single().targetName)
+    }
 }

@@ -1,6 +1,7 @@
 package app.osprey.android
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.osprey.actions.rename.cleanStem
 import app.osprey.actions.visual.burstId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -19,5 +20,11 @@ class NamePatternsInstrumentedTest {
         assertNull(burstId("e\u0301burst3.jpg"))
         assertNull(burstId("star-burst1.jpg"))
         assertEquals("6", burstId("2018-BURST6.jpg"))
+    }
+
+    @Test
+    fun copySuffixesAreStrippedInAnyCase() {
+        assertEquals("photo", cleanStem("photo - COPY (2)"))
+        assertEquals("photo", cleanStem("photo COPY 2"))
     }
 }

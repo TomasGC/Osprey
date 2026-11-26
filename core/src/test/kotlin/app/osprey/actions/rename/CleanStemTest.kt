@@ -68,4 +68,11 @@ class CleanStemTest {
     fun `zero passes change nothing`() {
         assertEquals("photo (1)", cleanStem("photo (1)", maxPasses = 0))
     }
+
+    @Test
+    fun `strips a copy suffix written in any case`() {
+        for (stem in listOf("photo - COPY", "photo - COPY (2)", "photo COPY", "photo COPY 2", "photo - cOpY")) {
+            assertEquals(stem, "photo", cleanStem(stem))
+        }
+    }
 }
