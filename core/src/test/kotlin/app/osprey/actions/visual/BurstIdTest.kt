@@ -31,4 +31,31 @@ class BurstIdTest {
     fun `BURST with no digits after it is not a burst id`() {
         assertNull(burstId("BURST_cover.jpg"))
     }
+
+    @Test
+    fun `reads a burst id whatever the case of the name`() {
+        assertEquals("20170101120000", burstId("dscpdc_0000_burst20170101120000.jpg"))
+        assertEquals("001", burstId("Img_Burst001.jpg"))
+        assertEquals("7", burstId("burst7.jpg"))
+        assertEquals("5", burstId("0000BURST5.jpg"))
+    }
+
+    @Test
+    fun `a word ending in burst is not a burst`() {
+        assertNull(burstId("sunburst2.jpg"))
+        assertNull(burstId("SUNBURST2.JPG"))
+        assertNull(burstId("éburst3.jpg"))
+    }
+
+    @Test
+    fun `a word is still a word across a hyphen or with its accent stored apart`() {
+        assertNull(burstId("star-burst1.jpg"))
+        assertNull(burstId("e\u0301burst3.jpg"))
+        assertEquals("6", burstId("2018-BURST6.jpg"))
+    }
+
+    @Test
+    fun `reads a burst id after a word ending in burst`() {
+        assertEquals("4", burstId("sunburst2_burst4.jpg"))
+    }
 }

@@ -82,4 +82,14 @@ class VisualDupeGroupUiTest : TimedTest() {
 
         assertEquals(listOf(1, 2), ui.map { it.index })
     }
+
+    @Test
+    fun `a lowercase burst set is pre-checked to keep every frame`() {
+        val group = listOf(member("img_0001_burst1.jpg", 100), member("img_0002_burst1.jpg", 300))
+
+        val ui = toUiGroups(listOf(group)).single()
+
+        assertTrue(ui.isBurst)
+        assertTrue(ui.members.all { ui.keep[it.name] == true })
+    }
 }
