@@ -75,4 +75,36 @@ class CleanStemTest {
             assertEquals(stem, "photo", cleanStem(stem))
         }
     }
+
+    @Test
+    fun `strips a French copy suffix`() {
+        for (stem in listOf("photo - Copie", "photo - copie", "photo - COPIE", "photo - Copie (2)")) {
+            assertEquals(stem, "photo", cleanStem(stem))
+        }
+        assertEquals("photo", cleanStem("photo (1) - Copie (2)"))
+    }
+
+    @Test
+    fun `leaves names that only look like a French copy suffix`() {
+        val names = listOf("photo-copie", "photo -copie", "photo- copie", "Ma copie", "photo - Copies", "- Copie")
+        for (stem in names) {
+            assertEquals(stem, cleanStem(stem))
+        }
+    }
+
+    @Test
+    fun `still strips an English copy suffix joined by a bare dash`() {
+        assertEquals("photo", cleanStem("photo-copy"))
+    }
+
+    @Test
+    fun `strips the suffixes of every language listed`() {
+        for (language in copySuffixLanguages) {
+            val word = language.word
+            val bare = if (language.bareWord) listOf("photo $word", "photo $word 2") else emptyList()
+            for (stem in listOf("photo - $word", "photo - $word (2)") + bare) {
+                assertEquals(stem, "photo", cleanStem(stem))
+            }
+        }
+    }
 }
