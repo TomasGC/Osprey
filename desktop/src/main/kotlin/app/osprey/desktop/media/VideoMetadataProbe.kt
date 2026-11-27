@@ -1,14 +1,14 @@
 package app.osprey.desktop.media
 
 import app.osprey.media.utcToLocal
-import java.io.IOException
 import java.nio.file.Path
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
-import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
 private const val FFPROBE_TIMEOUT_SECONDS = 30L
+private val FFPROBE_TIMEOUT: Duration = Duration.ofSeconds(FFPROBE_TIMEOUT_SECONDS)
 
 /**
  * `ffprobe`'s container `creation_time` for [path], converted from UTC to this machine's local
@@ -16,8 +16,8 @@ private const val FFPROBE_TIMEOUT_SECONDS = 30L
  * video actions degrade gracefully rather than crashing, same as the POC's `video_datetime`
  * (which, unlike this, read the UTC clock value as local time).
  */
-fun probeVideoCreationTime(path: Path): LocalDateTime? {
-    val json = runFfprobe(path) ?: return null
+fun probeVideoCreationTime(path: Path, timeout: Duration = FFPROBE_TIMEOUT): LocalDateTime? {
+    val json = runFfprobe(path, timeout) ?: return null
     val raw = JSONObject(json)
         .optJSONObject("format")
         ?.optJSONObject("tags")
@@ -31,15 +31,7 @@ fun probeVideoCreationTime(path: Path): LocalDateTime? {
     }
 }
 
-@Suppress("SwallowedException") // ffprobe missing/failing returns null -- graceful degradation, not a crash.
-private fun runFfprobe(path: Path): String? = try {
-    val process = ProcessBuilder(
-        "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path.toString(),
-    ).redirectError(ProcessBuilder.Redirect.DISCARD).start()
-    val output = process.inputStream.bufferedReader().readText()
-    val finished = process.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    if (!finished) process.destroyForcibly()
-    if (finished && process.exitValue() == 0) output else null
-} catch (e: IOException) {
-    null
-}
+private fun runFfprobe(path: Path, timeout: Duration): String? = processOutput(
+    listOf("ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path.toString()),
+    timeout,
+)?.toString(Charsets.UTF_8)
