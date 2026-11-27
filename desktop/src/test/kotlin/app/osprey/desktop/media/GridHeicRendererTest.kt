@@ -37,10 +37,10 @@ class GridHeicRendererTest : TimedTest() {
     fun `a photo with no tile grid is rendered by the plain command alone`() {
         val calls = Calls()
 
-        val png = renderer(calls, probe = """{"stream_groups": []}""") { whole }.renderPng(photo)
+        val png = renderer(calls, probe = """{"stream_groups": []}""") { whole }.render(photo)
 
         assertArrayEquals(whole, png)
-        assertEquals(listOf(heicRenderCommand(photo)), calls.commands)
+        assertEquals(listOf(heicRenderCommand(photo, HeicOutput.PNG)), calls.commands)
         assertEquals(listOf(photo), calls.probed)
     }
 
@@ -48,36 +48,53 @@ class GridHeicRendererTest : TimedTest() {
     fun `a photo that cannot be probed is rendered by the plain command alone`() {
         val calls = Calls()
 
-        renderer(calls, probe = null) { whole }.renderPng(photo)
+        renderer(calls, probe = null) { whole }.render(photo)
 
-        assertEquals(listOf(heicRenderCommand(photo)), calls.commands)
+        assertEquals(listOf(heicRenderCommand(photo, HeicOutput.PNG)), calls.commands)
     }
 
     @Test
     fun `a tile grid is composed with its tiles and its turn, and nothing else is run`() {
         val calls = Calls()
 
-        val png = renderer(calls, probe = gridJson, turns = 3) { if (isComposed(it)) composed else whole }.renderPng(
+        val png = renderer(calls, probe = gridJson, turns = 3) { if (isComposed(it)) composed else whole }.render(
             photo,
         )
 
         assertArrayEquals(composed, png)
         assertEquals(1, calls.commands.size)
-        assertEquals(heicGridCommand(photo, parseHeicGrid(gridJson)!!, 3), calls.commands.single())
+        assertEquals(heicGridCommand(photo, parseHeicGrid(gridJson)!!, 3, HeicOutput.PNG), calls.commands.single())
     }
 
     @Test
     fun `when the composed picture cannot be made the plain command is tried`() {
         val calls = Calls()
 
-        val png = renderer(calls, probe = gridJson) { if (isComposed(it)) null else whole }.renderPng(photo)
+        val png = renderer(calls, probe = gridJson) { if (isComposed(it)) null else whole }.render(photo)
 
         assertArrayEquals(whole, png)
         assertEquals(listOf(true, false), calls.commands.map(::isComposed))
     }
 
     @Test
+    fun `an 8-bit picture is asked for as BMP, composed and plain alike`() {
+        val eightBit = gridJson.replace(""""type": "Tile Grid",""",
+            """"type": "Tile Grid", "streams": [{"pix_fmt": "yuvj420p"}],""")
+        val calls = Calls()
+
+        renderer(calls, probe = eightBit) { null }.render(photo)
+
+        assertEquals(
+            listOf(
+                heicGridCommand(photo, parseHeicGrid(eightBit)!!, 0, HeicOutput.BMP),
+                heicRenderCommand(photo, HeicOutput.BMP),
+            ),
+            calls.commands,
+        )
+    }
+
+    @Test
     fun `nothing renders when every command fails`() {
-        assertNull(renderer(Calls(), probe = gridJson) { null }.renderPng(photo))
+        assertNull(renderer(Calls(), probe = gridJson) { null }.render(photo))
     }
 }

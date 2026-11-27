@@ -14,13 +14,13 @@ class HeicGridCommandTest : TimedTest() {
     )
 
     private fun graph(turns: Int = 0, grid: HeicGrid = this.grid): String {
-        val command = heicGridCommand(Path.of("my photos", "IMG 1.heic"), grid, turns)
+        val command = heicGridCommand(Path.of("my photos", "IMG 1.heic"), grid, turns, HeicOutput.PNG)
         return command[command.indexOf("-filter_complex") + 1]
     }
 
     @Test
     fun `the command reads the photo, maps the composed picture and writes one PNG on stdout`() {
-        val command = heicGridCommand(Path.of("my photos", "IMG 1.heic"), grid, 0)
+        val command = heicGridCommand(Path.of("my photos", "IMG 1.heic"), grid, 0, HeicOutput.PNG)
 
         assertEquals("ffmpeg", command.first())
         assertEquals(Path.of("my photos", "IMG 1.heic").toString(), command[command.indexOf("-i") + 1])
@@ -30,6 +30,15 @@ class HeicGridCommandTest : TimedTest() {
         assertEquals("image2pipe", command[command.indexOf("-f") + 1])
         assertEquals("1", command[command.indexOf("-compression_level") + 1])
         assertTrue("-nostdin" in command)
+        assertEquals("-", command.last())
+    }
+
+    @Test
+    fun `the composed picture is written in the format asked for`() {
+        val command = heicGridCommand(Path.of("a.heic"), grid, 0, HeicOutput.BMP)
+
+        assertEquals("bmp", command[command.indexOf("-vcodec") + 1])
+        assertEquals(false, "-compression_level" in command)
         assertEquals("-", command.last())
     }
 

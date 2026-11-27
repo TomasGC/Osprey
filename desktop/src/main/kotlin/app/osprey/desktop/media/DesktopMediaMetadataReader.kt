@@ -35,7 +35,7 @@ class DesktopMediaMetadataReader(private val heicRenderer: HeicRenderer = Ffmpeg
         return when (extensionOf(path)) {
             in heicExtensions -> decodeHeicPixelBuffer(path, maxSide, heicRenderer)
             in imageExtensions -> decodeImagePixelBuffer(path, maxSide)
-            in videoExtensions -> extractVideoFramePng(path)?.let { decodePngPixelBuffer(it, maxSide) }
+            in videoExtensions -> extractVideoFramePng(path)?.let { decodeBytesPixelBuffer(it, maxSide) }
             else -> null
         }
     }

@@ -8,6 +8,7 @@ import java.io.IOException
 import java.nio.file.Path
 import javax.imageio.ImageIO
 import javax.imageio.stream.ImageInputStream
+import javax.imageio.stream.MemoryCacheImageInputStream
 
 /**
  * Decodes the image at [path] into a [PixelBuffer], at full resolution or, with [maxSide], subsampled
@@ -25,7 +26,7 @@ fun decodeImagePixelBuffer(path: Path, maxSide: Int? = null): PixelBuffer? = try
     null
 }
 
-private fun readSubsampled(input: ImageInputStream?, maxSide: Int): BufferedImage? {
+private fun readSubsampled(input: ImageInputStream?, maxSide: Int?): BufferedImage? {
     if (input == null) return null
     return input.use { stream ->
         val readers = ImageIO.getImageReaders(stream)
@@ -33,7 +34,7 @@ private fun readSubsampled(input: ImageInputStream?, maxSide: Int): BufferedImag
         val reader = readers.next()
         try {
             reader.input = stream
-            val step = subsampleStepFor(reader.getWidth(0), reader.getHeight(0), maxSide)
+            val step = maxSide?.let { subsampleStepFor(reader.getWidth(0), reader.getHeight(0), it) } ?: 1
             val param = reader.defaultReadParam.apply { setSourceSubsampling(step, step, 0, 0) }
             reader.read(0, param)
         } finally {
@@ -42,16 +43,13 @@ private fun readSubsampled(input: ImageInputStream?, maxSide: Int): BufferedImag
     }
 }
 
-/** Decodes raw [pngBytes] (e.g. a piped `ffmpeg` frame) into a [PixelBuffer], subsampled to [maxSide] if given. */
+/**
+ * Decodes a picture held in memory (a piped `ffmpeg` frame) into a [PixelBuffer], subsampled to [maxSide] if given.
+ * It is read from memory: `ImageIO`'s default stream first copies the bytes into a file on disk.
+ */
 @Suppress("SwallowedException")
-fun decodePngPixelBuffer(pngBytes: ByteArray, maxSide: Int? = null): PixelBuffer? = try {
-    val bytes = ByteArrayInputStream(pngBytes)
-    val image = if (maxSide == null) {
-        ImageIO.read(bytes)
-    } else {
-        readSubsampled(ImageIO.createImageInputStream(bytes), maxSide)
-    }
-    image?.toPixelBuffer()
+fun decodeBytesPixelBuffer(bytes: ByteArray, maxSide: Int? = null): PixelBuffer? = try {
+    readSubsampled(MemoryCacheImageInputStream(ByteArrayInputStream(bytes)), maxSide)?.toPixelBuffer()
 } catch (e: IOException) {
     null
 }
