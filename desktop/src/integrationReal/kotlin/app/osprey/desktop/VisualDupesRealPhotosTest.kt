@@ -2,12 +2,15 @@ package app.osprey.desktop
 
 import app.osprey.actions.trash.TrashLocation
 import app.osprey.actions.visual.VisualDupePlanner
+import app.osprey.actions.visual.frameHash
+import app.osprey.actions.visual.hashFrames
 import app.osprey.actions.visual.moveUncheckedToTrash
 import app.osprey.desktop.filesystem.DesktopFileSystemRepository
 import app.osprey.desktop.filesystem.PathHandle
 import app.osprey.desktop.media.uprightDesktopMediaMetadataReader
 import app.osprey.desktop.testing.TimedTest
 import app.osprey.fixtures.Photos
+import app.osprey.jobs.NoJobControl
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.After
@@ -66,6 +69,24 @@ class VisualDupesRealPhotosTest : TimedTest() {
             (setOf("$subject.heic", "$subject.png", "$subject.jpg") + tagged)
         }.toSet()
         assertEquals(expected, groups())
+    }
+
+    @Test
+    fun `decoding four files at once gives the hashes and the groups of one at a time`() {
+        Photos.heic(fixtures).forEach(::place)
+        Photos.png(fixtures).forEach(::place)
+        Photos.jpeg(fixtures).forEach(::place)
+        val fs = DesktopFileSystemRepository()
+        val reader = uprightDesktopMediaMetadataReader()
+        val files = fs.list(PathHandle(folder)).sortedBy { it.name }
+
+        val oneByOne = hashFrames(files, 1, NoJobControl, reader::frameHash)
+        val together = hashFrames(files, 4, NoJobControl, reader::frameHash)
+
+        assertEquals(files.size, oneByOne?.size)
+        assertEquals(oneByOne, together)
+        val inParallel = VisualDupePlanner(fs, reader, workers = 4)
+        assertEquals(planner.plan(PathHandle(folder)), inParallel.plan(PathHandle(folder)))
     }
 
     private fun placeAs(photo: Path, name: String) = Files.copy(photo, folder.resolve(name))

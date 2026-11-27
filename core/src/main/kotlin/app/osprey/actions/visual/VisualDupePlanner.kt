@@ -8,7 +8,6 @@ import app.osprey.filesystem.FileHandle
 import app.osprey.filesystem.FileSystemRepository
 import app.osprey.jobs.JobControl
 import app.osprey.jobs.NoJobControl
-import app.osprey.jobs.forEachUntilStopped
 import app.osprey.media.MediaMetadataReader
 
 /**
@@ -42,10 +41,14 @@ private const val BYTES_PER_KB = 1024
  *
  * Frame *decoding* (image or representative video frame) is a platform concern handled by
  * [MediaMetadataReader] — this planner only ever sees the resulting [app.osprey.media.PixelBuffer].
+ *
+ * [workers] files are decoded at once (see [hashFrames]); with more than one, the reader must be safe to call from
+ * several threads. The plan is the same whatever the number.
  */
 class VisualDupePlanner(
     private val fs: FileSystemRepository,
     private val mediaMetadataReader: MediaMetadataReader,
+    private val workers: Int = 1,
 ) {
 
     /**
@@ -60,18 +63,15 @@ class VisualDupePlanner(
         control: JobControl = NoJobControl,
     ): VisualDupePlan {
         val files = fs.list(root).filterNot { it.isDirectory }.filter { isImageOrVideo(it.name) }
-        val items = mutableListOf<Pair<FileEntry, Long>>()
-        val decoded = control.forEachUntilStopped(files, FileEntry::name) { entry ->
-            mediaMetadataReader.decodeFrame(entry.handle, HASH_DECODE_MAX_SIDE)?.let { items += entry to phash(it) }
-        }
-        if (!decoded) return VisualDupePlan(emptyList())
+        val items = hashFrames(files, workers, control, mediaMetadataReader::frameHash)
+            ?: return VisualDupePlan(emptyList())
 
-        val burstIds = items.map { (entry, _) -> burstId(entry.name) }
+        val burstIds = items.map { burstId(it.entry.name) }
         val unionFind = UnionFind<Int>()
         for (i in items.indices) {
             for (j in (i + 1) until items.size) {
                 if (burstIds[i] != null && burstIds[i] == burstIds[j]) continue
-                val distance = (items[i].second xor items[j].second).countOneBits()
+                val distance = (items[i].hash xor items[j].hash).countOneBits()
                 if (distance <= threshold) unionFind.union(i, j)
             }
         }
@@ -84,7 +84,7 @@ class VisualDupePlanner(
         val groups = clusters.values
             .filter { it.size >= 2 }
             .map { memberIndices ->
-                memberIndices.map { items[it].first }
+                memberIndices.map { items[it].entry }
                     .sortedByDescending { it.sizeBytes }
                     .map { VisualDupeMember(it.handle, it.name, it.sizeBytes) }
             }

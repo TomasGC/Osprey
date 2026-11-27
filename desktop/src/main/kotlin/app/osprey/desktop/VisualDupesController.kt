@@ -49,7 +49,7 @@ class VisualDupesController(
         scanning = true
         val label = scopedName("Visual Dupes", scope)
         jobs.enqueue("$label scan", onDone = { scanning = false }, writes = false) { control ->
-            val plan = VisualDupePlanner(fs, mediaMetadataReader).plan(yearDir, control = control)
+            val plan = VisualDupePlanner(fs, mediaMetadataReader, scanWorkers()).plan(yearDir, control = control)
             if (control.shouldStop()) {
                 JobOutcome("$label scan: stopped", stopped = true)
             } else {
