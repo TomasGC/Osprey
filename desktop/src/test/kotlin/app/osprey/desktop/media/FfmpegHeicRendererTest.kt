@@ -25,7 +25,7 @@ class FfmpegHeicRendererTest : TimedTest() {
 
     @Test
     fun `the command renders one frame of the photo as PNG on stdout`() {
-        val command = heicRenderCommand(Path.of("my photos", "IMG 1.heic"))
+        val command = heicRenderCommand(Path.of("my photos", "IMG 1.heic"), HeicOutput.PNG)
 
         assertEquals("ffmpeg", command.first())
         assertEquals(Path.of("my photos", "IMG 1.heic").toString(), command[command.indexOf("-i") + 1])
@@ -37,21 +37,30 @@ class FfmpegHeicRendererTest : TimedTest() {
 
     @Test
     fun `the command asks for the fastest PNG compression and never reads stdin`() {
-        val command = heicRenderCommand(Path.of("a.heic"))
+        val command = heicRenderCommand(Path.of("a.heic"), HeicOutput.PNG)
 
         assertEquals("1", command[command.indexOf("-compression_level") + 1])
         assertEquals(true, "-nostdin" in command)
     }
 
     @Test
+    fun `the command asks for the format it is given, last before stdout`() {
+        val command = heicRenderCommand(Path.of("a.heic"), HeicOutput.BMP)
+
+        assertEquals("bmp", command[command.indexOf("-vcodec") + 1])
+        assertEquals(false, "-compression_level" in command)
+        assertEquals("-", command.last())
+    }
+
+    @Test
     fun `a photo that does not exist renders nothing, with or without ffmpeg installed`() {
-        assertNull(FfmpegHeicRenderer.renderPng(tempDir.resolve("missing.heic")))
+        assertNull(FfmpegHeicRenderer.render(tempDir.resolve("missing.heic")))
     }
 
     @Test
     fun `a file that is not a picture renders nothing`() {
         val broken = Files.write(tempDir.resolve("broken.heic"), byteArrayOf(1, 2, 3))
 
-        assertNull(FfmpegHeicRenderer.renderPng(broken))
+        assertNull(FfmpegHeicRenderer.render(broken))
     }
 }

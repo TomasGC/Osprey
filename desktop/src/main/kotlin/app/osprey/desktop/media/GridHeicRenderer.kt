@@ -14,9 +14,10 @@ class GridHeicRenderer(
     private val turns: (Path) -> Int,
 ) : HeicRenderer {
 
-    override fun renderPng(path: Path): ByteArray? {
-        val grid = probe(path)?.let(::parseHeicGrid)
-        val composed = grid?.let { run(heicGridCommand(path, it, turns(path))) }
-        return composed ?: run(heicRenderCommand(path))
+    override fun render(path: Path): ByteArray? {
+        val probed = probe(path)
+        val output = heicOutputFor(probed)
+        val composed = probed?.let(::parseHeicGrid)?.let { run(heicGridCommand(path, it, turns(path), output)) }
+        return composed ?: run(heicRenderCommand(path, output))
     }
 }

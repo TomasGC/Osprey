@@ -1,9 +1,11 @@
 package app.osprey.desktop
 
 import app.osprey.desktop.filesystem.PathHandle
+import app.osprey.desktop.media.HeicOutput
 import app.osprey.desktop.media.decodeHeicPixelBuffer
 import app.osprey.desktop.media.HeicRenderer
 import app.osprey.desktop.media.heicGridCommand
+import app.osprey.desktop.media.heicOutputFor
 import app.osprey.desktop.media.heicRenderCommand
 import app.osprey.desktop.media.parseHeicGrid
 import app.osprey.desktop.media.probeHeicGroups
@@ -50,10 +52,31 @@ class HeicGridRealPhotosTest : TimedTest() {
         }
     }
 
+    private fun appCommandPixels(photo: Path, output: HeicOutput) = decodeHeicPixelBuffer(
+        photo,
+        null,
+        HeicRenderer {
+            val grid = parseHeicGrid(probeHeicGroups(it)!!)!!
+            runFfmpeg(heicGridCommand(it, grid, turnsOf(it), output))
+        },
+    )
+
+    @Test
+    fun `every real HEIC is asked for as BMP, which holds the same pixels as its PNG`() {
+        for (photo in firstOfEachSubject()) {
+            assertEquals("${photo.fileName}", HeicOutput.BMP, heicOutputFor(probeHeicGroups(photo)))
+
+            val png = appCommandPixels(photo, HeicOutput.PNG)
+            assertNotNull("${photo.fileName} did not decode", png)
+            assertEquals("${photo.fileName}", png, appCommandPixels(photo, HeicOutput.BMP))
+        }
+    }
+
     @Test
     fun `the composed picture is the one an ffmpeg that composes grids itself gives`() {
         for (photo in firstOfEachSubject()) {
-            val plain = decodeHeicPixelBuffer(photo, null, HeicRenderer { runFfmpeg(heicRenderCommand(it)) })
+            val renderer = HeicRenderer { runFfmpeg(heicRenderCommand(it, HeicOutput.PNG)) }
+            val plain = decodeHeicPixelBuffer(photo, null, renderer)
             val sideways = turnsOf(photo) % 2 == 1
             val expectedWidth = if (sideways) STORED_HEIGHT else STORED_WIDTH
             assumeTrue("this ffmpeg does not compose tile grids itself", plain?.width == expectedWidth)
@@ -63,7 +86,7 @@ class HeicGridRealPhotosTest : TimedTest() {
             val composed = decodeHeicPixelBuffer(
                 photo,
                 null,
-                HeicRenderer { runFfmpeg(heicGridCommand(it, grid!!, turnsOf(it))) },
+                HeicRenderer { runFfmpeg(heicGridCommand(it, grid!!, turnsOf(it), HeicOutput.PNG)) },
             )
 
             assertEquals("${photo.fileName}", plain, composed)
